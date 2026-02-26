@@ -1,0 +1,22 @@
+{
+  "functions": {
+    "app/api/**/*.js": {
+      "maxDuration": 30
+    }
+  },
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "Permissions-Policy",
+          "value": "display-capture=(self)"
+        },
+        {
+          "key": "Feature-Policy",
+          "value": "display-capture 'self'"
+        }
+      ]
+    }
+  ]
+}

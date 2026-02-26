@@ -1,0 +1,23 @@
+{
+  "authentication": {
+    "login_flow": "Google OAuth → Supabase Auth → App redirect",
+    "user_data": "Name and email stored in users table",
+    "session_persistence": "Automatic session management"
+  },
+  "time_tracking": {
+    "timer_accuracy": "Second-level precision",
+    "data_storage": "Real-time sync to Supabase",
+    "project_management": "CRUD operations with RLS"
+  },
+  "ai_analysis": {
+    "capture_interval": "30 seconds (optimized)",
+    "analysis_speed": "2-5 seconds per screenshot",
+    "accuracy": "85%+ for common applications",
+    "distraction_detection": "Context-aware based on planned task"
+  },
+  "data_persistence": {
+    "work_logs": "Stored in work_logs table with RLS",
+    "screenshots": "Uploaded to Supabase Storage",
+    "settings": "User-specific in user_settings table"
+  }
+}
