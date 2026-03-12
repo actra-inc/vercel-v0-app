@@ -4,7 +4,7 @@ import { type NextRequest, NextResponse } from "next/server"
 
 export async function POST(request: NextRequest) {
   try {
-    const cookieStore = await cookies()
+    const cookieStore = cookies()
 
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
     const screenshot = formData.get("screenshot") as File
     const apiKey = formData.get("apiKey") as string
     const currentTask = formData.get("currentTask") as string
-    const model = "gemini-1.5-flash"
+    const model = "gemma-3-4b-it"
 
     if (!screenshot) {
       return NextResponse.json({ error: "Screenshot is required" }, { status: 400 })
@@ -83,7 +83,7 @@ export async function POST(request: NextRequest) {
 
 予定作業が設定されている場合は、task_alignmentで一致度を評価してください。`
 
-    const apiUrl = `https://generativelanguage.googleapis.com/v1/models/${model}:generateContent?key=${apiKey}`
+    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
 
     const response = await fetch(apiUrl, {
       method: "POST",
@@ -168,14 +168,19 @@ export async function POST(request: NextRequest) {
       activity: analysis.activity || "不明な活動",
       category: analysis.category || "neutral",
       details: analysis.details || "詳細情報なし",
-      confidence: analysis.confidence || 0.5,
+      confidence: Math.round((Number(analysis.confidence) || 0.5) * 100),
       applications: analysis.apps || [],
-      focus_score: analysis.distraction_check?.task_alignment || 0.5,
-      distraction_check: analysis.distraction_check || {
-        is_distracted: false,
-        reason: "判定不可",
-        task_alignment: 0.5,
-      },
+      focus_score: Math.round((Number(analysis.distraction_check?.task_alignment) || 0.5) * 100),
+      distraction_check: analysis.distraction_check
+        ? {
+            ...analysis.distraction_check,
+            task_alignment: Number(analysis.distraction_check.task_alignment) || 0.5,
+          }
+        : {
+            is_distracted: false,
+            reason: "判定不可",
+            task_alignment: 0.5,
+          },
     })
   } catch (error) {
     console.error("Screenshot analysis error:", error)

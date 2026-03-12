@@ -110,7 +110,7 @@ export function WorkLogItem({ log, onPlayAlert }: WorkLogItemProps) {
           </div>
           {log.confidence !== undefined && (
             <Badge variant="secondary" className="bg-gray-100 text-gray-700">
-              信頼度: {Math.round(log.confidence * 100)}%
+              信頼度: {log.confidence}%
             </Badge>
           )}
         </div>
