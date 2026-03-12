@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import {
   getCurrentUser,
   getUserSettings,
@@ -31,11 +31,15 @@ export function useSupabaseData() {
   const [workLogs, setWorkLogs] = useState<WorkLog[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const hasLoadedRef = useRef(false)
 
   // useCallbackでloadUserDataをメモ化して、依存関係の問題を解決
   const loadUserData = useCallback(async () => {
     try {
-      setLoading(true)
+      // 初回のみローディング表示（再フェッチ時はコンテンツを維持して画面共有を継続）
+      if (!hasLoadedRef.current) {
+        setLoading(true)
+      }
       setError(null)
 
       const { user: currentUser, error: userError } = await getCurrentUser()
@@ -117,10 +121,12 @@ export function useSupabaseData() {
         console.error("Work logs error:", err)
       }
 
+      hasLoadedRef.current = true
       setLoading(false)
     } catch (err) {
       console.error("Error loading user data:", err)
       setError(err instanceof Error ? err.message : "Failed to load user data")
+      hasLoadedRef.current = true
       setLoading(false)
     }
   }, []) // 空の依存配列

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useCallback, useMemo } from "react"
+import { useEffect, useState, useCallback, useMemo, useRef } from "react"
 import { supabase, signInWithGoogle } from "@/lib/supabase"
 import { useSupabaseData } from "@/hooks/use-supabase-data"
 import { TimeTracker } from "@/components/time-tracker"
@@ -15,6 +15,7 @@ import { Settings, LogOut, Activity, FileText } from "lucide-react"
 const Page = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [authChecked, setAuthChecked] = useState(false)
+  const isLoggedInRef = useRef(false)
   const [showSettings, setShowSettings] = useState(false)
   const [currentTask, setCurrentTask] = useState("")
   const [currentTab, setCurrentTab] = useState("logs")
@@ -66,11 +67,13 @@ const Page = () => {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
       if (mounted) {
-        const wasLoggedIn = isLoggedIn
+        const wasLoggedIn = isLoggedInRef.current
+        isLoggedInRef.current = !!session
         setIsLoggedIn(!!session)
         setAuthChecked(true)
 
-        // ログイン時のみデータをリフレッシュ（ログアウトやタブ切り替えではリフレッシュしない）
+        // 実際に新規ログインした時だけデータをリフレッシュ
+        // TOKEN_REFRESHED や タブ復帰時の SIGNED_IN 再発火では refreshData を呼ばない
         if (event === "SIGNED_IN" && session && !wasLoggedIn) {
           refreshData()
         }
