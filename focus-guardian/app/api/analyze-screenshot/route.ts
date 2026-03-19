@@ -37,7 +37,6 @@ export async function POST(request: NextRequest) {
     const screenshot = formData.get("screenshot") as File
     const apiKey = formData.get("apiKey") as string
     const currentTask = formData.get("currentTask") as string
-    const model = "gemma-3-4b-it"
 
     if (!screenshot) {
       return NextResponse.json({ error: "Screenshot is required" }, { status: 400 })
@@ -51,78 +50,41 @@ export async function POST(request: NextRequest) {
     const base64 = Buffer.from(bytes).toString("base64")
     const mimeType = screenshot.type || "image/png"
 
-    const prompt = `
-あなたは作業効率分析の専門家です。このスクリーンショットを詳細に分析して、以下の情報をJSONで返してください。
-
-現在の予定作業: "${currentTask || "未設定"}"
-
-画面を詳しく観察して以下を分析してください：
-1. 開いているアプリケーション
-2. 表示されているコンテンツの内容
-3. 作業の種類
-4. 予定作業との一致度
-
-必須回答項目（JSON形式）：
-{
-  "activity": "画面で行われている主な活動（日本語、具体的に30文字以内）",
-  "category": "productive/distracted/neutral のいずれか",
-  "confidence": 0.0〜1.0の数値,
-  "apps": ["使用中のアプリ名"],
-  "distraction_check": {
-    "is_distracted": true/false,
-    "reason": "脱線している場合の理由（日本語）",
-    "task_alignment": 0.0〜1.0（予定作業との一致度）
-  },
-  "details": "追加の詳細情報（日本語、50文字以内）"
-}
-
-判定基準：
-- productive: 仕事や学習に関連した活動
-- distracted: SNS、動画視聴、ゲームなど娯楽的な活動
-- neutral: ブラウザのトップページなど判定が難しい状態
-
-予定作業が設定されている場合は、task_alignmentで一致度を評価してください。`
-
-    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
-
-    const response = await fetch(apiUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [
-              { text: prompt },
-              {
-                inline_data: {
-                  mime_type: mimeType,
-                  data: base64,
-                },
-              },
-            ],
-          },
+    // --- Step 1: Geminiで画面テキスト・アプリ情報を抽出（503時は1回リトライ）---
+    const visionModel = "gemini-2.5-flash-lite"
+    const visionUrl = `https://generativelanguage.googleapis.com/v1beta/models/${visionModel}:generateContent?key=${apiKey}`
+    const visionBody = JSON.stringify({
+      contents: [{
+        parts: [
+          { text: "この画面に表示されているアプリ名、URL、テキスト内容を簡潔に抽出してください。箇条書きで200文字以内。" },
+          { inline_data: { mime_type: mimeType, data: base64 } },
         ],
-        generationConfig: {
-          temperature: 0.4,
-          topK: 32,
-          topP: 1,
-          maxOutputTokens: 1024,
-        },
-      }),
+      }],
+      generationConfig: { temperature: 0.1, maxOutputTokens: 300 },
     })
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => null)
-      console.error("Gemini API error:", errorData)
+    let visionResponse = await fetch(visionUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: visionBody,
+    })
 
-      // Check if it's a quota exceeded error (429)
-      if (response.status === 429) {
+    // 503の場合は2秒待ってリトライ
+    if (visionResponse.status === 503) {
+      await new Promise((r) => setTimeout(r, 2000))
+      visionResponse = await fetch(visionUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: visionBody,
+      })
+    }
+
+    if (!visionResponse.ok) {
+      const errorData = await visionResponse.json().catch(() => null)
+      if (visionResponse.status === 429) {
         const retryAfter = errorData?.error?.details?.find(
           (d: any) => d["@type"] === "type.googleapis.com/google.rpc.RetryInfo",
         )?.retryDelay
-
         return NextResponse.json(
           {
             error: "quota_exceeded",
@@ -134,14 +96,56 @@ export async function POST(request: NextRequest) {
           { status: 429 },
         )
       }
-
-      // Other API errors
       return NextResponse.json(
-        {
-          error: "api_error",
-          message: `Gemini API error: ${response.status}`,
-          details: errorData?.error?.message || "不明なエラー",
-        },
+        { error: "api_error", message: `Gemini vision error: ${visionResponse.status}`, details: errorData?.error?.message || "不明なエラー" },
+        { status: visionResponse.status },
+      )
+    }
+
+    const visionData = await visionResponse.json()
+    const extractedText = visionData.candidates?.[0]?.content?.parts?.[0]?.text || "画面情報の抽出に失敗"
+
+    // --- Step 2: Gemmaで抽出テキストを解析 ---
+    const analysisModel = "gemma-3-4b-it"
+    const analysisUrl = `https://generativelanguage.googleapis.com/v1beta/models/${analysisModel}:generateContent?key=${apiKey}`
+
+    const analysisPrompt = `あなたは作業効率分析の専門家です。以下の画面情報を分析してJSONで返してください。
+
+現在の予定作業: "${currentTask || "未設定"}"
+
+画面情報:
+${extractedText}
+
+必須回答項目（JSON形式のみ、余計な説明不要）：
+{
+  "activity": "画面で行われている主な活動（日本語、30文字以内）",
+  "category": "productive/distracted/neutral のいずれか",
+  "confidence": 0.0〜1.0の数値,
+  "apps": ["使用中のアプリ名"],
+  "distraction_check": {
+    "is_distracted": true/false,
+    "reason": "脱線している場合の理由（日本語）",
+    "task_alignment": 0.0〜1.0（予定作業との一致度）
+  },
+  "details": "追加の詳細情報（日本語、50文字以内）"
+}
+
+判定基準：productive=仕事/学習、distracted=SNS/動画/ゲーム、neutral=判定困難`
+
+    const response = await fetch(analysisUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: analysisPrompt }] }],
+        generationConfig: { temperature: 0.4, maxOutputTokens: 1024 },
+      }),
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => null)
+      console.error("Gemma API error:", errorData)
+      return NextResponse.json(
+        { error: "api_error", message: `Gemma API error: ${response.status}`, details: errorData?.error?.message || "不明なエラー" },
         { status: response.status },
       )
     }
@@ -149,25 +153,34 @@ export async function POST(request: NextRequest) {
     const data = await response.json()
     const textContent = data.candidates?.[0]?.content?.parts?.[0]?.text || ""
 
+    // GemmaのレスポンスからJSONを抽出（パース失敗時はextractedTextでフォールバック）
+    let analysis: any = null
     const jsonMatch = textContent.match(/\{[\s\S]*\}/)
-    if (!jsonMatch) {
-      console.error("No JSON found in response:", textContent)
-      return NextResponse.json({ error: "Invalid response format from Gemini API" }, { status: 500 })
+    if (jsonMatch) {
+      try {
+        analysis = JSON.parse(jsonMatch[0])
+      } catch (parseError) {
+        console.error("Failed to parse Gemma JSON:", parseError)
+      }
     }
 
-    let analysis
-    try {
-      analysis = JSON.parse(jsonMatch[0])
-    } catch (parseError) {
-      console.error("Failed to parse JSON:", parseError)
-      console.error("JSON string:", jsonMatch[0])
-      return NextResponse.json({ error: "Failed to parse Gemini API response" }, { status: 500 })
+    // パース失敗時でも必ずログが保存されるようフォールバック
+    if (!analysis) {
+      console.warn("Gemma JSON parse failed, using extracted text as fallback")
+      analysis = {
+        activity: "画面解析",
+        category: "neutral",
+        details: extractedText.slice(0, 80),
+        confidence: 0.5,
+        apps: [],
+        distraction_check: { is_distracted: false, reason: "", task_alignment: 0.5 },
+      }
     }
 
     return NextResponse.json({
       activity: analysis.activity || "不明な活動",
       category: analysis.category || "neutral",
-      details: analysis.details || "詳細情報なし",
+      details: analysis.details || extractedText.slice(0, 80) || "詳細情報なし",
       confidence: Math.round((Number(analysis.confidence) || 0.5) * 100),
       applications: analysis.apps || [],
       focus_score: Math.round((Number(analysis.distraction_check?.task_alignment) || 0.5) * 100),
@@ -181,6 +194,7 @@ export async function POST(request: NextRequest) {
             reason: "判定不可",
             task_alignment: 0.5,
           },
+      extracted_text: extractedText,
     })
   } catch (error) {
     console.error("Screenshot analysis error:", error)

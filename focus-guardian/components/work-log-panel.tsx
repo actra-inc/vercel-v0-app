@@ -137,11 +137,11 @@ export function WorkLogPanel({
       setIsAnalyzing(true)
 
       try {
-        // 前回と画面が変わっていなければAPIをスキップ
+        // 前回と画面が変わっていなければAPIをスキップ（閾値3%）
         const currentImageData = await getImageData(blob)
         if (prevImageDataRef.current) {
           const diff = calculateDiff(prevImageDataRef.current, currentImageData)
-          if (diff < 0.05) {
+          if (diff < 0.03) {
             console.log(`[v0] Screen unchanged (diff=${(diff * 100).toFixed(1)}%), skipping API call`)
             setIsAnalyzing(false)
             return
