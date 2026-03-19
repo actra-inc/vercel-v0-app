@@ -121,6 +121,7 @@ export const signInWithGoogle = async () => {
         access_type: "offline",
         prompt: "consent",
       },
+      scopes: "https://www.googleapis.com/auth/calendar.readonly",
     },
   })
   return { data, error }

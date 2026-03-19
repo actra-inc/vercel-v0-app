@@ -7,8 +7,9 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Play, Pause, Square, Clock, Trash2, RefreshCw, Loader2, Download, CheckCircle } from "lucide-react"
+import { Play, Pause, Square, Clock, Trash2, RefreshCw, Loader2, Download, CheckCircle, Calendar, ChevronDown, ChevronUp } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { useGoogleCalendar } from "@/hooks/use-google-calendar"
 
 interface Project {
   id: string
@@ -60,8 +61,11 @@ export function TimeTracker({
   const [description, setDescription] = useState("")
   const [selectedProjectId, setSelectedProjectId] = useState("")
   const [syncMessage, setSyncMessage] = useState<{ text: string; success: boolean } | null>(null)
+  const [showCalendar, setShowCalendar] = useState(false)
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
   const togglSyncIntervalRef = useRef<NodeJS.Timeout | null>(null)
+
+  const { events, loading: calendarLoading, error: calendarError, needsReauth, fetchTodayEvents, formatEventTime, isEventNow } = useGoogleCalendar()
 
   // タイマー更新
   useEffect(() => {
@@ -575,6 +579,80 @@ export function TimeTracker({
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          {/* Googleカレンダー連携 */}
+          <div className="space-y-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                if (!showCalendar) {
+                  setShowCalendar(true)
+                  if (events.length === 0) await fetchTodayEvents()
+                } else {
+                  setShowCalendar(false)
+                }
+              }}
+              disabled={isRunning}
+              className="w-full flex items-center justify-between gap-2 border-green-200 text-green-700 hover:bg-green-50"
+            >
+              <span className="flex items-center gap-2">
+                <Calendar className="h-4 w-4" />
+                Googleカレンダーから作業内容を選択
+              </span>
+              {showCalendar ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </Button>
+
+            {showCalendar && (
+              <div className="border border-green-100 rounded-lg p-3 bg-green-50 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-green-800">今日の予定</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={fetchTodayEvents}
+                    disabled={calendarLoading}
+                    className="h-6 px-2 text-xs text-green-700 hover:bg-green-100"
+                  >
+                    {calendarLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+                  </Button>
+                </div>
+
+                {calendarError && (
+                  <div className="text-xs text-red-600 bg-red-50 rounded p-2">
+                    {calendarError}
+                    {needsReauth && (
+                      <div className="mt-1 text-xs text-gray-500">
+                        ※ 一度ログアウトして再度Googleでログインしてください
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {!calendarLoading && !calendarError && events.length === 0 && (
+                  <div className="text-xs text-gray-500 text-center py-2">今日の予定はありません</div>
+                )}
+
+                {events.map((event) => (
+                  <button
+                    key={event.id}
+                    onClick={() => {
+                      setDescription(event.summary)
+                      setShowCalendar(false)
+                    }}
+                    className={`w-full text-left rounded-md px-3 py-2 text-sm transition-colors ${
+                      isEventNow(event)
+                        ? "bg-green-200 border border-green-400 text-green-900 font-medium"
+                        : "bg-white border border-gray-200 text-gray-700 hover:bg-green-100 hover:border-green-300"
+                    }`}
+                  >
+                    <div className="font-medium truncate">{event.summary}</div>
+                    <div className="text-xs text-gray-500 mt-0.5">{formatEventTime(event)}</div>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* 作業内容 */}
