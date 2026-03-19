@@ -34,78 +34,19 @@ export async function POST(request: NextRequest) {
     }
 
     const formData = await request.formData()
-    const screenshot = formData.get("screenshot") as File
+    const extractedText = formData.get("extractedText") as string
     const apiKey = formData.get("apiKey") as string
     const currentTask = formData.get("currentTask") as string
 
-    if (!screenshot) {
-      return NextResponse.json({ error: "Screenshot is required" }, { status: 400 })
+    if (!extractedText) {
+      return NextResponse.json({ error: "extractedText is required" }, { status: 400 })
     }
 
     if (!apiKey) {
       return NextResponse.json({ error: "API key is required" }, { status: 400 })
     }
 
-    const bytes = await screenshot.arrayBuffer()
-    const base64 = Buffer.from(bytes).toString("base64")
-    const mimeType = screenshot.type || "image/png"
-
-    // --- Step 1: Geminiで画面テキスト・アプリ情報を抽出（503時は1回リトライ）---
-    const visionModel = "gemini-2.5-flash-lite"
-    const visionUrl = `https://generativelanguage.googleapis.com/v1beta/models/${visionModel}:generateContent?key=${apiKey}`
-    const visionBody = JSON.stringify({
-      contents: [{
-        parts: [
-          { text: "この画面に表示されているアプリ名、URL、テキスト内容を簡潔に抽出してください。箇条書きで200文字以内。" },
-          { inline_data: { mime_type: mimeType, data: base64 } },
-        ],
-      }],
-      generationConfig: { temperature: 0.1, maxOutputTokens: 300 },
-    })
-
-    let visionResponse = await fetch(visionUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: visionBody,
-    })
-
-    // 503の場合は2秒待ってリトライ
-    if (visionResponse.status === 503) {
-      await new Promise((r) => setTimeout(r, 2000))
-      visionResponse = await fetch(visionUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: visionBody,
-      })
-    }
-
-    if (!visionResponse.ok) {
-      const errorData = await visionResponse.json().catch(() => null)
-      if (visionResponse.status === 429) {
-        const retryAfter = errorData?.error?.details?.find(
-          (d: any) => d["@type"] === "type.googleapis.com/google.rpc.RetryInfo",
-        )?.retryDelay
-        return NextResponse.json(
-          {
-            error: "quota_exceeded",
-            message: "Gemini APIの利用制限に達しました",
-            details: errorData?.error?.message || "1日あたりのリクエスト数の上限を超えています",
-            retryAfter: retryAfter || "しばらく時間をおいてから再試行してください",
-            userMessage: `Gemini API の無料枠の制限（1日20リクエスト）に達しました。\n\n${retryAfter ? `約${Number.parseInt(retryAfter)}秒後に再試行できます。` : "しばらく時間をおいてから再度お試しください。"}\n\nより多くのリクエストが必要な場合は、Google AI Studio で有料プランへのアップグレードをご検討ください。`,
-          },
-          { status: 429 },
-        )
-      }
-      return NextResponse.json(
-        { error: "api_error", message: `Gemini vision error: ${visionResponse.status}`, details: errorData?.error?.message || "不明なエラー" },
-        { status: visionResponse.status },
-      )
-    }
-
-    const visionData = await visionResponse.json()
-    const extractedText = visionData.candidates?.[0]?.content?.parts?.[0]?.text || "画面情報の抽出に失敗"
-
-    // --- Step 2: Gemmaで抽出テキストを解析 ---
+    // Gemmaで抽出テキストを解析（Gemini APIを完全に排除）
     const analysisModel = "gemma-3-4b-it"
     const analysisUrl = `https://generativelanguage.googleapis.com/v1beta/models/${analysisModel}:generateContent?key=${apiKey}`
 
@@ -114,7 +55,7 @@ export async function POST(request: NextRequest) {
 現在の予定作業: "${currentTask || "未設定"}"
 
 画面情報:
-${extractedText}
+${extractedText.slice(0, 1000)}
 
 必須回答項目（JSON形式のみ、余計な説明不要）：
 {
@@ -144,6 +85,21 @@ ${extractedText}
     if (!response.ok) {
       const errorData = await response.json().catch(() => null)
       console.error("Gemma API error:", errorData)
+      if (response.status === 429) {
+        const retryAfter = errorData?.error?.details?.find(
+          (d: any) => d["@type"] === "type.googleapis.com/google.rpc.RetryInfo",
+        )?.retryDelay
+        return NextResponse.json(
+          {
+            error: "quota_exceeded",
+            message: "Gemma APIの利用制限に達しました",
+            details: errorData?.error?.message || "利用制限を超えています",
+            retryAfter: retryAfter || "しばらく時間をおいてから再試行してください",
+            userMessage: `Gemma API の制限に達しました。\n\n${retryAfter ? `約${Number.parseInt(retryAfter)}秒後に再試行できます。` : "しばらく時間をおいてから再度お試しください。"}`,
+          },
+          { status: 429 },
+        )
+      }
       return NextResponse.json(
         { error: "api_error", message: `Gemma API error: ${response.status}`, details: errorData?.error?.message || "不明なエラー" },
         { status: response.status },
@@ -153,7 +109,7 @@ ${extractedText}
     const data = await response.json()
     const textContent = data.candidates?.[0]?.content?.parts?.[0]?.text || ""
 
-    // GemmaのレスポンスからJSONを抽出（パース失敗時はextractedTextでフォールバック）
+    // GemmaのレスポンスからJSONを抽出
     let analysis: any = null
     const jsonMatch = textContent.match(/\{[\s\S]*\}/)
     if (jsonMatch) {

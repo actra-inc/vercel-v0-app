@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from "next/server"
 
 export async function POST(request: NextRequest) {
   try {
-    const { workLogs, apiKey, model } = await request.json()
+    const { workLogs, apiKey } = await request.json()
 
     if (!apiKey) {
       return NextResponse.json({ error: "API key is required" }, { status: 400 })
@@ -70,9 +70,9 @@ ${recentLogs[2].distraction_check ? `- 脱線検知: ${recentLogs[2].distraction
 必ず有効なJSONのみを返してください。余計な説明文は不要です。
 `
 
-    // Gemini API呼び出し
+    // Gemma API呼び出し（Gemini APIを使用しない）
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemma-3-4b-it:generateContent?key=${apiKey}`,
       {
         method: "POST",
         headers: {

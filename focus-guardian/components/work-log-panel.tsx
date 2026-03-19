@@ -73,7 +73,30 @@ export function WorkLogPanel({
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [isApiKeyValid, setIsApiKeyValid] = useState(false)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
+  const [isOcrLoading, setIsOcrLoading] = useState(false)
   const prevImageDataRef = useRef<ImageData | null>(null)
+  const tesseractWorkerRef = useRef<any>(null)
+
+  // Tesseract workerの初期化（初回のみ）
+  const getOcrWorker = useCallback(async () => {
+    if (tesseractWorkerRef.current) return tesseractWorkerRef.current
+    setIsOcrLoading(true)
+    try {
+      const { createWorker } = await import("tesseract.js")
+      const worker = await createWorker(["jpn", "eng"])
+      tesseractWorkerRef.current = worker
+      return worker
+    } finally {
+      setIsOcrLoading(false)
+    }
+  }, [])
+
+  // アンマウント時にworkerを解放
+  useEffect(() => {
+    return () => {
+      tesseractWorkerRef.current?.terminate()
+    }
+  }, [])
 
   const getImageData = useCallback(async (blob: Blob): Promise<ImageData> => {
     return new Promise((resolve) => {
@@ -150,16 +173,19 @@ export function WorkLogPanel({
         }
         prevImageDataRef.current = currentImageData
 
-        console.log("🔄 Analyzing screenshot with Gemini API...")
+        // ブラウザ側でOCR実行（Gemini API不要）
+        console.log("🔍 Running OCR with Tesseract.js...")
+        const worker = await getOcrWorker()
+        const { data: { text: ocrText } } = await worker.recognize(blob)
+        const extractedText = ocrText.trim() || "画面情報を取得できませんでした"
+        console.log(`[v0] OCR extracted ${extractedText.length} chars`)
 
         const formData = new FormData()
-        formData.append("screenshot", blob, "screenshot.png")
+        formData.append("extractedText", extractedText)
         formData.append("apiKey", apiKey)
         formData.append("currentTask", currentTask || "作業中")
-        formData.append("model", model || "gemini-2.5-flash-lite")
 
-        console.log("[v0] Sending request to /api/analyze-screenshot")
-        console.log("[v0] FormData keys:", Array.from(formData.keys()))
+        console.log("[v0] Sending OCR text to /api/analyze-screenshot")
 
         const response = await fetch("/api/analyze-screenshot", {
           method: "POST",
@@ -223,7 +249,7 @@ export function WorkLogPanel({
         setIsAnalyzing(false)
       }
     },
-    [apiKey, currentTask, model, addWorkLog],
+    [apiKey, currentTask, model, addWorkLog, getOcrWorker],
   ) // 必要最小限の依存関係のみ
 
   const handleAutoGenerateReport = useCallback(
@@ -303,7 +329,7 @@ export function WorkLogPanel({
     [analyzeScreenshot],
   )
 
-  const { mediaStream, isTracking, isCapturing, lastCaptureTime, startAutoCapture, stopCapture } = useScreenCapture({
+  const { isTracking, isCapturing, lastCaptureTime, startAutoCapture, stopCapture } = useScreenCapture({
     interval: captureInterval * 1000,
     quality: 0.8,
     onCapture: handleCapture,
@@ -459,7 +485,12 @@ export function WorkLogPanel({
                   : "bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 shadow-blue-200",
               )}
             >
-              {isCapturing ? (
+              {isOcrLoading ? (
+                <>
+                  <Camera className="h-4 w-4 animate-pulse" />
+                  OCR初期化中...
+                </>
+              ) : isCapturing ? (
                 <>
                   <Camera className="h-4 w-4 animate-pulse" />
                   キャプチャ中...
