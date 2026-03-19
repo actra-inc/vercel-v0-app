@@ -313,7 +313,7 @@ export const deleteTimeEntry = async (id: string) => {
   return { error }
 }
 
-export const getWorkLogs = async (userId: string, limit = 50) => {
+export const getWorkLogs = async (userId: string, limit = 500) => {
   const { data, error } = await supabase
     .from("work_logs")
     .select("*")

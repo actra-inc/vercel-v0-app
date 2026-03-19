@@ -224,7 +224,7 @@ export function useSupabaseData() {
     const { data, error } = await createWorkLog({ ...log, user_id: user.id })
     if (error) throw new Error(error.message || "Failed to create work log")
     if (data) {
-      setWorkLogs([data, ...workLogs])
+      setWorkLogs((prev) => [data, ...prev])
     }
     return data
   }

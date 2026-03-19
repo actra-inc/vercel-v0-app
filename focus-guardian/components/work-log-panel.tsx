@@ -175,10 +175,17 @@ export function WorkLogPanel({
 
         // ブラウザ側でOCR実行（Gemini API不要）
         console.log("🔍 Running OCR with Tesseract.js...")
-        const worker = await getOcrWorker()
-        const { data: { text: ocrText } } = await worker.recognize(blob)
-        const extractedText = ocrText.trim() || "画面情報を取得できませんでした"
-        console.log(`[v0] OCR extracted ${extractedText.length} chars`)
+        let extractedText = "画面情報を取得できませんでした"
+        try {
+          const worker = await getOcrWorker()
+          const { data: { text: ocrText } } = await worker.recognize(blob)
+          extractedText = ocrText.trim() || extractedText
+          console.log(`[v0] OCR extracted ${extractedText.length} chars`)
+        } catch (ocrError) {
+          console.warn("[v0] OCR failed, using fallback:", ocrError)
+          // OCR失敗時は現在の作業情報だけで分析を続行
+          extractedText = `作業中: ${currentTask || "不明"}`
+        }
 
         const formData = new FormData()
         formData.append("extractedText", extractedText)
