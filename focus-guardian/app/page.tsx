@@ -297,15 +297,8 @@ const Page = () => {
 
           <TabsContent value="reports">
             <ReportsTab
-              reports={workLogs.filter((log: any) => log.report_type === "summary")}
-              onDeleteReport={async (reportId: string) => {
-                // TODO: Implement delete report
-                console.log("Delete report:", reportId)
-              }}
-              onDeleteAllReports={async () => {
-                // TODO: Implement delete all reports
-                console.log("Delete all reports")
-              }}
+              workLogs={workLogs}
+              userId={user?.id || ""}
               onRefresh={refreshData}
             />
           </TabsContent>
