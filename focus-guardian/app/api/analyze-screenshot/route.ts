@@ -37,6 +37,10 @@ export async function POST(request: NextRequest) {
     const extractedText = formData.get("extractedText") as string
     const apiKey = formData.get("apiKey") as string
     const currentTask = formData.get("currentTask") as string
+    const categoriesJson = formData.get("categories") as string
+    const categories: string[] = categoriesJson
+      ? JSON.parse(categoriesJson).map((c: { name: string }) => c.name)
+      : ["メールチェック", "娯楽", "チャット", "リサーチ", "ミーティング", "業務以外のSNS", "その他"]
 
     if (!extractedText) {
       return NextResponse.json({ error: "extractedText is required" }, { status: 400 })
@@ -50,6 +54,7 @@ export async function POST(request: NextRequest) {
     const analysisModel = "gemma-3-4b-it"
     const analysisUrl = `https://generativelanguage.googleapis.com/v1beta/models/${analysisModel}:generateContent?key=${apiKey}`
 
+    const categoriesList = categories.join("、")
     const analysisPrompt = `あなたは作業効率分析の専門家です。以下の画面情報を分析してJSONで返してください。
 
 現在の予定作業: "${currentTask || "未設定"}"
@@ -61,6 +66,7 @@ ${extractedText.slice(0, 1000)}
 {
   "activity": "画面で行われている主な活動（日本語、30文字以内）",
   "category": "productive/distracted/neutral のいずれか",
+  "work_category": "作業種類（次のいずれかから最も近いものを選択: ${categoriesList}）",
   "confidence": 0.0〜1.0の数値,
   "apps": ["使用中のアプリ名"],
   "distraction_check": {

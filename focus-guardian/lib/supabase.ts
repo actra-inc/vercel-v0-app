@@ -70,6 +70,7 @@ export interface WorkLog {
     planned_task: string
     severity: "high" | "medium" | "low"
   }
+  work_category?: string
   report_type?: string
   report_data?: ReportData
   created_at: string
