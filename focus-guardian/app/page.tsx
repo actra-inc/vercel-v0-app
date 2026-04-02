@@ -10,7 +10,8 @@ import { ReportsTab } from "@/components/reports-tab"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Settings, LogOut, Activity, FileText } from "lucide-react"
+import { Settings, LogOut, Activity, FileText, BarChart3 } from "lucide-react"
+import { ActivityBreakdown, DEFAULT_CATEGORIES, type ActivityCategory } from "@/components/activity-breakdown"
 
 const Page = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
@@ -19,6 +20,20 @@ const Page = () => {
   const [showSettings, setShowSettings] = useState(false)
   const [currentTask, setCurrentTask] = useState("")
   const [currentTab, setCurrentTab] = useState("logs")
+  const [categories, setCategories] = useState<ActivityCategory[]>(() => {
+    if (typeof window === "undefined") return DEFAULT_CATEGORIES
+    try {
+      const saved = localStorage.getItem("activity_categories")
+      return saved ? JSON.parse(saved) : DEFAULT_CATEGORIES
+    } catch {
+      return DEFAULT_CATEGORIES
+    }
+  })
+
+  const handleCategoriesChange = useCallback((newCategories: ActivityCategory[]) => {
+    setCategories(newCategories)
+    localStorage.setItem("activity_categories", JSON.stringify(newCategories))
+  }, [])
 
   const {
     user,
@@ -27,7 +42,6 @@ const Page = () => {
     timeEntries,
     workLogs,
     loading,
-    error,
     updateSettings,
     addProject,
     editProject,
@@ -261,6 +275,10 @@ const Page = () => {
                 <span className="ml-1 rounded-full bg-blue-500 px-2 py-0.5 text-xs text-white">{reportsCount}</span>
               )}
             </TabsTrigger>
+            <TabsTrigger value="breakdown" className="gap-2">
+              <BarChart3 className="h-4 w-4" />
+              作業内訳
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="logs" className="space-y-4">
@@ -270,7 +288,7 @@ const Page = () => {
                 <TimeTracker
                   onTimeEntryChange={() => {}}
                   onCurrentTaskChange={setCurrentTask}
-                  togglSyncInterval={userSettings?.toggl_sync_interval || 300}
+                  togglSyncInterval={300}
                   onProjectsSync={handleProjectsSync}
                   projects={projects}
                   timeEntries={timeEntries}
@@ -287,7 +305,8 @@ const Page = () => {
                   apiKey={userSettings?.gemini_api_key || ""}
                   model={userSettings?.gemini_model || "gemini-2.5-flash-lite"}
                   captureInterval={userSettings?.capture_interval || 30}
-                  workLogs={workLogs}
+                  workLogs={workLogs as any}
+                  categories={categories}
                   addWorkLog={addWorkLog}
                   clearWorkLogs={clearWorkLogs}
                 />
@@ -302,6 +321,15 @@ const Page = () => {
               onRefresh={refreshData}
             />
           </TabsContent>
+
+          <TabsContent value="breakdown">
+            <ActivityBreakdown
+              workLogs={workLogs as any}
+              categories={categories}
+              captureInterval={userSettings?.capture_interval || 30}
+              onCategoriesChange={handleCategoriesChange}
+            />
+          </TabsContent>
         </Tabs>
       </main>
 
@@ -309,16 +337,20 @@ const Page = () => {
       {showSettings && (
         <SettingsPanel
           onClose={() => setShowSettings(false)}
-          userEmail={user?.email || ""}
           apiKey={userSettings?.gemini_api_key || ""}
           model={userSettings?.gemini_model || "gemini-2.5-flash-lite"}
           captureInterval={userSettings?.capture_interval || 30}
+          togglApiToken={userSettings?.toggl_api_token || ""}
+          togglWorkspaceId={userSettings?.toggl_workspace_id || ""}
           onApiKeyChange={handleApiKeyChange}
           onModelChange={async (model) => {
             await updateSettings({ gemini_model: model })
           }}
           onCaptureIntervalChange={async (interval) => {
             await updateSettings({ capture_interval: interval })
+          }}
+          onTogglCredentialsChange={async (token, workspaceId) => {
+            await updateSettings({ toggl_api_token: token, toggl_workspace_id: workspaceId })
           }}
           projects={projects}
           addProject={addProject}

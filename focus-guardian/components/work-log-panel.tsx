@@ -13,6 +13,7 @@ import { AIAnalysisStatus } from "@/components/ai-analysis-status"
 import { AudioPermissionManager } from "@/components/audio-permission-manager"
 import { useScreenCapture } from "@/hooks/use-screen-capture"
 import { cn } from "@/lib/utils"
+import type { ActivityCategory } from "@/components/activity-breakdown"
 
 interface DistractionCheck {
   is_distracted: boolean
@@ -57,6 +58,7 @@ interface WorkLogPanelProps {
   model: string
   captureInterval: number
   workLogs: WorkLogEntry[]
+  categories: ActivityCategory[]
   addWorkLog: (log: any) => Promise<any>
   clearWorkLogs: () => Promise<void>
 }
@@ -67,6 +69,7 @@ export function WorkLogPanel({
   model,
   captureInterval,
   workLogs,
+  categories,
   addWorkLog,
   clearWorkLogs,
 }: WorkLogPanelProps) {
@@ -191,6 +194,7 @@ export function WorkLogPanel({
         formData.append("extractedText", extractedText)
         formData.append("apiKey", apiKey)
         formData.append("currentTask", currentTask || "作業中")
+        formData.append("categories", JSON.stringify(categories))
 
         console.log("[v0] Sending OCR text to /api/analyze-screenshot")
 
@@ -235,6 +239,7 @@ export function WorkLogPanel({
           applications: result.applications || [],
           focus_score: result.focus_score || 0,
           distraction_check: result.distraction_check || null,
+          work_category: result.work_category || "その他",
         }
 
         console.log("[v0] Adding work log entry:", logEntry)
@@ -256,7 +261,7 @@ export function WorkLogPanel({
         setIsAnalyzing(false)
       }
     },
-    [apiKey, currentTask, model, addWorkLog, getOcrWorker],
+    [apiKey, currentTask, model, addWorkLog, getOcrWorker, categories],
   ) // 必要最小限の依存関係のみ
 
   const handleAutoGenerateReport = useCallback(

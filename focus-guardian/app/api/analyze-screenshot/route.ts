@@ -132,6 +132,7 @@ ${extractedText.slice(0, 1000)}
       analysis = {
         activity: "画面解析",
         category: "neutral",
+        work_category: categories[categories.length - 1] || "その他",
         details: extractedText.slice(0, 80),
         confidence: 0.5,
         apps: [],
@@ -139,9 +140,15 @@ ${extractedText.slice(0, 1000)}
       }
     }
 
+    // work_categoryがカテゴリリストに含まれていなければ「その他」にフォールバック
+    const validCategory = categories.includes(analysis.work_category)
+      ? analysis.work_category
+      : "その他"
+
     return NextResponse.json({
       activity: analysis.activity || "不明な活動",
       category: analysis.category || "neutral",
+      work_category: validCategory,
       details: analysis.details || extractedText.slice(0, 80) || "詳細情報なし",
       confidence: Math.round((Number(analysis.confidence) || 0.5) * 100),
       applications: analysis.apps || [],
