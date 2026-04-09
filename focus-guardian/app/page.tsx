@@ -17,7 +17,6 @@ const Page = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [authChecked, setAuthChecked] = useState(false)
   const isLoggedInRef = useRef(false)
-  const [showSettings, setShowSettings] = useState(false)
   const [currentTask, setCurrentTask] = useState("")
   const [currentTab, setCurrentTab] = useState("logs")
   const [categories, setCategories] = useState<ActivityCategory[]>(() => {
@@ -249,7 +248,7 @@ const Page = () => {
           </div>
 
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => setShowSettings(true)} className="gap-2">
+            <Button variant="outline" size="sm" onClick={() => setCurrentTab("settings")} className="gap-2">
               <Settings className="h-4 w-4" />
               設定
             </Button>
@@ -330,34 +329,33 @@ const Page = () => {
               onCategoriesChange={handleCategoriesChange}
             />
           </TabsContent>
+
+          <TabsContent value="settings">
+            <SettingsPanel
+              onClose={() => setCurrentTab("logs")}
+              apiKey={userSettings?.gemini_api_key || ""}
+              model={userSettings?.gemini_model || "gemini-2.5-flash-lite"}
+              captureInterval={userSettings?.capture_interval || 30}
+              togglApiToken={userSettings?.toggl_api_token || ""}
+              togglWorkspaceId={userSettings?.toggl_workspace_id || ""}
+              onApiKeyChange={handleApiKeyChange}
+              onModelChange={async (model) => {
+                await updateSettings({ gemini_model: model })
+              }}
+              onCaptureIntervalChange={async (interval) => {
+                await updateSettings({ capture_interval: interval })
+              }}
+              onTogglCredentialsChange={async (token, workspaceId) => {
+                await updateSettings({ toggl_api_token: token, toggl_workspace_id: workspaceId })
+              }}
+              projects={projects}
+              addProject={addProject}
+              editProject={editProject}
+              removeProject={removeProject}
+            />
+          </TabsContent>
         </Tabs>
       </main>
-
-      {/* 設定パネル */}
-      {showSettings && (
-        <SettingsPanel
-          onClose={() => setShowSettings(false)}
-          apiKey={userSettings?.gemini_api_key || ""}
-          model={userSettings?.gemini_model || "gemini-2.5-flash-lite"}
-          captureInterval={userSettings?.capture_interval || 30}
-          togglApiToken={userSettings?.toggl_api_token || ""}
-          togglWorkspaceId={userSettings?.toggl_workspace_id || ""}
-          onApiKeyChange={handleApiKeyChange}
-          onModelChange={async (model) => {
-            await updateSettings({ gemini_model: model })
-          }}
-          onCaptureIntervalChange={async (interval) => {
-            await updateSettings({ capture_interval: interval })
-          }}
-          onTogglCredentialsChange={async (token, workspaceId) => {
-            await updateSettings({ toggl_api_token: token, toggl_workspace_id: workspaceId })
-          }}
-          projects={projects}
-          addProject={addProject}
-          editProject={editProject}
-          removeProject={removeProject}
-        />
-      )}
     </div>
   )
 }
