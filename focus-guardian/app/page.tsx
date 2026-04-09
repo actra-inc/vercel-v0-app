@@ -287,13 +287,7 @@ const Page = () => {
                 <TimeTracker
                   onTimeEntryChange={() => {}}
                   onCurrentTaskChange={setCurrentTask}
-                  togglSyncInterval={300}
-                  onProjectsSync={handleProjectsSync}
-                  projects={projects}
                   timeEntries={timeEntries}
-                  addTimeEntry={addTimeEntry}
-                  editTimeEntry={editTimeEntry}
-                  removeTimeEntry={removeTimeEntry}
                 />
               </div>
 

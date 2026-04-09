@@ -9,6 +9,26 @@ export interface CalendarEvent {
   start: { dateTime?: string; date?: string }
   end: { dateTime?: string; date?: string }
   description?: string
+  colorId?: string
+}
+
+// Google Calendar の colorId → 色マッピング
+export const CALENDAR_COLORS: Record<string, string> = {
+  "1": "#D50000",  // トマト
+  "2": "#E91E63",  // フラミンゴ
+  "3": "#F4511E",  // タンジェリン
+  "4": "#F6BF26",  // バナナ
+  "5": "#33B679",  // セージ
+  "6": "#0B8043",  // バジル
+  "7": "#039BE5",  // ピーコック
+  "8": "#3F51B5",  // ブルーベリー
+  "9": "#7986CB",  // ラベンダー
+  "10": "#8E24AA", // グレープ
+  "11": "#616161", // グラファイト
+}
+
+export const getEventColor = (colorId?: string): string => {
+  return colorId ? (CALENDAR_COLORS[colorId] || "#039BE5") : "#039BE5"
 }
 
 export function useGoogleCalendar() {
