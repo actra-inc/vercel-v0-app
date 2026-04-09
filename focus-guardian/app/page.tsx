@@ -23,7 +23,10 @@ const Page = () => {
     if (typeof window === "undefined") return DEFAULT_CATEGORIES
     try {
       const saved = localStorage.getItem("activity_categories")
-      return saved ? JSON.parse(saved) : DEFAULT_CATEGORIES
+      if (!saved) return DEFAULT_CATEGORIES
+      const parsed: ActivityCategory[] = JSON.parse(saved)
+      // "その他" → "未分類" へ移行
+      return parsed.map((c) => c.name === "その他" ? { ...c, name: "未分類" } : c)
     } catch {
       return DEFAULT_CATEGORIES
     }

@@ -19,7 +19,7 @@ export const DEFAULT_CATEGORIES: ActivityCategory[] = [
   { id: "research", name: "リサーチ", color: "#10B981" },
   { id: "meeting", name: "ミーティング", color: "#F59E0B" },
   { id: "sns", name: "業務以外のSNS", color: "#EC4899" },
-  { id: "other", name: "その他", color: "#6B7280" },
+  { id: "other", name: "未分類", color: "#6B7280" },
 ]
 
 const COLOR_OPTIONS = [
@@ -69,7 +69,9 @@ export function ActivityBreakdown({
     categories.forEach((c) => {
       map[c.name] = 0
     })
-    map["未分類"] = 0
+    if (!("未分類" in map)) {
+      map["未分類"] = 0
+    }
 
     regularLogs.forEach((log) => {
       const key = log.work_category || "未分類"
