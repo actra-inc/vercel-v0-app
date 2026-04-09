@@ -61,6 +61,7 @@ interface WorkLogPanelProps {
   categories: ActivityCategory[]
   addWorkLog: (log: any) => Promise<any>
   clearWorkLogs: () => Promise<void>
+  onTrackingChange?: (isTracking: boolean, startTime: Date | null) => void
 }
 
 export function WorkLogPanel({
@@ -72,6 +73,7 @@ export function WorkLogPanel({
   categories,
   addWorkLog,
   clearWorkLogs,
+  onTrackingChange,
 }: WorkLogPanelProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [isApiKeyValid, setIsApiKeyValid] = useState(false)
@@ -352,9 +354,11 @@ export function WorkLogPanel({
     if (isTracking) {
       console.log("⏹️ Stopping screen capture...")
       stopCapture()
+      onTrackingChange?.(false, null)
     } else {
       console.log("▶️ Starting screen capture...")
       await startAutoCapture()
+      onTrackingChange?.(true, new Date())
     }
   }
 

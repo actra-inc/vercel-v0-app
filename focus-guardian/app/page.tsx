@@ -19,6 +19,8 @@ const Page = () => {
   const isLoggedInRef = useRef(false)
   const [currentTask, setCurrentTask] = useState("")
   const [currentTab, setCurrentTab] = useState("logs")
+  const [screenSessions, setScreenSessions] = useState<Array<{ id: string; startTime: Date; endTime?: Date; task: string }>>([])
+  const screenSessionStartRef = useRef<{ time: Date; task: string } | null>(null)
   const [categories, setCategories] = useState<ActivityCategory[]>(() => {
     if (typeof window === "undefined") return DEFAULT_CATEGORIES
     try {
@@ -36,6 +38,22 @@ const Page = () => {
     setCategories(newCategories)
     localStorage.setItem("activity_categories", JSON.stringify(newCategories))
   }, [])
+
+  const handleTrackingChange = useCallback((isTracking: boolean, startTime: Date | null) => {
+    if (isTracking && startTime) {
+      screenSessionStartRef.current = { time: startTime, task: currentTask }
+    } else {
+      const started = screenSessionStartRef.current
+      if (started) {
+        const now = new Date()
+        setScreenSessions((prev) => [
+          { id: Date.now().toString(), startTime: started.time, endTime: now, task: started.task },
+          ...prev,
+        ])
+        screenSessionStartRef.current = null
+      }
+    }
+  }, [currentTask])
 
   const {
     user,
@@ -291,6 +309,9 @@ const Page = () => {
                   onTimeEntryChange={() => {}}
                   onCurrentTaskChange={setCurrentTask}
                   timeEntries={timeEntries}
+                  screenSessions={screenSessions}
+                  togglApiToken={userSettings?.toggl_api_token || ""}
+                  togglWorkspaceId={userSettings?.toggl_workspace_id || ""}
                 />
               </div>
 
@@ -305,6 +326,7 @@ const Page = () => {
                   categories={categories}
                   addWorkLog={addWorkLog}
                   clearWorkLogs={clearWorkLogs}
+                  onTrackingChange={handleTrackingChange}
                 />
               </div>
             </div>
