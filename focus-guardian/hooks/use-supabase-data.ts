@@ -63,8 +63,8 @@ export function useSupabaseData() {
       try {
         const { data: settings, error: settingsError } = await getUserSettings(currentUser.id)
 
-        if (settingsError && !settingsError.includes("No rows")) {
-          console.error("Error loading settings:", settingsError)
+        if (settingsError && !settingsError.message?.includes("No rows")) {
+          console.warn("Error loading settings:", settingsError)
         }
 
         if (settings) {
@@ -82,43 +82,43 @@ export function useSupabaseData() {
           }
         }
       } catch (err) {
-        console.error("Settings error:", err)
+        console.warn("Settings error:", err)
       }
 
       // Load projects
       try {
         const { data: projectsData, error: projectsError } = await getProjects(currentUser.id)
         if (projectsError) {
-          console.error("Error loading projects:", projectsError)
+          console.warn("Error loading projects:", projectsError)
         } else if (projectsData) {
           setProjects(projectsData)
         }
       } catch (err) {
-        console.error("Projects error:", err)
+        console.warn("Projects error:", err)
       }
 
       // Load time entries
       try {
         const { data: entriesData, error: entriesError } = await getTimeEntries(currentUser.id)
         if (entriesError) {
-          console.error("Error loading time entries:", entriesError)
+          console.warn("Error loading time entries:", entriesError)
         } else if (entriesData) {
           setTimeEntries(entriesData)
         }
       } catch (err) {
-        console.error("Time entries error:", err)
+        console.warn("Time entries error:", err)
       }
 
       // Load work logs
       try {
         const { data: logsData, error: logsError } = await getWorkLogs(currentUser.id)
         if (logsError) {
-          console.error("Error loading work logs:", logsError)
+          console.warn("Error loading work logs:", logsError)
         } else if (logsData) {
           setWorkLogs(logsData)
         }
       } catch (err) {
-        console.error("Work logs error:", err)
+        console.warn("Work logs error:", err)
       }
 
       hasLoadedRef.current = true
