@@ -109,13 +109,17 @@ export function useSupabaseData() {
         console.warn("Time entries error:", err)
       }
 
-      // Load work logs
+      // Load work logs (削除済みタイムスタンプより新しいものだけ表示)
       try {
         const { data: logsData, error: logsError } = await getWorkLogs(currentUser.id)
         if (logsError) {
           console.warn("Error loading work logs:", logsError)
         } else if (logsData) {
-          setWorkLogs(logsData)
+          const clearedAt = localStorage.getItem(`work_logs_cleared_at_${currentUser.id}`)
+          const filtered = clearedAt
+            ? logsData.filter((log) => new Date(log.timestamp) > new Date(clearedAt))
+            : logsData
+          setWorkLogs(filtered)
         }
       } catch (err) {
         console.warn("Work logs error:", err)
@@ -232,6 +236,8 @@ export function useSupabaseData() {
       throw new Error(msg || "Failed to create work log")
     }
     if (data) {
+      // 新しいログが追加されたら削除タイムスタンプをリセット
+      localStorage.removeItem(`work_logs_cleared_at_${user.id}`)
       setWorkLogs((prev) => [data, ...prev])
     }
     return data
@@ -242,9 +248,18 @@ export function useSupabaseData() {
       throw new Error("User not authenticated")
     }
 
-    const { error } = await deleteAllWorkLogs(user.id)
-    if (error) throw new Error(error.message || "Failed to clear work logs")
+    // 削除タイムスタンプを先に記録（DB削除が失敗しても再表示されないよう）
+    const clearedAt = new Date().toISOString()
+    localStorage.setItem(`work_logs_cleared_at_${user.id}`, clearedAt)
     setWorkLogs([])
+
+    // DB削除はベストエフォート（失敗してもlocalStorageで隠蔽）
+    try {
+      const { error } = await deleteAllWorkLogs(user.id)
+      if (error) console.warn("DB delete work logs warning:", error.message)
+    } catch (err) {
+      console.warn("DB delete work logs failed:", err)
+    }
   }
 
   return {

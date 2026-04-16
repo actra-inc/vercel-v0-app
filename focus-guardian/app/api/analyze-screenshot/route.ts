@@ -55,20 +55,20 @@ export async function POST(request: NextRequest) {
     const analysisUrl = `https://generativelanguage.googleapis.com/v1beta/models/${analysisModel}:generateContent?key=${apiKey}`
 
     const categoriesList = categories.join("、")
-    const analysisPrompt = `あなたは厳格な作業効率モニタリングシステムです。画面情報を分析し、予定作業との一致を厳しく判定してください。
+    const analysisPrompt = `あなたは作業効率モニタリングシステムです。画面情報を分析し、予定作業との一致度を判定してください。
 
 現在の予定作業: "${currentTask || "未設定"}"
 
 画面情報:
 ${extractedText.slice(0, 1000)}
 
-【厳格な脱線判定ルール】
-- 予定作業が設定されている場合、画面内容が予定作業と直接関係しない場合は必ず is_distracted: true にすること
+【脱線判定ルール】
 - 以下は予定作業に関わらず必ず distracted 扱い:
   ショッピングサイト(Amazon/楽天/Yahoo!ショッピング等)、SNS(Twitter/X/Instagram/TikTok/Facebook等)、
-  動画サービス(YouTube/Netflix/Hulu等)、ニュースサイト閲覧、ゲーム、まとめサイト、掲示板(5ch等)
-- task_alignmentが0.5未満の場合は is_distracted: true にすること
-- 予定作業が「未設定」の場合のみ、判定を緩めてよい
+  動画サービス(YouTube/Netflix/Hulu等)、ゲーム、まとめサイト、掲示板(5ch等)
+- ニュースサイトや技術ブログは作業内容によっては neutral や productive でもよい
+- 予定作業が設定されており、task_alignmentが0.35未満の場合のみ is_distracted: true にすること
+- 予定作業が「未設定」の場合は判定を緩める
 
 必須回答項目（JSON形式のみ、余計な説明不要）：
 {
@@ -79,13 +79,13 @@ ${extractedText.slice(0, 1000)}
   "apps": ["使用中のアプリ名"],
   "distraction_check": {
     "is_distracted": true/false,
-    "reason": "脱線している場合の具体的な理由（日本語）。例: 予定作業はアプリ開発だが、Amazonで商品を閲覧している",
-    "task_alignment": 0.0〜1.0（予定作業との一致度。ショッピング・SNS・動画は0.0〜0.2）
+    "reason": "脱線している場合の具体的な理由（日本語）",
+    "task_alignment": 0.0〜1.0（予定作業との一致度。ショッピング・SNS・動画は0.0〜0.2、技術調査・ドキュメント閲覧は0.6〜0.8）
   },
   "details": "追加の詳細情報（日本語、50文字以内）"
 }
 
-判定基準：productive=予定作業に直接関係する活動、distracted=予定作業と無関係な活動(ショッピング/SNS/動画/ゲーム/ニュース等)、neutral=判定困難または予定作業未設定`
+判定基準：productive=予定作業に関連、distracted=明らかに無関係(ショッピング/SNS/動画等)、neutral=判断が難しい活動`
 
     const response = await fetch(analysisUrl, {
       method: "POST",
@@ -154,8 +154,8 @@ ${extractedText.slice(0, 1000)}
       : "その他"
 
     const taskAlignment = Number(analysis.distraction_check?.task_alignment) || 0.5
-    // 予定作業が設定されており task_alignment が 0.5 未満なら強制的に脱線判定
-    const forceDistracted = !!currentTask && taskAlignment < 0.5
+    // 予定作業が設定されており task_alignment が 0.35 未満なら強制的に脱線判定
+    const forceDistracted = !!currentTask && taskAlignment < 0.35
     const distractionCheck = analysis.distraction_check
       ? {
           ...analysis.distraction_check,
