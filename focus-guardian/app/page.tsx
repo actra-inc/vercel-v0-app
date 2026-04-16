@@ -21,6 +21,8 @@ const Page = () => {
   const [currentTab, setCurrentTab] = useState("logs")
   const [screenSessions, setScreenSessions] = useState<Array<{ id: string; startTime: Date; endTime?: Date; task: string }>>([])
   const screenSessionStartRef = useRef<{ time: Date; task: string } | null>(null)
+  const togglApiToken = typeof window !== "undefined" ? localStorage.getItem("toggl_api_token") || "" : ""
+  const togglWorkspaceId = typeof window !== "undefined" ? localStorage.getItem("toggl_workspace_id") || "" : ""
   const [categories, setCategories] = useState<ActivityCategory[]>(() => {
     if (typeof window === "undefined") return DEFAULT_CATEGORIES
     try {
@@ -66,9 +68,6 @@ const Page = () => {
     addProject,
     editProject,
     removeProject,
-    addTimeEntry,
-    editTimeEntry,
-    removeTimeEntry,
     addWorkLog,
     clearWorkLogs,
     refreshData,
@@ -120,26 +119,6 @@ const Page = () => {
     }
   }, []) // 依存配列を空にして初回のみ実行
 
-  const handleProjectsSync = useCallback(
-    async (newProjects: any[]) => {
-      if (!user?.id) return
-
-      for (const project of newProjects) {
-        try {
-          await addProject({
-            user_id: user.id,
-            name: project.name,
-            color: project.color,
-            client: project.client,
-          })
-        } catch (error) {
-          console.error("Error adding project:", error)
-        }
-      }
-      await refreshData()
-    },
-    [addProject, user?.id, refreshData],
-  )
 
   const handleApiKeyChange = useCallback(
     async (apiKey: string) => {
@@ -310,8 +289,8 @@ const Page = () => {
                   onCurrentTaskChange={setCurrentTask}
                   timeEntries={timeEntries}
                   screenSessions={screenSessions}
-                  togglApiToken={userSettings?.toggl_api_token || ""}
-                  togglWorkspaceId={userSettings?.toggl_workspace_id || ""}
+                  togglApiToken={togglApiToken}
+                  togglWorkspaceId={togglWorkspaceId}
                 />
               </div>
 
