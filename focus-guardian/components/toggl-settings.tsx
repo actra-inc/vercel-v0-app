@@ -26,6 +26,7 @@ interface TogglEntry {
   description: string | null
   start: string | null
   duration: number | null
+  elapsed_seconds?: number | null
   is_running: boolean
   entry_id: number | null
   project_id: number | null
@@ -188,17 +189,12 @@ export function TogglSettings() {
     }
   }
 
-  const formatDuration = (duration: number | null) => {
-    if (!duration) return "0:00"
-
-    const seconds = Math.abs(duration)
-    const hours = Math.floor(seconds / 3600)
-    const minutes = Math.floor((seconds % 3600) / 60)
-
-    if (hours > 0) {
-      return `${hours}:${minutes.toString().padStart(2, "0")}`
-    }
-    return `${minutes}:${(seconds % 60).toString().padStart(2, "0")}`
+  const formatDuration = (seconds: number | null) => {
+    if (!seconds || seconds <= 0) return "00:00:00"
+    const h = Math.floor(seconds / 3600)
+    const m = Math.floor((seconds % 3600) / 60)
+    const s = seconds % 60
+    return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`
   }
 
   if (isConfigured && apiToken && workspaceId) {
@@ -270,7 +266,7 @@ export function TogglSettings() {
                     <div>
                       <div className="text-xs font-medium text-gray-600 mb-1">実行時間:</div>
                       <div className="font-medium flex items-center gap-2">
-                        {formatDuration(currentEntry.duration)}
+                        {formatDuration(currentEntry.elapsed_seconds ?? null)}
                         {currentEntry.is_running && (
                           <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">実行中</span>
                         )}
