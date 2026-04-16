@@ -256,9 +256,14 @@ export function WorkLogPanel({
 
         console.log("✅ Work log added successfully")
       } catch (error) {
-        console.error("❌ Analysis error:", error)
         const errorMessage = error instanceof Error ? error.message : "不明なエラー"
-        alert(`解析エラー: ${errorMessage}\n\n詳細はコンソールログを確認してください。`)
+        // ネットワーク一時エラーはオーバーレイを出さずにwarnのみ
+        if (errorMessage.includes("Failed to fetch") || errorMessage.includes("fetch")) {
+          console.warn("⚠️ Network error (work log save):", errorMessage)
+        } else {
+          console.error("❌ Analysis error:", error)
+          alert(`解析エラー: ${errorMessage}\n\n詳細はコンソールログを確認してください。`)
+        }
       } finally {
         setIsAnalyzing(false)
       }

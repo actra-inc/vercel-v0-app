@@ -222,7 +222,15 @@ export function useSupabaseData() {
     }
 
     const { data, error } = await createWorkLog({ ...log, user_id: user.id })
-    if (error) throw new Error(error.message || "Failed to create work log")
+    if (error) {
+      // ネットワーク一時エラーはthrowせずwarnに留める
+      const msg = error.message || ""
+      if (msg.includes("fetch") || msg.includes("network") || msg.includes("Failed")) {
+        console.warn("⚠️ Work log save skipped (network):", msg)
+        return null
+      }
+      throw new Error(msg || "Failed to create work log")
+    }
     if (data) {
       setWorkLogs((prev) => [data, ...prev])
     }
