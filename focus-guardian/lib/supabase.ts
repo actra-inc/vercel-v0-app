@@ -332,8 +332,8 @@ export const getWorkLogs = async (userId: string, limit = 500) => {
 }
 
 export const createWorkLog = async (log: Omit<WorkLog, "id" | "created_at">) => {
-  // report_data はDBスキーマに存在しないため除外
-  const { report_data: _report_data, ...insertLog } = log as any
+  // report_data / report_type / distraction_check はDBスキーマに存在しないため除外
+  const { report_data: _rd, report_type: _rt, distraction_check: _dc, ...insertLog } = log as any
   const { data, error } = await supabase.from("work_logs").insert(insertLog).select().single()
 
   if (data) {
