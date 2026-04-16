@@ -332,7 +332,9 @@ export const getWorkLogs = async (userId: string, limit = 500) => {
 }
 
 export const createWorkLog = async (log: Omit<WorkLog, "id" | "created_at">) => {
-  const { data, error } = await supabase.from("work_logs").insert(log).select().single()
+  // report_data はDBスキーマに存在しないため除外
+  const { report_data: _report_data, ...insertLog } = log as any
+  const { data, error } = await supabase.from("work_logs").insert(insertLog).select().single()
 
   if (data) {
     return { data: parseWorkLog(data), error }
