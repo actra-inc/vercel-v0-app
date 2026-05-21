@@ -52,13 +52,20 @@ export function TimeTracker({
   const [selectedEventColor, setSelectedEventColor] = useState<string | null>(null)
   const [showCalendar, setShowCalendar] = useState(false)
   const [taskSource, setTaskSource] = useState<TaskSource>("calendar")
-  const [togglEntries, setTogglEntries] = useState<Array<{ description: string; project: string | null; is_running: boolean }>>([])
+  const [togglCurrentEntry, setTogglCurrentEntry] = useState<{ description: string; project: string | null; is_running: boolean } | null>(null)
   const [togglLoading, setTogglLoading] = useState(false)
   const [togglError, setTogglError] = useState<string | null>(null)
-  const [showToggl, setShowToggl] = useState(false)
+  const [togglLastFetched, setTogglLastFetched] = useState<Date | null>(null)
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
+  const togglIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const isRunningRef = useRef(isRunning)
 
   const { events, loading: calendarLoading, error: calendarError, needsReauth, fetchTodayEvents, formatEventTime, isEventNow } = useGoogleCalendar()
+
+  // isRunning の最新値を ref で追跡（ポーリングコールバック内で使用）
+  useEffect(() => {
+    isRunningRef.current = isRunning
+  }, [isRunning])
 
   // タイマー更新
   useEffect(() => {
@@ -91,7 +98,7 @@ export function TimeTracker({
     }
   }, [currentEntry, description, onCurrentTaskChange])
 
-  const fetchTogglEntries = useCallback(async () => {
+  const fetchTogglCurrentEntry = useCallback(async () => {
     if (!togglApiToken || !togglWorkspaceId) {
       setTogglError("Togglのトークンとワークスペースが設定されていません。設定画面から入力してください。")
       return
@@ -105,10 +112,15 @@ export function TimeTracker({
         setTogglError(data.error || "Togglの取得に失敗しました")
         return
       }
-      if (data.description) {
-        setTogglEntries([{ description: data.description, project: data.project, is_running: data.is_running }])
-      } else {
-        setTogglEntries([])
+      const entry = data.description
+        ? { description: data.description, project: data.project, is_running: data.is_running }
+        : null
+      setTogglCurrentEntry(entry)
+      setTogglLastFetched(new Date())
+      // タイマー未実行時のみ説明欄を自動更新
+      if (entry && !isRunningRef.current) {
+        setDescription(entry.description)
+        setSelectedEventColor(null)
       }
     } catch {
       setTogglError("Togglの取得に失敗しました")
@@ -116,6 +128,25 @@ export function TimeTracker({
       setTogglLoading(false)
     }
   }, [togglApiToken, togglWorkspaceId])
+
+  // Togglモード時に3分ごと自動ポーリング
+  useEffect(() => {
+    if (taskSource !== "toggl") {
+      if (togglIntervalRef.current) {
+        clearInterval(togglIntervalRef.current)
+        togglIntervalRef.current = null
+      }
+      return
+    }
+    fetchTogglCurrentEntry()
+    togglIntervalRef.current = setInterval(fetchTogglCurrentEntry, 3 * 60 * 1000)
+    return () => {
+      if (togglIntervalRef.current) {
+        clearInterval(togglIntervalRef.current)
+        togglIntervalRef.current = null
+      }
+    }
+  }, [taskSource, fetchTogglCurrentEntry])
 
   const saveToStorage = (entries: TimeEntry[]) => {
     localStorage.setItem("time_entries", JSON.stringify(entries))
@@ -343,83 +374,52 @@ export function TimeTracker({
             </div>
           )}
 
-          {/* Toggl連携 */}
+          {/* Toggl連携（自動同期） */}
           {taskSource === "toggl" && (
-            <div className="space-y-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={async () => {
-                  if (!showToggl) {
-                    setShowToggl(true)
-                    await fetchTogglEntries()
-                  } else {
-                    setShowToggl(false)
-                  }
-                }}
-                disabled={isRunning}
-                className="w-full flex items-center justify-between gap-2 border-orange-200 text-orange-700 hover:bg-orange-50"
-              >
-                <span className="flex items-center gap-2">
-                  <ToggleLeft className="h-4 w-4" />
-                  Togglから作業内容を選択
+            <div className="border border-orange-100 rounded-lg p-3 bg-orange-50 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-orange-800">
+                  Toggl自動同期（3分ごと）
+                  {togglLastFetched && (
+                    <span className="ml-2 text-orange-500 font-normal">
+                      最終取得: {togglLastFetched.toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" })}
+                    </span>
+                  )}
                 </span>
-                {showToggl ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-              </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={fetchTogglCurrentEntry}
+                  disabled={togglLoading || isRunning}
+                  className="h-6 px-2 text-xs text-orange-700 hover:bg-orange-100"
+                >
+                  {togglLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+                </Button>
+              </div>
 
-              {!selectedEventColor && description && !showToggl && (
-                <div className="flex items-center gap-2 px-3 py-2 rounded-md border border-orange-200 bg-orange-50 text-sm">
-                  <ToggleLeft className="h-3 w-3 text-orange-500 flex-shrink-0" />
-                  <span className="truncate text-gray-700">{description}</span>
-                </div>
+              {togglError && (
+                <div className="text-xs text-red-600 bg-red-50 rounded p-2">{togglError}</div>
               )}
 
-              {showToggl && (
-                <div className="border border-orange-100 rounded-lg p-3 bg-orange-50 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-orange-800">Togglのエントリ</span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={fetchTogglEntries}
-                      disabled={togglLoading}
-                      className="h-6 px-2 text-xs text-orange-700 hover:bg-orange-100"
-                    >
-                      {togglLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
-                    </Button>
+              {!togglLoading && !togglError && !togglCurrentEntry && (
+                <div className="text-xs text-gray-500 text-center py-2">Togglで実行中のエントリがありません</div>
+              )}
+
+              {togglCurrentEntry && (
+                <div className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm ${
+                  togglCurrentEntry.is_running
+                    ? "bg-orange-200 border border-orange-400 text-orange-900"
+                    : "bg-white border border-gray-200 text-gray-700"
+                }`}>
+                  {togglCurrentEntry.is_running && (
+                    <div className="w-2 h-2 rounded-full bg-orange-500 animate-pulse flex-shrink-0" />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium truncate">{togglCurrentEntry.description || "説明なし"}</div>
+                    {togglCurrentEntry.project && (
+                      <div className="text-xs text-gray-500 mt-0.5">{togglCurrentEntry.project}</div>
+                    )}
                   </div>
-
-                  {togglError && (
-                    <div className="text-xs text-red-600 bg-red-50 rounded p-2">{togglError}</div>
-                  )}
-
-                  {!togglLoading && !togglError && togglEntries.length === 0 && (
-                    <div className="text-xs text-gray-500 text-center py-2">Togglのエントリが見つかりません</div>
-                  )}
-
-                  {togglEntries.map((entry, i) => (
-                    <button
-                      key={i}
-                      onClick={() => {
-                        setDescription(entry.description)
-                        setSelectedEventColor(null)
-                        setShowToggl(false)
-                      }}
-                      className={`w-full text-left rounded-md px-3 py-2 text-sm transition-colors border ${
-                        entry.is_running
-                          ? "bg-orange-200 border-orange-400 text-orange-900 font-medium"
-                          : "bg-white border-gray-200 text-gray-700 hover:bg-orange-100 hover:border-orange-300"
-                      }`}
-                    >
-                      <div className="flex items-center gap-2">
-                        {entry.is_running && <div className="w-2 h-2 rounded-full bg-orange-500 animate-pulse flex-shrink-0" />}
-                        <span className="truncate">{entry.description}</span>
-                      </div>
-                      {entry.project && (
-                        <div className="text-xs text-gray-500 mt-0.5 ml-4">{entry.project}</div>
-                      )}
-                    </button>
-                  ))}
                 </div>
               )}
             </div>
