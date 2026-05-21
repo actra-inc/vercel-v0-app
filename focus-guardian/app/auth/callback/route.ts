@@ -1,5 +1,4 @@
 import { createServerClient } from "@supabase/ssr"
-import { cookies } from "next/headers"
 import { NextResponse, type NextRequest } from "next/server"
 
 export async function GET(request: NextRequest) {
@@ -14,21 +13,23 @@ export async function GET(request: NextRequest) {
   }
 
   if (code) {
-    const cookieStore = await cookies()
+    // レスポンスを先に作成し、クッキーをそのレスポンスに直接セットする
+    // （cookies() から取得した cookieStore に set しても NextResponse.redirect の
+    //   レスポンスには反映されないため、この順序が重要）
+    const response = NextResponse.redirect(origin)
+
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       {
         cookies: {
           getAll() {
-            return cookieStore.getAll()
+            return request.cookies.getAll()
           },
           setAll(cookiesToSet) {
-            try {
-              cookiesToSet.forEach(({ name, value, options }) =>
-                cookieStore.set(name, value, options),
-              )
-            } catch {}
+            cookiesToSet.forEach(({ name, value, options }) =>
+              response.cookies.set(name, value, options),
+            )
           },
         },
       },
@@ -37,7 +38,7 @@ export async function GET(request: NextRequest) {
     const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
 
     if (!exchangeError) {
-      return NextResponse.redirect(origin)
+      return response
     }
 
     console.error("Code exchange error:", exchangeError)
