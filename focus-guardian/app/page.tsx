@@ -8,7 +8,7 @@ import { WorkLogPanel } from "@/components/work-log-panel"
 import { SettingsPanel } from "@/components/settings-panel"
 import { ReportsTab } from "@/components/reports-tab"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Settings, LogOut, Activity, FileText, BarChart3 } from "lucide-react"
 import { ActivityBreakdown, DEFAULT_CATEGORIES, type ActivityCategory } from "@/components/activity-breakdown"
@@ -209,6 +209,11 @@ const Page = () => {
               Googleでログイン
             </Button>
           </CardContent>
+          <CardFooter className="justify-center gap-4 text-xs text-gray-400 pb-6">
+            <a href="/terms" className="hover:text-gray-600 hover:underline">利用規約</a>
+            <span>·</span>
+            <a href="/privacy" className="hover:text-gray-600 hover:underline">プライバシーポリシー</a>
+          </CardFooter>
         </Card>
       </div>
     )
