@@ -52,7 +52,7 @@ export function TimeTracker({
   const [selectedEventColor, setSelectedEventColor] = useState<string | null>(null)
   const [showCalendar, setShowCalendar] = useState(false)
   const [taskSource, setTaskSource] = useState<TaskSource>("calendar")
-  const [togglCurrentEntry, setTogglCurrentEntry] = useState<{ description: string; project: string | null; is_running: boolean } | null>(null)
+  const [togglCurrentEntry, setTogglCurrentEntry] = useState<{ description: string; project: string | null; is_running: boolean; start: string | null } | null>(null)
   const [togglLoading, setTogglLoading] = useState(false)
   const [togglError, setTogglError] = useState<string | null>(null)
   const [togglLastFetched, setTogglLastFetched] = useState<Date | null>(null)
@@ -113,7 +113,7 @@ export function TimeTracker({
         return
       }
       const entry = data.description
-        ? { description: data.description, project: data.project, is_running: data.is_running }
+        ? { description: data.description, project: data.project, is_running: data.is_running, start: data.start ?? null }
         : null
       setTogglCurrentEntry(entry)
       setTogglLastFetched(new Date())
@@ -155,18 +155,24 @@ export function TimeTracker({
   const startTimer = () => {
     const taskDescription = description || "作業中..."
 
+    // Togglモードで実行中エントリがある場合はTogglの開始時刻を使い、経過時間を同期する
+    const startTime =
+      taskSource === "toggl" && togglCurrentEntry?.is_running && togglCurrentEntry.start
+        ? new Date(togglCurrentEntry.start)
+        : new Date()
+
     const newEntry: TimeEntry = {
       id: Date.now().toString(),
       projectId: "",
       description: taskDescription,
-      startTime: new Date(),
+      startTime,
       duration: 0,
       tags: [],
     }
 
     setCurrentEntry(newEntry)
     setIsRunning(true)
-    setCurrentTime(0)
+    setCurrentTime(Math.floor((Date.now() - startTime.getTime()) / 1000))
     onTimeEntryChange(newEntry)
   }
 
