@@ -5,8 +5,8 @@ import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'v0 App',
-  description: 'Created with v0',
+  title: 'FlowNudge',
+  description: 'FlowNudge - 思考の脱線検知システム',
   generator: 'v0.app',
   icons: {
     icon: [

@@ -168,7 +168,7 @@ const Page = () => {
                 />
               </svg>
             </div>
-            <CardTitle className="text-2xl font-bold">作業ログトラッカー</CardTitle>
+            <CardTitle className="text-2xl font-bold">FlowNudge</CardTitle>
             <CardDescription>
               思考の脱線検知システムのベータテストページです。
               <br />
@@ -242,7 +242,7 @@ const Page = () => {
               </svg>
             </div>
             <div>
-              <h1 className="text-xl font-bold text-gray-900">FocusGuardian</h1>
+              <h1 className="text-xl font-bold text-gray-900">FlowNudge</h1>
               <p className="text-xs text-gray-500">{user?.email}</p>
             </div>
           </div>
