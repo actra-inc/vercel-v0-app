@@ -168,7 +168,7 @@ const Page = () => {
                 />
               </svg>
             </div>
-            <CardTitle className="text-2xl font-bold">FocusGuardian</CardTitle>
+            <CardTitle className="text-2xl font-bold">作業ログトラッカー</CardTitle>
             <CardDescription>
               思考の脱線検知システムのベータテストページです。
               <br />
