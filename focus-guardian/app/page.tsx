@@ -158,15 +158,8 @@ const Page = () => {
       <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
         <Card className="w-full max-w-md shadow-xl">
           <CardHeader className="space-y-1 text-center">
-            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-purple-600">
-              <svg className="h-8 w-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
+            <div className="mx-auto mb-4">
+              <img src="/flownudge-logo.png" alt="FlowNudge" className="h-20 w-20 object-contain" />
             </div>
             <CardTitle className="text-2xl font-bold">FlowNudge</CardTitle>
             <CardDescription>
@@ -236,15 +229,8 @@ const Page = () => {
       <header className="sticky top-0 z-50 border-b bg-white/80 backdrop-blur-md shadow-sm">
         <div className="container mx-auto flex h-16 items-center justify-between px-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-purple-600">
-              <svg className="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
+            <div className="flex h-10 w-10 items-center justify-center">
+              <img src="/flownudge-logo.png" alt="FlowNudge" className="h-10 w-10 object-contain" />
             </div>
             <div>
               <h1 className="text-xl font-bold text-gray-900">FlowNudge</h1>
