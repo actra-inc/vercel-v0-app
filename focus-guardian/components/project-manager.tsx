@@ -26,16 +26,16 @@ interface ProjectManagerProps {
 }
 
 const PROJECT_COLORS = [
-  "#3b82f6", // blue
-  "#10b981", // green
-  "#f59e0b", // yellow
-  "#ef4444", // red
-  "#8b5cf6", // purple
-  "#06b6d4", // cyan
   "#f97316", // orange
+  "#f59e0b", // amber
+  "#10b981", // green
+  "#ef4444", // red
+  "#eab308", // yellow
+  "#06b6d4", // cyan
   "#84cc16", // lime
   "#ec4899", // pink
   "#6b7280", // gray
+  "#a16207", // dark amber
 ]
 
 export function ProjectManager({

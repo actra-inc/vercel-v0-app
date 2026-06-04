@@ -98,7 +98,7 @@ export function WorkLogItem({ log, onPlayAlert }: WorkLogItemProps) {
                 <span className="ml-1">{log.activity}</span>
               </Badge>
               {log.focus_score !== undefined && (
-                <Badge variant="outline" className="border-blue-200 text-blue-700 bg-blue-50">
+                <Badge variant="outline" className="border-orange-200 text-orange-700 bg-orange-50">
                   集中度: {log.focus_score}
                 </Badge>
               )}

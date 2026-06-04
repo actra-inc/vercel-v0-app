@@ -244,14 +244,14 @@ export function TimeTracker({
       <Card className="shadow-md border border-gray-200">
         <CardHeader className="pb-3 bg-white border-b border-gray-100">
           <CardTitle className="flex items-center gap-2 text-gray-800">
-            <Clock className="h-5 w-5 text-blue-600" />
+            <Clock className="h-5 w-5 text-orange-600" />
             タイムトラッカー
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4 pt-6">
           {/* 現在のタイマー表示 */}
-          <div className="text-center py-6 bg-gradient-to-b from-blue-50 to-white rounded-lg border border-blue-100">
-            <div className="text-6xl font-mono font-bold text-blue-600 mb-3">{formatDuration(currentTime)}</div>
+          <div className="text-center py-6 bg-gradient-to-b from-orange-50 to-white rounded-lg border border-orange-100">
+            <div className="text-6xl font-mono font-bold text-orange-600 mb-3">{formatDuration(currentTime)}</div>
             {currentEntry && (
               <div className="flex items-center justify-center gap-2 text-sm text-gray-600">
                 {selectedEventColor && (
@@ -443,7 +443,7 @@ export function TimeTracker({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               disabled={isRunning}
-              className={isRunning ? "bg-blue-50 border-blue-200" : ""}
+              className={isRunning ? "bg-orange-50 border-orange-200" : ""}
               autoComplete="off"
               data-1p-ignore="true"
               data-lpignore="true"
@@ -528,7 +528,7 @@ export function TimeTracker({
       <Card className="shadow-md border border-gray-200">
         <CardHeader className="pb-3 bg-white border-b border-gray-100">
           <CardTitle className="flex items-center gap-2 text-lg text-gray-800">
-            <Monitor className="h-4 w-4 text-blue-500" />
+            <Monitor className="h-4 w-4 text-orange-500" />
             画面共有セッション
           </CardTitle>
         </CardHeader>
@@ -539,7 +539,7 @@ export function TimeTracker({
                 ? Math.floor((session.endTime.getTime() - session.startTime.getTime()) / 1000)
                 : null
               return (
-                <div key={session.id} className="flex items-center justify-between p-3 bg-blue-50 rounded-lg border border-blue-100">
+                <div key={session.id} className="flex items-center justify-between p-3 bg-orange-50 rounded-lg border border-orange-100">
                   <div className="flex-1">
                     {session.task && (
                       <div className="text-sm font-medium text-gray-700 mb-0.5">{session.task}</div>
@@ -550,7 +550,7 @@ export function TimeTracker({
                     </div>
                   </div>
                   {duration !== null && (
-                    <Badge variant="outline" className="font-mono border-blue-200 text-blue-700">
+                    <Badge variant="outline" className="font-mono border-orange-200 text-orange-700">
                       {formatDuration(duration)}
                     </Badge>
                   )}

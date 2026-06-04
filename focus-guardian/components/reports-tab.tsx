@@ -128,7 +128,7 @@ export function ReportsTab({ workLogs, userId, onRefresh }: ReportsTabProps) {
       {/* ヘッダー */}
       <div className="flex items-center justify-between px-6 pt-6">
         <div className="flex items-center gap-3">
-          <FileText className="h-6 w-6 text-blue-600" />
+          <FileText className="h-6 w-6 text-orange-600" />
           <h2 className="text-2xl font-bold text-gray-800">統合レポート履歴</h2>
           <Badge variant="secondary" className="text-lg">
             {reports.length}件
@@ -180,12 +180,12 @@ export function ReportsTab({ workLogs, userId, onRefresh }: ReportsTabProps) {
             return (
               <Card
                 key={report.id}
-                className="shadow-lg border-0 bg-gradient-to-br from-blue-50 via-white to-indigo-50"
+                className="shadow-lg border-0 bg-gradient-to-br from-orange-50 via-white to-orange-50"
               >
-                <CardHeader className="pb-4 bg-gradient-to-r from-blue-100 to-indigo-100 rounded-t-lg">
+                <CardHeader className="pb-4 bg-gradient-to-r from-orange-100 to-orange-100 rounded-t-lg">
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="p-2 bg-blue-500 rounded-lg">
+                      <div className="p-2 bg-orange-500 rounded-lg">
                         <FileText className="h-5 w-5 text-white" />
                       </div>
                       <div>
@@ -203,7 +203,7 @@ export function ReportsTab({ workLogs, userId, onRefresh }: ReportsTabProps) {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Badge variant="outline" className="border-blue-300 text-blue-700 bg-blue-50 text-lg px-4 py-1">
+                      <Badge variant="outline" className="border-orange-300 text-orange-700 bg-orange-50 text-lg px-4 py-1">
                         <Target className="h-4 w-4 mr-1" />
                         {data.overall_score}点
                       </Badge>
@@ -237,18 +237,18 @@ export function ReportsTab({ workLogs, userId, onRefresh }: ReportsTabProps) {
                 </CardHeader>
                 <CardContent className="space-y-6 pt-6">
                   {/* サマリー */}
-                  <div className="p-4 bg-white rounded-lg border border-blue-100 shadow-sm">
+                  <div className="p-4 bg-white rounded-lg border border-orange-100 shadow-sm">
                     <h4 className="font-semibold text-gray-800 mb-2 flex items-center gap-2">
-                      <FileText className="h-4 w-4 text-blue-600" />
+                      <FileText className="h-4 w-4 text-orange-600" />
                       概要
                     </h4>
                     <p className="text-gray-700">{data.summary}</p>
                   </div>
 
                   {/* 時間配分 */}
-                  <div className="p-4 bg-white rounded-lg border border-blue-100 shadow-sm">
+                  <div className="p-4 bg-white rounded-lg border border-orange-100 shadow-sm">
                     <h4 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                      <TrendingUp className="h-4 w-4 text-blue-600" />
+                      <TrendingUp className="h-4 w-4 text-orange-600" />
                       時間配分
                     </h4>
                     <div className="space-y-3">
@@ -304,18 +304,18 @@ export function ReportsTab({ workLogs, userId, onRefresh }: ReportsTabProps) {
                   {/* 詳細分析セクション */}
                   <div className="grid md:grid-cols-2 gap-4">
                     {/* 生産性分析 */}
-                    <div className="p-4 bg-white rounded-lg border border-blue-100 shadow-sm">
+                    <div className="p-4 bg-white rounded-lg border border-orange-100 shadow-sm">
                       <h4 className="font-semibold text-gray-800 mb-2 flex items-center gap-2">
-                        <TrendingUp className="h-4 w-4 text-blue-600" />
+                        <TrendingUp className="h-4 w-4 text-orange-600" />
                         生産性分析
                       </h4>
                       <p className="text-sm text-gray-700 leading-relaxed">{data.productivity_analysis}</p>
                     </div>
 
                     {/* 集中度の推移 */}
-                    <div className="p-4 bg-white rounded-lg border border-blue-100 shadow-sm">
+                    <div className="p-4 bg-white rounded-lg border border-orange-100 shadow-sm">
                       <h4 className="font-semibold text-gray-800 mb-2 flex items-center gap-2">
-                        <Target className="h-4 w-4 text-blue-600" />
+                        <Target className="h-4 w-4 text-orange-600" />
                         集中度の推移
                       </h4>
                       <p className="text-sm text-gray-700 leading-relaxed">{data.focus_trend}</p>
@@ -332,15 +332,15 @@ export function ReportsTab({ workLogs, userId, onRefresh }: ReportsTabProps) {
                   </div>
 
                   {/* 重要な発見 */}
-                  <div className="p-4 bg-white rounded-lg border border-blue-100 shadow-sm">
+                  <div className="p-4 bg-white rounded-lg border border-orange-100 shadow-sm">
                     <h4 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-blue-600" />
+                      <CheckCircle className="h-4 w-4 text-orange-600" />
                       重要な発見
                     </h4>
                     <ul className="space-y-2">
                       {data.key_findings.map((finding, idx) => (
                         <li key={idx} className="flex items-start gap-2 text-sm text-gray-700">
-                          <span className="text-blue-600 mt-0.5 flex-shrink-0">•</span>
+                          <span className="text-orange-600 mt-0.5 flex-shrink-0">•</span>
                           <span className="leading-relaxed">{finding}</span>
                         </li>
                       ))}

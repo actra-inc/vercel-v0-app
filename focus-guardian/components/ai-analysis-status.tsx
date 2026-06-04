@@ -32,13 +32,13 @@ export function AIAnalysisStatus({
   }
 
   return (
-    <Card className="mb-4 shadow-lg border-0 bg-gradient-to-br from-indigo-50 to-purple-50">
-      <CardHeader className="pb-3 bg-gradient-to-r from-indigo-100 to-purple-100 rounded-t-lg border-b border-indigo-200">
+    <Card className="mb-4 shadow-lg border-0 bg-gradient-to-br from-orange-50 to-amber-50">
+      <CardHeader className="pb-3 bg-gradient-to-r from-orange-100 to-amber-100 rounded-t-lg border-b border-orange-200">
         <CardTitle className="flex items-center gap-2 text-lg text-gray-800">
-          <Brain className="h-5 w-5 text-indigo-600" />
+          <Brain className="h-5 w-5 text-orange-600" />
           AI分析サマリー
           {isAnalyzing && (
-            <Badge variant="secondary" className="animate-pulse bg-blue-100 text-blue-700 border-blue-200">
+            <Badge variant="secondary" className="animate-pulse bg-orange-100 text-orange-700 border-orange-200">
               解析中...
             </Badge>
           )}
@@ -47,22 +47,22 @@ export function AIAnalysisStatus({
       <CardContent>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* 総ログ数 */}
-          <div className="text-center p-4 bg-white/60 rounded-lg border border-blue-100 shadow-sm">
+          <div className="text-center p-4 bg-white/60 rounded-lg border border-orange-100 shadow-sm">
             <div className="flex items-center justify-center gap-2 mb-3">
-              <div className="p-2 bg-blue-100 rounded-full">
-                <Zap className="h-4 w-4 text-blue-600" />
+              <div className="p-2 bg-orange-100 rounded-full">
+                <Zap className="h-4 w-4 text-orange-600" />
               </div>
               <span className="text-sm font-medium text-gray-700">解析済みログ</span>
             </div>
-            <div className="text-3xl font-bold text-blue-600 mb-1">{totalLogs}</div>
+            <div className="text-3xl font-bold text-orange-600 mb-1">{totalLogs}</div>
             <div className="text-xs text-gray-500">件</div>
           </div>
 
           {/* 平均集中度 */}
-          <div className="text-center p-4 bg-white/60 rounded-lg border border-purple-100 shadow-sm">
+          <div className="text-center p-4 bg-white/60 rounded-lg border border-amber-100 shadow-sm">
             <div className="flex items-center justify-center gap-2 mb-3">
-              <div className="p-2 bg-purple-100 rounded-full">
-                <TrendingUp className="h-4 w-4 text-purple-600" />
+              <div className="p-2 bg-amber-100 rounded-full">
+                <TrendingUp className="h-4 w-4 text-amber-600" />
               </div>
               <span className="text-sm font-medium text-gray-700">平均集中度</span>
             </div>
@@ -90,8 +90,8 @@ export function AIAnalysisStatus({
         </div>
 
         {totalLogs > 0 && (
-          <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-            <div className="text-sm text-blue-800">
+          <div className="mt-4 p-3 bg-orange-50 border border-orange-200 rounded-lg">
+            <div className="text-sm text-orange-800">
               💡 <strong>AI分析結果:</strong>
               {averageFocusScore >= 70
                 ? " 高い集中力を維持できています！"

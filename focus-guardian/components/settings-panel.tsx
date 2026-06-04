@@ -86,7 +86,7 @@ export function SettingsPanel({
       <Card className="m-4">
         <CardContent className="pt-4">
           <div className="flex items-center justify-center py-8">
-            <Loader2 className="h-6 w-6 animate-spin text-blue-600 mr-2" />
+            <Loader2 className="h-6 w-6 animate-spin text-orange-600 mr-2" />
             <span className="text-gray-600">設定を読み込み中...</span>
           </div>
         </CardContent>
@@ -97,10 +97,10 @@ export function SettingsPanel({
   return (
     <ErrorBoundary>
       <Card className="border-2 shadow-lg">
-        <CardHeader className="bg-gradient-to-r from-blue-50 to-purple-50 border-b">
+        <CardHeader className="bg-gradient-to-r from-orange-50 to-amber-50 border-b">
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2">
-              <Settings className="h-5 w-5 text-blue-600" />
+              <Settings className="h-5 w-5 text-orange-600" />
               アプリケーション設定
             </CardTitle>
             <Button variant="ghost" size="sm" onClick={onClose}>

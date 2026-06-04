@@ -111,7 +111,7 @@ export function ApiUsageMonitor({ requestCount, onUsageUpdate }: ApiUsageMonitor
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Clock className="h-4 w-4 text-blue-600" />
+              <Clock className="h-4 w-4 text-orange-600" />
               <span className="text-sm font-medium">分間リクエスト数</span>
             </div>
             <span className="text-sm font-bold">
@@ -168,7 +168,7 @@ export function ApiUsageMonitor({ requestCount, onUsageUpdate }: ApiUsageMonitor
         {/* 使用量の詳細 */}
         <div className="grid grid-cols-2 gap-4 p-3 bg-gray-50 rounded-lg">
           <div className="text-center">
-            <div className="text-lg font-bold text-blue-600">{requestCount}</div>
+            <div className="text-lg font-bold text-orange-600">{requestCount}</div>
             <div className="text-xs text-gray-600">総リクエスト数</div>
           </div>
           <div className="text-center">

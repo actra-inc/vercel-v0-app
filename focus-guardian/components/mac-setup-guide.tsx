@@ -82,7 +82,7 @@ export function MacSetupGuide() {
               key={index}
               className={`flex items-start gap-3 p-3 rounded-lg border transition-colors ${
                 index === currentStep
-                  ? "bg-blue-50 border-blue-200"
+                  ? "bg-orange-50 border-orange-200"
                   : index < currentStep
                     ? "bg-green-50 border-green-200"
                     : "bg-gray-50 border-gray-200"
@@ -91,7 +91,7 @@ export function MacSetupGuide() {
               <div
                 className={`p-2 rounded-full ${
                   index === currentStep
-                    ? "bg-blue-100 text-blue-600"
+                    ? "bg-orange-100 text-orange-600"
                     : index < currentStep
                       ? "bg-green-100 text-green-600"
                       : "bg-gray-100 text-gray-600"

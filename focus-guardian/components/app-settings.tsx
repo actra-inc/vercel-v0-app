@@ -64,8 +64,8 @@ export function AppSettings({ captureInterval, onCaptureIntervalChange }: AppSet
             <p className="text-xs text-gray-500">集中作業時は短い間隔、バッテリー節約時は長い間隔がおすすめです</p>
           </div>
 
-          <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-            <div className="text-sm text-blue-800">
+          <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg">
+            <div className="text-sm text-orange-800">
               <div className="font-medium mb-2">💡 推奨設定:</div>
               <ul className="list-disc list-inside space-y-1 text-xs">
                 <li>集中作業時: 30秒〜1分間隔</li>

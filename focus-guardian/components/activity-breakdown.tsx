@@ -118,10 +118,10 @@ export function ActivityBreakdown({
 
   return (
     <Card className="shadow-lg border-0 bg-white/90 backdrop-blur-sm">
-      <CardHeader className="pb-3 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-t-lg border-b border-gray-100">
+      <CardHeader className="pb-3 bg-gradient-to-r from-orange-50 to-amber-50 rounded-t-lg border-b border-gray-100">
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2 text-gray-800">
-            <BarChart3 className="h-5 w-5 text-indigo-600" />
+            <BarChart3 className="h-5 w-5 text-orange-600" />
             作業種類の内訳
           </CardTitle>
           <Button

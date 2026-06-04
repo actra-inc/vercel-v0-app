@@ -123,8 +123,8 @@ export function DistractionAlert({ result, plannedTask, actualActivity, onDismis
             </div>
 
             {result.is_distracted && (
-              <Alert className="border-blue-200 bg-blue-50">
-                <AlertDescription className="text-blue-800">
+              <Alert className="border-orange-200 bg-orange-50">
+                <AlertDescription className="text-orange-800">
                   💡 <strong>提案:</strong> {result.suggestion}
                 </AlertDescription>
               </Alert>

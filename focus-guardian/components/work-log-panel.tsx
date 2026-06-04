@@ -438,9 +438,9 @@ export function WorkLogPanel({
 
       {/* 画面解析コントロール */}
       <Card className="shadow-lg border-0 bg-white/90 backdrop-blur-sm">
-        <CardHeader className="pb-3 bg-gradient-to-r from-purple-50 to-pink-50 rounded-t-lg border-b border-gray-100">
+        <CardHeader className="pb-3 bg-gradient-to-r from-amber-50 to-pink-50 rounded-t-lg border-b border-gray-100">
           <CardTitle className="flex items-center gap-2 text-gray-800">
-            <Camera className="h-5 w-5 text-purple-600" />
+            <Camera className="h-5 w-5 text-amber-600" />
             画面解析 + 脱線検知
             <div
               className={cn(
@@ -448,7 +448,7 @@ export function WorkLogPanel({
                 isTracking ? "bg-green-500 animate-pulse" : "bg-gray-400",
               )}
             />
-            <Badge variant="outline" className="ml-auto border-purple-200 text-purple-700 bg-purple-50">
+            <Badge variant="outline" className="ml-auto border-amber-200 text-amber-700 bg-amber-50">
               <Zap className="h-3 w-3 mr-1" />
               {captureInterval < 60 ? `${captureInterval}秒間隔` : `${captureInterval / 60}分間隔`}
             </Badge>
@@ -482,8 +482,8 @@ export function WorkLogPanel({
           )}
 
           {isTracking && lastCaptureTime && (
-            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-              <div className="text-sm text-blue-800">
+            <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg">
+              <div className="text-sm text-orange-800">
                 <div className="font-medium">📸 自動キャプチャ実行中</div>
                 <div className="text-xs mt-1">
                   最終キャプチャ: {lastCaptureTime.toLocaleTimeString("ja-JP")}
@@ -503,7 +503,7 @@ export function WorkLogPanel({
                 "flex items-center gap-2 shadow-md transition-all duration-200",
                 isTracking
                   ? "bg-red-500 hover:bg-red-600 shadow-red-200"
-                  : "bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 shadow-blue-200",
+                  : "bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 shadow-orange-200",
               )}
             >
               {isOcrLoading ? (
@@ -570,8 +570,8 @@ export function WorkLogPanel({
           </div>
 
           {currentTask ? (
-            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-              <div className="text-sm text-blue-800">
+            <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg">
+              <div className="text-sm text-orange-800">
                 <div className="font-medium mb-1">🎯 現在の予定作業:</div>
                 <div>{currentTask}</div>
                 <div className="text-xs mt-1 opacity-75">この内容と画面解析結果を比較して脱線を自動判定します</div>
@@ -606,7 +606,7 @@ export function WorkLogPanel({
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2 text-gray-800">
               作業ログ
-              <Badge variant="secondary" className="bg-blue-100 text-blue-700 border-blue-200">
+              <Badge variant="secondary" className="bg-orange-100 text-orange-700 border-orange-200">
                 {regularLogsCount}件
               </Badge>
               {isAnalyzing && (

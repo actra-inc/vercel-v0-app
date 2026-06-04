@@ -146,7 +146,7 @@ const Page = () => {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="text-center">
-          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-600 border-r-transparent"></div>
+          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-orange-600 border-r-transparent"></div>
           <p className="mt-4 text-gray-600">認証状態を確認中...</p>
         </div>
       </div>
@@ -155,7 +155,7 @@ const Page = () => {
 
   if (!isLoggedIn) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-orange-50 to-orange-100 p-4">
         <Card className="w-full max-w-md shadow-xl">
           <CardHeader className="space-y-1 text-center">
             <div className="mx-auto mb-4">
@@ -216,7 +216,7 @@ const Page = () => {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="text-center">
-          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-600 border-r-transparent"></div>
+          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-orange-600 border-r-transparent"></div>
           <p className="mt-4 text-gray-600">データを読み込み中...</p>
         </div>
       </div>
@@ -262,7 +262,7 @@ const Page = () => {
               <FileText className="h-4 w-4" />
               レポート
               {reportsCount > 0 && (
-                <span className="ml-1 rounded-full bg-blue-500 px-2 py-0.5 text-xs text-white">{reportsCount}</span>
+                <span className="ml-1 rounded-full bg-orange-500 px-2 py-0.5 text-xs text-white">{reportsCount}</span>
               )}
             </TabsTrigger>
             <TabsTrigger value="breakdown" className="gap-2">

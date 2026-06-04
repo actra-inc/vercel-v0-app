@@ -20,7 +20,7 @@ export function ScreenCaptureStatus({
 }: ScreenCaptureStatusProps) {
   const getStatusColor = () => {
     if (!isTracking) return "bg-gray-100 text-gray-800"
-    if (isAnalyzing) return "bg-blue-100 text-blue-800"
+    if (isAnalyzing) return "bg-orange-100 text-orange-800"
     return "bg-green-100 text-green-800"
   }
 
@@ -72,10 +72,10 @@ export function ScreenCaptureStatus({
         )}
 
         {!isTracking && (
-          <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-            <div className="text-sm text-blue-800">
+          <div className="mt-3 p-3 bg-orange-50 border border-orange-200 rounded-lg">
+            <div className="text-sm text-orange-800">
               💡 <strong>画面共有の手順:</strong>
-              <ol className="mt-2 list-decimal list-inside space-y-1 text-blue-700">
+              <ol className="mt-2 list-decimal list-inside space-y-1 text-orange-700">
                 <li>「開始」ボタンをクリック</li>
                 <li>ブラウザの許可ダイアログで共有する画面/ウィンドウを選択</li>
                 <li>「共有」ボタンをクリックして許可</li>

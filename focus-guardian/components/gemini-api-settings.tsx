@@ -84,7 +84,7 @@ export function GeminiApiSettings({ apiKey, model, onApiKeyChange, onModelChange
               href="https://aistudio.google.com/app/apikey"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-blue-600 hover:underline"
+              className="text-orange-600 hover:underline"
             >
               Google AI Studio
             </a>

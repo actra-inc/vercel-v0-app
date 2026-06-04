@@ -245,8 +245,8 @@ export function TogglSettings() {
 
           {currentEntry && (
             <div className="space-y-3">
-              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                <div className="text-sm text-blue-800">
+              <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                <div className="text-sm text-orange-800">
                   <div className="font-medium mb-2">📊 現在のTogglエントリ:</div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div>
