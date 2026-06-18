@@ -441,7 +441,7 @@ export function TimeTracker({
             </Label>
             <Input
               id="description"
-              placeholder="{t('tt_taskPlaceholder')}"
+              placeholder={t('tt_taskPlaceholder')}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               disabled={isRunning}

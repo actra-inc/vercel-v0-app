@@ -5,12 +5,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Volume2, VolumeX, CheckCircle, AlertTriangle } from "lucide-react"
+import { useTranslation } from "@/lib/i18n"
 
 interface AudioPermissionManagerProps {
   onPermissionGranted: () => void
 }
 
 export function AudioPermissionManager({ onPermissionGranted }: AudioPermissionManagerProps) {
+  const { t } = useTranslation()
   const [audioPermission, setAudioPermission] = useState<"granted" | "denied" | "prompt" | "unknown">("unknown")
   const [isTestingAudio, setIsTestingAudio] = useState(false)
 
@@ -20,13 +22,10 @@ export function AudioPermissionManager({ onPermissionGranted }: AudioPermissionM
 
   const checkAudioPermission = async () => {
     try {
-      // Web Audio APIの利用可能性をチェック
       if (!window.AudioContext && !(window as any).webkitAudioContext) {
         setAudioPermission("denied")
         return
       }
-
-      // 基本的にWeb Audio APIは許可不要だが、ユーザーインタラクションが必要
       setAudioPermission("prompt")
     } catch (error) {
       console.error("Audio permission check error:", error)
@@ -37,12 +36,9 @@ export function AudioPermissionManager({ onPermissionGranted }: AudioPermissionM
   const requestAudioPermission = async () => {
     try {
       setIsTestingAudio(true)
-
-      // ユーザーインタラクションによってAudioContextを初期化
       const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext
       const audioContext = new AudioContextClass()
 
-      // テスト音を再生
       const oscillator = audioContext.createOscillator()
       const gainNode = audioContext.createGain()
 
@@ -73,11 +69,9 @@ export function AudioPermissionManager({ onPermissionGranted }: AudioPermissionM
   const playTestSound = async () => {
     try {
       setIsTestingAudio(true)
-
       const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext
       const audioContext = new AudioContextClass()
 
-      // 脱線警告音のテスト
       for (let i = 0; i < 2; i++) {
         setTimeout(() => {
           const oscillator = audioContext.createOscillator()
@@ -138,9 +132,9 @@ export function AudioPermissionManager({ onPermissionGranted }: AudioPermissionM
       <Alert className="border-green-200 bg-green-50 mb-4">
         <CheckCircle className="h-4 w-4 text-green-600" />
         <AlertDescription className="flex items-center justify-between">
-          <span>🔊 音声アラート機能が有効です</span>
+          <span>{t('ap_granted')}</span>
           <Button variant="outline" size="sm" onClick={playTestSound} disabled={isTestingAudio}>
-            {isTestingAudio ? "再生中..." : "テスト音"}
+            {isTestingAudio ? t('ap_playingTest') : t('ap_testSound')}
           </Button>
         </AlertDescription>
       </Alert>
@@ -152,7 +146,7 @@ export function AudioPermissionManager({ onPermissionGranted }: AudioPermissionM
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2">
           {getPermissionIcon()}
-          音声アラート設定
+          {t('ap_title')}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -160,16 +154,14 @@ export function AudioPermissionManager({ onPermissionGranted }: AudioPermissionM
           <AlertDescription>
             {audioPermission === "prompt" && (
               <div>
-                <div className="font-medium mb-2">🔊 音声アラート機能を有効にしてください</div>
-                <div className="text-sm">脱線検知時に警告音を再生するため、音声機能の初期化が必要です。</div>
+                <div className="font-medium mb-2">{t('ap_promptTitle')}</div>
+                <div className="text-sm">{t('ap_promptDesc')}</div>
               </div>
             )}
             {audioPermission === "denied" && (
               <div>
-                <div className="font-medium mb-2 text-red-800">❌ 音声機能が利用できません</div>
-                <div className="text-sm text-red-700">
-                  ブラウザまたはシステムの設定で音声が無効になっている可能性があります。
-                </div>
+                <div className="font-medium mb-2 text-red-800">{t('ap_deniedTitle')}</div>
+                <div className="text-sm text-red-700">{t('ap_deniedDesc')}</div>
               </div>
             )}
           </AlertDescription>
@@ -178,36 +170,21 @@ export function AudioPermissionManager({ onPermissionGranted }: AudioPermissionM
         {audioPermission === "prompt" && (
           <div className="space-y-3">
             <Button onClick={requestAudioPermission} disabled={isTestingAudio} className="w-full">
-              {isTestingAudio ? "テスト中..." : "音声アラートを有効にする"}
+              {isTestingAudio ? t('ap_testingButton') : t('ap_enableButton')}
             </Button>
 
             <div className="text-sm text-gray-600">
-              <div className="font-medium mb-2">🍎 macOS での音声設定:</div>
+              <div className="font-medium mb-2">{t('ap_macTitle')}</div>
               <ul className="list-disc list-inside space-y-1 text-xs">
-                <li>システム設定 &gt; サウンド &gt; 出力 でスピーカーが選択されていることを確認</li>
-                <li>ブラウザの音量がミュートになっていないことを確認</li>
-                <li>システムの音量が適切に設定されていることを確認</li>
-                <li>「おやすみモード」が有効になっていないことを確認</li>
+                <li>{t('ap_macStep1')}</li>
+                <li>{t('ap_macStep2')}</li>
+                <li>{t('ap_macStep3')}</li>
+                <li>{t('ap_macStep4')}</li>
               </ul>
             </div>
           </div>
         )}
 
-        {audioPermission === "granted" && (
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              onClick={playTestSound}
-              disabled={isTestingAudio}
-              className="flex-1 bg-transparent"
-            >
-              {isTestingAudio ? "再生中..." : "警告音をテスト"}
-            </Button>
-            <Button variant="outline" onClick={checkAudioPermission} className="flex-1 bg-transparent">
-              再確認
-            </Button>
-          </div>
-        )}
       </CardContent>
     </Card>
   )
