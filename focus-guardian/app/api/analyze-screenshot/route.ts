@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "API key is required" }, { status: 400 })
     }
 
-    const analysisModel = "gemma-3-4b-it"
+    const analysisModel = "gemma-4-26b-a4b-it"
     const analysisUrl = `https://generativelanguage.googleapis.com/v1beta/models/${analysisModel}:generateContent?key=${apiKey}`
 
     const categoriesList = categories.join("、")

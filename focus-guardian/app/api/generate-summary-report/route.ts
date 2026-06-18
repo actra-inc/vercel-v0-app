@@ -72,7 +72,7 @@ ${recentLogs[2].distraction_check ? `- 脱線検知: ${recentLogs[2].distraction
 
     // Gemma API呼び出し（Gemini APIを使用しない）
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemma-3-4b-it:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemma-4-26b-a4b-it:generateContent?key=${apiKey}`,
       {
         method: "POST",
         headers: {
