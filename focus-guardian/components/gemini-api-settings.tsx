@@ -6,7 +6,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Key, Save, Loader2, CheckCircle2, AlertCircle } from "lucide-react"
 
@@ -17,10 +16,9 @@ interface GeminiApiSettingsProps {
   onModelChange: (model: string) => void
 }
 
-export function GeminiApiSettings({ apiKey, model, onApiKeyChange, onModelChange }: GeminiApiSettingsProps) {
+export function GeminiApiSettings({ apiKey, onApiKeyChange }: GeminiApiSettingsProps) {
   const { t } = useTranslation()
   const [localApiKey, setLocalApiKey] = useState(apiKey)
-  const [localModel, setLocalModel] = useState(model || "gemini-2.5-flash-lite")
   const [isSaving, setIsSaving] = useState(false)
   const [saveStatus, setSaveStatus] = useState<"idle" | "success" | "error">("idle")
   const [errorMessage, setErrorMessage] = useState("")
@@ -29,32 +27,16 @@ export function GeminiApiSettings({ apiKey, model, onApiKeyChange, onModelChange
     setLocalApiKey(apiKey)
   }, [apiKey])
 
-  useEffect(() => {
-    setLocalModel(model || "gemini-2.5-flash-lite")
-  }, [model])
-
   const handleSave = async () => {
     setIsSaving(true)
     setSaveStatus("idle")
     setErrorMessage("")
 
     try {
-      console.log("💾 Saving Gemini API settings:", { apiKey: localApiKey ? "***" : "", model: localModel })
-
-      // APIキーを親コンポーネントに通知
       await onApiKeyChange(localApiKey)
-
-      console.log("✅ API key change completed")
-
-      // モデルを親コンポーネントに通知
-      onModelChange(localModel)
-
-      console.log("✅ Model change completed")
-
       setSaveStatus("success")
       setTimeout(() => setSaveStatus("idle"), 3000)
     } catch (error) {
-      console.error("❌ Failed to save settings:", error)
       setSaveStatus("error")
       setErrorMessage(error instanceof Error ? error.message : t('ga_saveError'))
     } finally {
@@ -94,51 +76,10 @@ export function GeminiApiSettings({ apiKey, model, onApiKeyChange, onModelChange
           </p>
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="gemini-model">{t('ga_modelLabel')}</Label>
-          <Select value={localModel} onValueChange={setLocalModel} disabled={isSaving}>
-            <SelectTrigger id="gemini-model">
-              <SelectValue placeholder={t('ga_modelPlaceholder')} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="gemini-2.5-flash-lite">
-                <div className="flex flex-col">
-                  <span>{t('ga_title')} 2.5 Flash-Lite</span>
-                  <span className="text-xs text-gray-500">高速・低コスト・バランス型</span>
-                </div>
-              </SelectItem>
-              <SelectItem value="gemini-2.5-flash">
-                <div className="flex flex-col">
-                  <span>Gemini 2.5 Flash</span>
-                  <span className="text-xs text-gray-500">高速・高精度</span>
-                </div>
-              </SelectItem>
-              <SelectItem value="gemini-2.5-pro">
-                <div className="flex flex-col">
-                  <span>Gemini 2.5 Pro</span>
-                  <span className="text-xs text-gray-500">最高精度・高コスト</span>
-                </div>
-              </SelectItem>
-              <SelectItem value="gemini-2.0-flash-exp">
-                <div className="flex flex-col">
-                  <span>Gemini 2.0 Flash</span>
-                  <span className="text-xs text-gray-500">実験版・高速</span>
-                </div>
-              </SelectItem>
-              <SelectItem value="gemini-2.0-flash-lite">
-                <div className="flex flex-col">
-                  <span>Gemini 2.0 Flash-Lite</span>
-                  <span className="text-xs text-gray-500">実験版・超高速</span>
-                </div>
-              </SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
         {saveStatus === "success" && (
           <Alert className="bg-green-50 border-green-200">
             <CheckCircle2 className="h-4 w-4 text-green-600" />
-            <AlertDescription className="text-green-800">設定を保存しました</AlertDescription>
+            <AlertDescription className="text-green-800">{t('ga_savedSuccess')}</AlertDescription>
           </Alert>
         )}
 
@@ -153,12 +94,12 @@ export function GeminiApiSettings({ apiKey, model, onApiKeyChange, onModelChange
           {isSaving ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              保存中...
+              {t('ga_savingButton')}
             </>
           ) : (
             <>
               <Save className="mr-2 h-4 w-4" />
-              保存
+              {t('ga_saveButton')}
             </>
           )}
         </Button>

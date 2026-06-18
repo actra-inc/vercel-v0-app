@@ -36,7 +36,6 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData()
     const extractedText = formData.get("extractedText") as string
     const apiKey = formData.get("apiKey") as string
-    const model = (formData.get("model") as string) || "gemini-2.5-flash-lite"
     const currentTask = formData.get("currentTask") as string
     const categoriesJson = formData.get("categories") as string
     const categories: string[] = categoriesJson
@@ -51,7 +50,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "API key is required" }, { status: 400 })
     }
 
-    const analysisUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
+    const analysisModel = "gemma-3-4b-it"
+    const analysisUrl = `https://generativelanguage.googleapis.com/v1beta/models/${analysisModel}:generateContent?key=${apiKey}`
 
     const categoriesList = categories.join("、")
     const analysisPrompt = `あなたは作業効率モニタリングシステムです。画面情報を分析し、予定作業との一致度を判定してください。
