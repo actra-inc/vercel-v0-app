@@ -1,4 +1,5 @@
 "use client"
+import { useTranslation } from "@/lib/i18n"
 
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -47,6 +48,7 @@ interface WorkLogItemProps {
 }
 
 export function WorkLogItem({ log, onPlayAlert }: WorkLogItemProps) {
+  const { t } = useTranslation()
   // レポートタイプの場合は専用コンポーネントで表示
   if (log.report_type === "summary" && log.report_data) {
     return <WorkSummaryReport timestamp={log.timestamp} reportData={log.report_data} />

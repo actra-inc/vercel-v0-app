@@ -10,6 +10,7 @@ import { GeminiApiSettings } from "@/components/gemini-api-settings"
 import { TogglSettings } from "@/components/toggl-settings"
 import { ProjectManager } from "@/components/project-manager"
 import { AppSettings } from "@/components/app-settings"
+import { useTranslation } from "@/lib/i18n"
 
 interface SettingsPanelProps {
   apiKey: string
@@ -46,6 +47,7 @@ export function SettingsPanel({
   editProject,
   removeProject,
 }: SettingsPanelProps) {
+  const { t } = useTranslation()
   const [mounted, setMounted] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState("gemini")
@@ -55,7 +57,7 @@ export function SettingsPanel({
       setMounted(true)
     } catch (err) {
       console.error("Settings panel mount error:", err)
-      setError(err instanceof Error ? err.message : "マウントエラー")
+      setError(err instanceof Error ? err.message : t('sp_mountError'))
     }
 
     return () => {
@@ -71,7 +73,7 @@ export function SettingsPanel({
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
               <div className="text-yellow-800">
-                <p className="font-medium">設定パネルの読み込みに問題が発生しました</p>
+                <p className="font-medium">{t('sp_loadError')}</p>
                 <p className="text-sm mt-1">{error}</p>
               </div>
             </AlertDescription>
@@ -87,7 +89,7 @@ export function SettingsPanel({
         <CardContent className="pt-4">
           <div className="flex items-center justify-center py-8">
             <Loader2 className="h-6 w-6 animate-spin text-orange-600 mr-2" />
-            <span className="text-gray-600">設定を読み込み中...</span>
+            <span className="text-gray-600">{t('sp_loading')}</span>
           </div>
         </CardContent>
       </Card>
@@ -101,7 +103,7 @@ export function SettingsPanel({
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2">
               <Settings className="h-5 w-5 text-orange-600" />
-              アプリケーション設定
+              {t('sp_title')}
             </CardTitle>
             <Button variant="ghost" size="sm" onClick={onClose}>
               <X className="h-4 w-4" />
@@ -113,19 +115,19 @@ export function SettingsPanel({
             <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="gemini" className="flex items-center gap-2">
                 <Key className="h-4 w-4" />
-                Gemini API
+                {t('sp_tabGemini')}
               </TabsTrigger>
               <TabsTrigger value="toggl" className="flex items-center gap-2">
                 <Link className="h-4 w-4" />
-                Toggl連携
+                {t('sp_tabToggl')}
               </TabsTrigger>
               <TabsTrigger value="projects" className="flex items-center gap-2">
                 <FolderOpen className="h-4 w-4" />
-                プロジェクト
+                {t('sp_tabProjects')}
               </TabsTrigger>
               <TabsTrigger value="app" className="flex items-center gap-2">
                 <Settings className="h-4 w-4" />
-                その他
+                {t('sp_tabOther')}
               </TabsTrigger>
             </TabsList>
 
@@ -154,7 +156,7 @@ export function SettingsPanel({
               ) : (
                 <Alert>
                   <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>プロジェクト管理機能を読み込めませんでした</AlertDescription>
+                  <AlertDescription>{t('sp_projectLoadError')}</AlertDescription>
                 </Alert>
               )}
             </TabsContent>

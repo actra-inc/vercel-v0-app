@@ -1,4 +1,5 @@
 "use client"
+import { useTranslation } from "@/lib/i18n"
 
 import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -8,28 +9,29 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Monitor, Shield, RefreshCw, ExternalLink } from "lucide-react"
 
 export function MacSetupGuide() {
+  const { t } = useTranslation()
   const [isExpanded, setIsExpanded] = useState(false)
   const [currentStep, setCurrentStep] = useState(0)
 
   const setupSteps = [
     {
-      title: "システム設定を開く",
-      description: "Appleメニュー > システム設定 をクリック",
+      title: t('ms_step1Title'),
+      description: t('ms_step1Desc'),
       icon: <Shield className="h-5 w-5" />,
     },
     {
-      title: "プライバシーとセキュリティ",
-      description: "左サイドバーから「プライバシーとセキュリティ」を選択",
+      title: t('ms_step2Title'),
+      description: t('ms_step2Desc'),
       icon: <Shield className="h-5 w-5" />,
     },
     {
-      title: "画面収録を許可",
-      description: "「画面収録」をクリックし、使用中のブラウザ（Safari/Chrome）をオンにする",
+      title: t('ms_step3Title'),
+      description: t('ms_step3Desc'),
       icon: <Monitor className="h-5 w-5" />,
     },
     {
-      title: "ブラウザを再起動",
-      description: "ブラウザを完全に終了して再起動する",
+      title: t('ms_step4Title'),
+      description: t('ms_step4Desc'),
       icon: <RefreshCw className="h-5 w-5" />,
     },
   ]
@@ -43,7 +45,7 @@ export function MacSetupGuide() {
     } else if (userAgent.includes("Firefox")) {
       return "Firefox"
     }
-    return "ブラウザ"
+    return t('ms_browser')
   }
 
   const browserName = detectBrowser()
@@ -53,9 +55,9 @@ export function MacSetupGuide() {
       <Alert className="mb-4">
         <Shield className="h-4 w-4" />
         <AlertDescription className="flex items-center justify-between">
-          <span>🍎 Mac で画面共有を使用するには追加設定が必要です</span>
+          <span>{t('ms_alertText')}</span>
           <Button variant="outline" size="sm" onClick={() => setIsExpanded(true)}>
-            設定方法を見る
+            {t('ms_setupButton')}
           </Button>
         </AlertDescription>
       </Alert>
@@ -67,7 +69,7 @@ export function MacSetupGuide() {
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2">
-            🍎 Mac での画面共有設定
+            {t('ms_cardTitle')}
             <Badge variant="outline">{browserName}</Badge>
           </CardTitle>
           <Button variant="ghost" size="sm" onClick={() => setIsExpanded(false)}>
@@ -118,11 +120,11 @@ export function MacSetupGuide() {
             <div className="flex items-start gap-2">
               <span className="text-yellow-600">⚠️</span>
               <div className="text-sm">
-                <div className="font-medium text-yellow-800">重要な注意事項:</div>
+                <div className="font-medium text-yellow-800">{t('ms_important')}</div>
                 <ul className="mt-2 space-y-1 text-yellow-700">
-                  <li>• 設定変更後は必ずブラウザを完全に再起動してください</li>
-                  <li>• 初回は「画面を共有しますか？」のダイアログが表示されます</li>
-                  <li>• プライベートブラウジングでは動作しない場合があります</li>
+                  <li>• {t('ms_note1')}</li>
+                  <li>• {t('ms_note2')}</li>
+                  <li>• {t('ms_note3')}</li>
                 </ul>
               </div>
             </div>

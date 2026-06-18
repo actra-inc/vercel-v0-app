@@ -1,4 +1,5 @@
 "use client"
+import { useTranslation } from "@/lib/i18n"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -25,6 +26,7 @@ interface WorkSummaryReportProps {
 }
 
 export function WorkSummaryReport({ timestamp, reportData }: WorkSummaryReportProps) {
+  const { t } = useTranslation()
   return (
     <Card className="shadow-xl border-0 bg-gradient-to-br from-orange-50 via-white to-orange-50">
       <CardHeader className="pb-4 bg-gradient-to-r from-orange-100 to-orange-100 rounded-t-lg">
@@ -34,7 +36,7 @@ export function WorkSummaryReport({ timestamp, reportData }: WorkSummaryReportPr
               <FileText className="h-5 w-5 text-white" />
             </div>
             <div>
-              <CardTitle className="text-xl text-gray-800">作業統合レポート（自動生成）</CardTitle>
+              <CardTitle className="text-xl text-gray-800">{t('wsr_title')}</CardTitle>
               <p className="text-sm text-gray-600 mt-1">
                 <Clock className="h-3 w-3 inline mr-1" />
                 {timestamp.toLocaleString("ja-JP")}
@@ -67,7 +69,7 @@ export function WorkSummaryReport({ timestamp, reportData }: WorkSummaryReportPr
             <div className="flex items-center gap-3">
               <div className="flex-1">
                 <div className="flex justify-between text-sm mb-1">
-                  <span className="text-gray-600">生産的な時間</span>
+                  <span className="text-gray-600">{t('wsr_productiveTime')}</span>
                   <span className="font-semibold text-green-600">{reportData.time_distribution.productive_time}%</span>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-2">
@@ -81,7 +83,7 @@ export function WorkSummaryReport({ timestamp, reportData }: WorkSummaryReportPr
             <div className="flex items-center gap-3">
               <div className="flex-1">
                 <div className="flex justify-between text-sm mb-1">
-                  <span className="text-gray-600">脱線時間</span>
+                  <span className="text-gray-600">{t('wsr_distractionTime')}</span>
                   <span className="font-semibold text-red-600">{reportData.time_distribution.distracted_time}%</span>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-2">
@@ -95,7 +97,7 @@ export function WorkSummaryReport({ timestamp, reportData }: WorkSummaryReportPr
             <div className="flex items-center gap-3">
               <div className="flex-1">
                 <div className="flex justify-between text-sm mb-1">
-                  <span className="text-gray-600">中立時間</span>
+                  <span className="text-gray-600">{t('wsr_neutralTime')}</span>
                   <span className="font-semibold text-gray-600">{reportData.time_distribution.neutral_time}%</span>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-2">

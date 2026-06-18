@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Play, Pause, Square, Clock, Trash2, RefreshCw, Loader2, Calendar, ChevronDown, ChevronUp, ToggleLeft, Monitor } from "lucide-react"
 import { useGoogleCalendar, getEventColor } from "@/hooks/use-google-calendar"
+import { useTranslation } from "@/lib/i18n"
 
 interface TimeEntry {
   id: string
@@ -60,6 +61,7 @@ export function TimeTracker({
   const togglIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const isRunningRef = useRef(isRunning)
 
+  const { t } = useTranslation()
   const { events, loading: calendarLoading, error: calendarError, needsReauth, fetchTodayEvents, formatEventTime, isEventNow } = useGoogleCalendar()
 
   // isRunning の最新値を ref で追跡（ポーリングコールバック内で使用）
@@ -100,7 +102,7 @@ export function TimeTracker({
 
   const fetchTogglCurrentEntry = useCallback(async () => {
     if (!togglApiToken || !togglWorkspaceId) {
-      setTogglError("Togglのトークンとワークスペースが設定されていません。設定画面から入力してください。")
+      setTogglError(t('tt_togglNotConfigured'))
       return
     }
     setTogglLoading(true)
@@ -109,7 +111,7 @@ export function TimeTracker({
       const res = await fetch(`/api/toggl-current?apiToken=${encodeURIComponent(togglApiToken)}&workspaceId=${encodeURIComponent(togglWorkspaceId)}`)
       const data = await res.json()
       if (!res.ok || data.error) {
-        setTogglError(data.error || "Togglの取得に失敗しました")
+        setTogglError(data.error || t('tt_togglError'))
         return
       }
       const entry = data.description
@@ -123,7 +125,7 @@ export function TimeTracker({
         setSelectedEventColor(null)
       }
     } catch {
-      setTogglError("Togglの取得に失敗しました")
+      setTogglError(t('tt_togglError'))
     } finally {
       setTogglLoading(false)
     }
@@ -153,7 +155,7 @@ export function TimeTracker({
   }
 
   const startTimer = () => {
-    const taskDescription = description || "作業中..."
+    const taskDescription = description || t('tt_working')
 
     // Togglモードで実行中エントリがある場合はTogglの開始時刻を使い、経過時間を同期する
     const startTime =
@@ -214,7 +216,7 @@ export function TimeTracker({
   }
 
   const formatTime = (date: Date) => {
-    return date.toLocaleTimeString("ja-JP", {
+    return date.toLocaleTimeString("ja-JP", {  // keep ja-JP for time formatting
       hour: "2-digit",
       minute: "2-digit",
     })
@@ -245,7 +247,7 @@ export function TimeTracker({
         <CardHeader className="pb-3 bg-white border-b border-gray-100">
           <CardTitle className="flex items-center gap-2 text-gray-800">
             <Clock className="h-5 w-5 text-orange-600" />
-            タイムトラッカー
+            {t('tt_title')}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4 pt-6">
@@ -274,7 +276,7 @@ export function TimeTracker({
               }`}
             >
               <Calendar className="h-4 w-4" />
-              Googleカレンダー
+              {t('tt_googleCalendar')}
             </button>
             <button
               onClick={() => setTaskSource("toggl")}
@@ -286,7 +288,7 @@ export function TimeTracker({
               }`}
             >
               <ToggleLeft className="h-4 w-4" />
-              Toggl
+              {t('tt_toggl')}
             </button>
           </div>
 
@@ -309,7 +311,7 @@ export function TimeTracker({
               >
                 <span className="flex items-center gap-2">
                   <Calendar className="h-4 w-4" />
-                  カレンダーから作業内容を選択
+                  {t('tt_selectFromCalendar')}
                 </span>
                 {showCalendar ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
               </Button>
@@ -324,7 +326,7 @@ export function TimeTracker({
               {showCalendar && (
                 <div className="border border-green-100 rounded-lg p-3 bg-green-50 space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-green-800">今日の予定</span>
+                    <span className="text-xs font-medium text-green-800">{t('tt_todaySchedule')}</span>
                     <Button
                       variant="ghost"
                       size="sm"
@@ -341,14 +343,14 @@ export function TimeTracker({
                       {calendarError}
                       {needsReauth && (
                         <div className="mt-1 text-xs text-gray-500">
-                          ※ 一度ログアウトして再度Googleでログインしてください
+                          {t('tt_reloginPrompt')}
                         </div>
                       )}
                     </div>
                   )}
 
                   {!calendarLoading && !calendarError && events.length === 0 && (
-                    <div className="text-xs text-gray-500 text-center py-2">今日の予定はありません</div>
+                    <div className="text-xs text-gray-500 text-center py-2">{t('tt_noEventsToday')}</div>
                   )}
 
                   {events.map((event) => {
@@ -385,10 +387,10 @@ export function TimeTracker({
             <div className="border border-orange-100 rounded-lg p-3 bg-orange-50 space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-medium text-orange-800">
-                  Toggl自動同期（3分ごと）
+                  {t('tt_togglAutoSync')}
                   {togglLastFetched && (
                     <span className="ml-2 text-orange-500 font-normal">
-                      最終取得: {togglLastFetched.toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" })}
+                      {t('tt_lastFetched')} {togglLastFetched.toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" })}
                     </span>
                   )}
                 </span>
@@ -408,7 +410,7 @@ export function TimeTracker({
               )}
 
               {!togglLoading && !togglError && !togglCurrentEntry && (
-                <div className="text-xs text-gray-500 text-center py-2">Togglで実行中のエントリがありません</div>
+                <div className="text-xs text-gray-500 text-center py-2">{t('tt_noTogglEntry')}</div>
               )}
 
               {togglCurrentEntry && (
@@ -421,7 +423,7 @@ export function TimeTracker({
                     <div className="w-2 h-2 rounded-full bg-orange-500 animate-pulse flex-shrink-0" />
                   )}
                   <div className="flex-1 min-w-0">
-                    <div className="font-medium truncate">{togglCurrentEntry.description || "説明なし"}</div>
+                    <div className="font-medium truncate">{togglCurrentEntry.description || t('tt_noDescription')}</div>
                     {togglCurrentEntry.project && (
                       <div className="text-xs text-gray-500 mt-0.5">{togglCurrentEntry.project}</div>
                     )}
@@ -434,12 +436,12 @@ export function TimeTracker({
           {/* 作業内容 */}
           <div className="space-y-2">
             <Label htmlFor="description" className="flex items-center gap-2">
-              作業内容
-              <span className="text-xs text-gray-500">(任意 - 脱線判定の精度向上に役立ちます)</span>
+              {t('tt_taskLabel')}
+              <span className="text-xs text-gray-500">{t('tt_taskLabelNote')}</span>
             </Label>
             <Input
               id="description"
-              placeholder="具体的な作業内容を入力すると、より正確な脱線判定が可能です"
+              placeholder="{t('tt_taskPlaceholder')}"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               disabled={isRunning}
@@ -449,7 +451,7 @@ export function TimeTracker({
               data-lpignore="true"
             />
             <div className="text-xs text-gray-500">
-              💡 入力すると画面解析結果と比較して脱線を自動判定します（未入力でも解析は実行されます）
+              {t('tt_taskHint')}
             </div>
           </div>
 
@@ -461,7 +463,7 @@ export function TimeTracker({
                 className="flex-1 flex items-center justify-center gap-2 h-11 bg-black hover:bg-gray-800"
               >
                 <Play className="h-4 w-4" />
-                開始
+                {t('tt_start')}
               </Button>
             ) : (
               <>
@@ -471,7 +473,7 @@ export function TimeTracker({
                   className="flex-1 flex items-center justify-center gap-2 h-11 bg-transparent"
                 >
                   <Pause className="h-4 w-4" />
-                  一時停止
+                  {t('tt_pause')}
                 </Button>
                 <Button
                   onClick={stopTimer}
@@ -479,7 +481,7 @@ export function TimeTracker({
                   className="flex-1 flex items-center justify-center gap-2 h-11"
                 >
                   <Square className="h-4 w-4" />
-                  停止
+                  {t('tt_stop')}
                 </Button>
               </>
             )}
@@ -491,7 +493,7 @@ export function TimeTracker({
       {todayEntries.length > 0 && (
         <Card className="shadow-md border border-gray-200">
           <CardHeader className="pb-3 bg-white border-b border-gray-100">
-            <CardTitle className="text-lg text-gray-800">今日のタイムエントリ</CardTitle>
+            <CardTitle className="text-lg text-gray-800">{t('tt_todayEntries')}</CardTitle>
           </CardHeader>
           <CardContent className="pt-4">
             <div className="space-y-3 max-h-64 overflow-y-auto">
@@ -529,7 +531,7 @@ export function TimeTracker({
         <CardHeader className="pb-3 bg-white border-b border-gray-100">
           <CardTitle className="flex items-center gap-2 text-lg text-gray-800">
             <Monitor className="h-4 w-4 text-orange-500" />
-            画面共有セッション
+            {t('tt_screenSessions')}
           </CardTitle>
         </CardHeader>
         <CardContent className="pt-4">
@@ -546,7 +548,7 @@ export function TimeTracker({
                     )}
                     <div className="text-xs text-gray-500">
                       {formatTime(session.startTime)}
-                      {session.endTime ? ` - ${formatTime(session.endTime)}` : " - 計測中..."}
+                      {session.endTime ? ` - ${formatTime(session.endTime)}` : ` - ${t('tt_measuring')}`}
                     </div>
                   </div>
                   {duration !== null && (
@@ -559,7 +561,7 @@ export function TimeTracker({
             })}
             {todayScreenSessions.length === 0 && (
               <div className="text-center py-4 text-gray-500 text-sm">
-                画面共有を開始するとセッションが記録されます
+                {t('tt_noScreenSessions')}
               </div>
             )}
           </div>

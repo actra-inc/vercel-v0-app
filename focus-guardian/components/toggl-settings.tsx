@@ -1,4 +1,5 @@
 "use client"
+import { useTranslation } from "@/lib/i18n"
 
 import type React from "react"
 
@@ -35,6 +36,7 @@ interface TogglEntry {
 }
 
 export function TogglSettings() {
+  const { t } = useTranslation()
   const [apiToken, setApiToken] = useState("")
   const [workspaceId, setWorkspaceId] = useState("")
   const [showApiToken, setShowApiToken] = useState(false)
@@ -211,7 +213,7 @@ export function TogglSettings() {
           <Alert variant="default" className="bg-green-50 border-green-200">
             <CheckCircle className="h-4 w-4" />
             <AlertDescription className="text-green-800">
-              ✅ Toggl連携が完了しています。APIとの接続が可能です。
+              {t('tg_connected')}
             </AlertDescription>
           </Alert>
 
@@ -229,7 +231,7 @@ export function TogglSettings() {
               設定をクリア
             </Button>
             <Button variant="outline" size="sm" onClick={() => setShowDebugInfo(!showDebugInfo)} className="ml-auto">
-              {showDebugInfo ? "Debug非表示" : "Debug表示"}
+              {showDebugInfo ? t('tg_hideDebug') : t('tg_showDebug')}
             </Button>
           </div>
 
@@ -237,7 +239,7 @@ export function TogglSettings() {
             <Alert className="border-red-200 bg-red-50">
               <AlertTriangle className="h-4 w-4 text-red-600" />
               <AlertDescription className="text-red-800">
-                <div className="font-medium">接続エラー:</div>
+                <div className="font-medium">{t('tg_connectionError')}</div>
                 <div className="text-sm mt-1">{connectionError}</div>
               </AlertDescription>
             </Alert>
@@ -247,28 +249,28 @@ export function TogglSettings() {
             <div className="space-y-3">
               <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg">
                 <div className="text-sm text-orange-800">
-                  <div className="font-medium mb-2">📊 現在のTogglエントリ:</div>
+                  <div className="font-medium mb-2">{t('tg_currentEntry')}</div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div>
-                      <div className="text-xs font-medium text-gray-600 mb-1">プロジェクト:</div>
-                      <div className="font-medium">{currentEntry.project || "未設定"}</div>
+                      <div className="text-xs font-medium text-gray-600 mb-1">{t('tg_project')}</div>
+                      <div className="font-medium">{currentEntry.project || t('tg_notSet')}</div>
                     </div>
                     <div>
-                      <div className="text-xs font-medium text-gray-600 mb-1">作業内容:</div>
-                      <div className="font-medium">{currentEntry.description || "未設定"}</div>
+                      <div className="text-xs font-medium text-gray-600 mb-1">{t('tg_task')}</div>
+                      <div className="font-medium">{currentEntry.description || t('tg_notSet')}</div>
                     </div>
                     <div>
-                      <div className="text-xs font-medium text-gray-600 mb-1">開始時刻:</div>
+                      <div className="text-xs font-medium text-gray-600 mb-1">{t('tg_startTime')}</div>
                       <div className="font-medium">
-                        {currentEntry.start ? new Date(currentEntry.start).toLocaleString("ja-JP") : "未設定"}
+                        {currentEntry.start ? new Date(currentEntry.start).toLocaleString("ja-JP") : t('tg_notSet')}
                       </div>
                     </div>
                     <div>
-                      <div className="text-xs font-medium text-gray-600 mb-1">実行時間:</div>
+                      <div className="text-xs font-medium text-gray-600 mb-1">{t('tg_duration')}</div>
                       <div className="font-medium flex items-center gap-2">
                         {formatDuration(currentEntry.elapsed_seconds ?? null)}
                         {currentEntry.is_running && (
-                          <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">実行中</span>
+                          <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">{t('tg_running')}</span>
                         )}
                       </div>
                     </div>
@@ -279,7 +281,7 @@ export function TogglSettings() {
               {showDebugInfo && currentEntry.debug && (
                 <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
                   <div className="text-sm">
-                    <div className="font-medium mb-2">🔧 Debug情報:</div>
+                    <div className="font-medium mb-2">{t('tg_debugInfo')}</div>
                     <pre className="text-xs bg-white p-2 rounded border overflow-x-auto">
                       {JSON.stringify(currentEntry.debug, null, 2)}
                     </pre>

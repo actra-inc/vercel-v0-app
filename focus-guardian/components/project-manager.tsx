@@ -1,4 +1,5 @@
 "use client"
+import { useTranslation } from "@/lib/i18n"
 
 import type React from "react"
 
@@ -45,6 +46,7 @@ export function ProjectManager({
   editProject,
   removeProject,
 }: ProjectManagerProps) {
+  const { t } = useTranslation()
   const [isOpen, setIsOpen] = useState(false)
   const [editingProject, setEditingProject] = useState<Project | null>(null)
   const [formData, setFormData] = useState({
@@ -87,11 +89,11 @@ export function ProjectManager({
 
   const handleDelete = async (projectId: string) => {
     if (projects.length <= 1) {
-      alert("最低1つのプロジェクトが必要です")
+      alert(t('pm_minRequired'))
       return
     }
 
-    if (confirm("このプロジェクトを削除しますか？")) {
+    if (confirm(t('pm_confirmDelete'))) {
       await removeProject(projectId)
     }
   }
@@ -108,43 +110,43 @@ export function ProjectManager({
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2">
             <Folder className="h-5 w-5" />
-            プロジェクト管理
+            {t('pm_title')}
           </CardTitle>
           <Dialog open={isOpen} onOpenChange={setIsOpen}>
             <DialogTrigger asChild>
               <Button size="sm" onClick={openNewProject} className="flex items-center gap-2">
                 <Plus className="h-4 w-4" />
-                新規
+                {t('pm_new')}
               </Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>{editingProject ? "プロジェクト編集" : "新しいプロジェクト"}</DialogTitle>
+                <DialogTitle>{editingProject ? t('pm_editTitle') : t('pm_createTitle')}</DialogTitle>
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="name">プロジェクト名</Label>
+                  <Label htmlFor="name">{t('pm_name')}</Label>
                   <Input
                     id="name"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    placeholder="例: ウェブサイト開発"
+                    placeholder={t('pm_namePlaceholder')}
                     required
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="client">クライアント（任意）</Label>
+                  <Label htmlFor="client">{t('pm_client')}</Label>
                   <Input
                     id="client"
                     value={formData.client}
                     onChange={(e) => setFormData({ ...formData, client: e.target.value })}
-                    placeholder="例: 株式会社サンプル"
+                    placeholder={t('pm_clientPlaceholder')}
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label>カラー</Label>
+                  <Label>{t('pm_color')}</Label>
                   <div className="flex gap-2 flex-wrap">
                     {PROJECT_COLORS.map((color) => (
                       <button
@@ -162,7 +164,7 @@ export function ProjectManager({
 
                 <div className="flex gap-2">
                   <Button type="submit" className="flex-1">
-                    {editingProject ? "更新" : "作成"}
+                    {editingProject ? t('common_update') : t('common_create')}
                   </Button>
                   <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>
                     キャンセル

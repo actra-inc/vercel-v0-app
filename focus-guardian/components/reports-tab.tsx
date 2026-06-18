@@ -1,4 +1,5 @@
 "use client"
+import { useTranslation } from "@/lib/i18n"
 
 import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -51,6 +52,7 @@ interface ReportsTabProps {
 }
 
 export function ReportsTab({ workLogs, userId, onRefresh }: ReportsTabProps) {
+  const { t } = useTranslation()
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [deletingAll, setDeletingAll] = useState(false)
 
@@ -74,11 +76,11 @@ export function ReportsTab({ workLogs, userId, onRefresh }: ReportsTabProps) {
         throw new Error(error.message || "Failed to delete report")
       }
 
-      alert("レポートを削除しました")
+      alert(t('rt_deleted'))
       onRefresh()
     } catch (error) {
       console.error("Delete report error:", error)
-      alert(error instanceof Error ? error.message : "レポートの削除中にエラーが発生しました")
+      alert(error instanceof Error ? error.message : t('rt_deleteError'))
     } finally {
       setDeletingId(null)
     }
@@ -93,11 +95,11 @@ export function ReportsTab({ workLogs, userId, onRefresh }: ReportsTabProps) {
         throw new Error(error.message || "Failed to delete all reports")
       }
 
-      alert("すべてのレポートを削除しました")
+      alert(t('rt_allDeleted'))
       onRefresh()
     } catch (error) {
       console.error("Delete all reports error:", error)
-      alert(error instanceof Error ? error.message : "すべてのレポートの削除中にエラーが発生しました")
+      alert(error instanceof Error ? error.message : t('rt_allDeleteError'))
     } finally {
       setDeletingAll(false)
     }
@@ -108,9 +110,9 @@ export function ReportsTab({ workLogs, userId, onRefresh }: ReportsTabProps) {
       <Card className="shadow-lg border-0 bg-white/90 backdrop-blur-sm">
         <CardContent className="p-12 text-center">
           <FileText className="h-16 w-16 mx-auto text-gray-300 mb-4" />
-          <h3 className="text-lg font-semibold text-gray-700 mb-2">レポートがまだありません</h3>
+          <h3 className="text-lg font-semibold text-gray-700 mb-2">{t('rt_noReports')}</h3>
           <p className="text-sm text-gray-500 mb-4">
-            3件の作業ログが記録されると、自動的に統合レポートが生成されます。
+            {t('rt_noReportsDesc')}
             <br />
             画面解析を開始して作業を記録してください。
           </p>
@@ -129,7 +131,7 @@ export function ReportsTab({ workLogs, userId, onRefresh }: ReportsTabProps) {
       <div className="flex items-center justify-between px-6 pt-6">
         <div className="flex items-center gap-3">
           <FileText className="h-6 w-6 text-orange-600" />
-          <h2 className="text-2xl font-bold text-gray-800">統合レポート履歴</h2>
+          <h2 className="text-2xl font-bold text-gray-800">{t('rt_title')}</h2>
           <Badge variant="secondary" className="text-lg">
             {reports.length}件
           </Badge>
@@ -144,24 +146,24 @@ export function ReportsTab({ workLogs, userId, onRefresh }: ReportsTabProps) {
               <AlertDialogTrigger asChild>
                 <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700 bg-transparent">
                   <Trash2 className="h-4 w-4 mr-2" />
-                  すべて削除
+                  {t('rt_deleteAll')}
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
                   <AlertDialogTitle>すべてのレポートを削除しますか？</AlertDialogTitle>
                   <AlertDialogDescription>
-                    この操作は取り消せません。すべてのレポート履歴が完全に削除されます。
+                    {t('rt_confirmDeleteAllDesc')}
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogCancel>キャンセル</AlertDialogCancel>
+                  <AlertDialogCancel>{t('common_cancel')}</AlertDialogCancel>
                   <AlertDialogAction
                     onClick={handleDeleteAllReports}
                     disabled={deletingAll}
                     className="bg-red-600 hover:bg-red-700"
                   >
-                    {deletingAll ? "削除中..." : "すべて削除"}
+                    {deletingAll ? t('rt_deleting') : "{t('rt_deleteAll')}"}
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
@@ -217,17 +219,17 @@ export function ReportsTab({ workLogs, userId, onRefresh }: ReportsTabProps) {
                           <AlertDialogHeader>
                             <AlertDialogTitle>このレポートを削除しますか？</AlertDialogTitle>
                             <AlertDialogDescription>
-                              この操作は取り消せません。レポートが完全に削除されます。
+                              {t('rt_confirmDeleteOneDesc')}
                             </AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>
-                            <AlertDialogCancel>キャンセル</AlertDialogCancel>
+                            <AlertDialogCancel>{t('common_cancel')}</AlertDialogCancel>
                             <AlertDialogAction
                               onClick={() => handleDeleteReport(report.id)}
                               disabled={deletingId === report.id}
                               className="bg-red-600 hover:bg-red-700"
                             >
-                              {deletingId === report.id ? "削除中..." : "削除"}
+                              {deletingId === report.id ? t('rt_deleting') : "削除"}
                             </AlertDialogAction>
                           </AlertDialogFooter>
                         </AlertDialogContent>

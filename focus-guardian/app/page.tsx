@@ -12,8 +12,10 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Settings, LogOut, Activity, FileText, BarChart3 } from "lucide-react"
 import { ActivityBreakdown, DEFAULT_CATEGORIES, type ActivityCategory } from "@/components/activity-breakdown"
+import { useTranslation } from "@/lib/i18n"
 
 const Page = () => {
+  const { t } = useTranslation()
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [authChecked, setAuthChecked] = useState(false)
   const isLoggedInRef = useRef(false)
@@ -147,7 +149,7 @@ const Page = () => {
       <div className="flex min-h-screen items-center justify-center">
         <div className="text-center">
           <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-orange-600 border-r-transparent"></div>
-          <p className="mt-4 text-gray-600">認証状態を確認中...</p>
+          <p className="mt-4 text-gray-600">{t('page_checkingAuth')}</p>
         </div>
       </div>
     )
@@ -163,9 +165,9 @@ const Page = () => {
             </div>
             <CardTitle className="text-2xl font-bold">FlowNudge</CardTitle>
             <CardDescription>
-              思考の脱線検知システムのベータテストページです。
+              {t('page_appDescription')}
               <br />
-              Googleアカウントでログインして続けてください。
+              {t('page_loginPrompt')}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -175,7 +177,7 @@ const Page = () => {
                   await signInWithGoogle()
                 } catch (error) {
                   console.error("Login error:", error)
-                  alert("ログインに失敗しました。もう一度お試しください。")
+                  alert(t('page_loginError'))
                 }
               }}
               className="w-full bg-white text-gray-800 hover:bg-gray-50 border border-gray-300 shadow-sm"
@@ -199,13 +201,13 @@ const Page = () => {
                   d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
                 />
               </svg>
-              Googleでログイン
+              {t('page_loginButton')}
             </Button>
           </CardContent>
           <CardFooter className="justify-center gap-4 text-xs text-gray-400 pb-6">
-            <a href="/terms" className="hover:text-gray-600 hover:underline">利用規約</a>
+            <a href="/terms" className="hover:text-gray-600 hover:underline">{t('page_termsOfService')}</a>
             <span>·</span>
-            <a href="/privacy" className="hover:text-gray-600 hover:underline">プライバシーポリシー</a>
+            <a href="/privacy" className="hover:text-gray-600 hover:underline">{t('page_privacyPolicy')}</a>
           </CardFooter>
         </Card>
       </div>
@@ -217,7 +219,7 @@ const Page = () => {
       <div className="flex min-h-screen items-center justify-center">
         <div className="text-center">
           <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-orange-600 border-r-transparent"></div>
-          <p className="mt-4 text-gray-600">データを読み込み中...</p>
+          <p className="mt-4 text-gray-600">{t('page_loadingData')}</p>
         </div>
       </div>
     )
@@ -241,11 +243,11 @@ const Page = () => {
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" onClick={() => setCurrentTab("settings")} className="gap-2">
               <Settings className="h-4 w-4" />
-              設定
+              {t('page_settings')}
             </Button>
             <Button variant="outline" size="sm" onClick={handleSignOut} className="gap-2 bg-transparent">
               <LogOut className="h-4 w-4" />
-              ログアウト
+              {t('page_logout')}
             </Button>
           </div>
         </div>
@@ -256,18 +258,18 @@ const Page = () => {
           <TabsList className="bg-white/80 backdrop-blur-sm border shadow-sm">
             <TabsTrigger value="logs" className="gap-2">
               <Activity className="h-4 w-4" />
-              作業ログ
+              {t('page_tabLogs')}
             </TabsTrigger>
             <TabsTrigger value="reports" className="gap-2">
               <FileText className="h-4 w-4" />
-              レポート
+              {t('page_tabReports')}
               {reportsCount > 0 && (
                 <span className="ml-1 rounded-full bg-orange-500 px-2 py-0.5 text-xs text-white">{reportsCount}</span>
               )}
             </TabsTrigger>
             <TabsTrigger value="breakdown" className="gap-2">
               <BarChart3 className="h-4 w-4" />
-              作業内訳
+              {t('page_tabBreakdown')}
             </TabsTrigger>
           </TabsList>
 

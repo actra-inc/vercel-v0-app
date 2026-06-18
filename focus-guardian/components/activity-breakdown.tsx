@@ -1,4 +1,5 @@
 "use client"
+import { useTranslation } from "@/lib/i18n"
 
 import { useState, useMemo } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -42,11 +43,11 @@ interface ActivityBreakdownProps {
 }
 
 function formatDuration(seconds: number): string {
-  if (seconds < 60) return `${seconds}秒`
-  if (seconds < 3600) return `${Math.round(seconds / 60)}分`
+  if (seconds < 60) return t('ab_seconds', { n: seconds })
+  if (seconds < 3600) return t('ab_minutes', { n: Math.round(seconds / 60) })
   const h = Math.floor(seconds / 3600)
   const m = Math.round((seconds % 3600) / 60)
-  return m > 0 ? `${h}時間${m}分` : `${h}時間`
+  return m > 0 ? t('ab_hoursMinutes', { h, m }) : t('ab_hours', { h })
 }
 
 export function ActivityBreakdown({
@@ -55,6 +56,7 @@ export function ActivityBreakdown({
   captureInterval,
   onCategoriesChange,
 }: ActivityBreakdownProps) {
+  const { t } = useTranslation()
   const [showCategoryEditor, setShowCategoryEditor] = useState(false)
   const [newCategoryName, setNewCategoryName] = useState("")
   const [newCategoryColor, setNewCategoryColor] = useState(COLOR_OPTIONS[0])
@@ -122,7 +124,7 @@ export function ActivityBreakdown({
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2 text-gray-800">
             <BarChart3 className="h-5 w-5 text-orange-600" />
-            作業種類の内訳
+            {t('ab_title')}
           </CardTitle>
           <Button
             variant="outline"
@@ -137,7 +139,7 @@ export function ActivityBreakdown({
       <CardContent className="space-y-4 pt-4">
         {showCategoryEditor && (
           <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg space-y-3">
-            <div className="text-sm font-medium text-gray-700">カテゴリ管理</div>
+            <div className="text-sm font-medium text-gray-700">{t('ab_categoryManagement')}</div>
             <div className="flex flex-wrap gap-2">
               {categories.map((cat) => (
                 <div
@@ -175,7 +177,7 @@ export function ActivityBreakdown({
               <Input
                 value={newCategoryName}
                 onChange={(e) => setNewCategoryName(e.target.value)}
-                placeholder="新しいカテゴリ名"
+                placeholder={t('ab_newCategoryPlaceholder')}
                 className="h-8 text-sm"
                 onKeyDown={(e) => e.key === "Enter" && handleAddCategory()}
               />
@@ -189,9 +191,9 @@ export function ActivityBreakdown({
 
         {totalSeconds === 0 ? (
           <div className="text-center py-8 text-gray-400 text-sm">
-            解析ログがありません。
+            {t('ab_noLogs')}
             <br />
-            解析を開始するとここに作業内訳が表示されます。
+            {t('ab_noLogsHint')}
           </div>
         ) : (
           <>
@@ -214,7 +216,7 @@ export function ActivityBreakdown({
                 ))}
               </div>
               <div className="text-xs text-right text-gray-400">
-                合計記録時間: {formatDuration(totalSeconds)}
+                {t('ab_totalTime')} {formatDuration(totalSeconds)}
               </div>
             </div>
 

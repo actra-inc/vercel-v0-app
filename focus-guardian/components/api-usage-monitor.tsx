@@ -1,4 +1,5 @@
 "use client"
+import { useTranslation } from "@/lib/i18n"
 
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -13,6 +14,7 @@ interface ApiUsageMonitorProps {
 }
 
 export function ApiUsageMonitor({ requestCount, onUsageUpdate }: ApiUsageMonitorProps) {
+  const { t } = useTranslation()
   const [dailyUsage, setDailyUsage] = useState(0)
   const [minuteUsage, setMinuteUsage] = useState(0)
   const [lastResetTime, setLastResetTime] = useState<Date>(new Date())
@@ -69,18 +71,18 @@ export function ApiUsageMonitor({ requestCount, onUsageUpdate }: ApiUsageMonitor
 
   const getUsageStatus = () => {
     if (minuteUsage >= MINUTE_LIMIT) {
-      return { status: "danger", message: "分間制限に達しました" }
+      return { status: "danger", message: t('au_minuteLimitReached') }
     }
     if (dailyUsage >= DAILY_LIMIT) {
-      return { status: "danger", message: "日間制限に達しました" }
+      return { status: "danger", message: t('au_dayLimitReached') }
     }
     if (minuteUsage >= MINUTE_LIMIT * 0.8) {
-      return { status: "warning", message: "分間制限に近づいています" }
+      return { status: "warning", message: t('au_minuteLimitNear') }
     }
     if (dailyUsage >= DAILY_LIMIT * 0.8) {
-      return { status: "warning", message: "日間制限に近づいています" }
+      return { status: "warning", message: t('au_dayLimitNear') }
     }
-    return { status: "normal", message: "正常範囲内です" }
+    return { status: "normal", message: t('au_normal') }
   }
 
   const usageStatus = getUsageStatus()
@@ -92,7 +94,7 @@ export function ApiUsageMonitor({ requestCount, onUsageUpdate }: ApiUsageMonitor
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2">
           <BarChart3 className="h-5 w-5" />
-          API使用量モニター
+          {t('au_title')}
           <Badge
             variant={
               usageStatus.status === "danger"
@@ -112,7 +114,7 @@ export function ApiUsageMonitor({ requestCount, onUsageUpdate }: ApiUsageMonitor
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Clock className="h-4 w-4 text-orange-600" />
-              <span className="text-sm font-medium">分間リクエスト数</span>
+              <span className="text-sm font-medium">{t('au_minuteRequests')}</span>
             </div>
             <span className="text-sm font-bold">
               {minuteUsage}/{MINUTE_LIMIT}
@@ -125,7 +127,7 @@ export function ApiUsageMonitor({ requestCount, onUsageUpdate }: ApiUsageMonitor
               background: minutePercentage >= 80 ? "#fee2e2" : "#f3f4f6",
             }}
           />
-          <div className="text-xs text-gray-500">毎分リセット • 残り: {MINUTE_LIMIT - minuteUsage}リクエスト</div>
+          <div className="text-xs text-gray-500">{t('au_minuteReset')} {MINUTE_LIMIT - minuteUsage}リクエスト</div>
         </div>
 
         {/* 日間使用量 */}
@@ -133,7 +135,7 @@ export function ApiUsageMonitor({ requestCount, onUsageUpdate }: ApiUsageMonitor
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Zap className="h-4 w-4 text-green-600" />
-              <span className="text-sm font-medium">日間トークン数</span>
+              <span className="text-sm font-medium">{t('au_dailyTokens')}</span>
             </div>
             <span className="text-sm font-bold">
               {(dailyUsage / 1000).toFixed(1)}K/{(DAILY_LIMIT / 1000).toFixed(0)}K
@@ -147,7 +149,7 @@ export function ApiUsageMonitor({ requestCount, onUsageUpdate }: ApiUsageMonitor
             }}
           />
           <div className="text-xs text-gray-500">
-            毎日リセット • 残り: {((DAILY_LIMIT - dailyUsage) / 1000).toFixed(0)}Kトークン
+            {t('au_dailyReset')} {((DAILY_LIMIT - dailyUsage) / 1000).toFixed(0)}Kトークン
           </div>
         </div>
 
@@ -159,7 +161,7 @@ export function ApiUsageMonitor({ requestCount, onUsageUpdate }: ApiUsageMonitor
             <AlertDescription className={usageStatus.status === "danger" ? "text-red-800" : "text-yellow-800"}>
               {usageStatus.status === "danger" ? "⚠️" : "💡"} {usageStatus.message}
               {usageStatus.status === "danger" && (
-                <div className="mt-1 text-xs">しばらく待ってから再試行してください。</div>
+                <div className="mt-1 text-xs">{t('au_retryMessage')}</div>
               )}
             </AlertDescription>
           </Alert>
@@ -169,13 +171,13 @@ export function ApiUsageMonitor({ requestCount, onUsageUpdate }: ApiUsageMonitor
         <div className="grid grid-cols-2 gap-4 p-3 bg-gray-50 rounded-lg">
           <div className="text-center">
             <div className="text-lg font-bold text-orange-600">{requestCount}</div>
-            <div className="text-xs text-gray-600">総リクエスト数</div>
+            <div className="text-xs text-gray-600">{t('au_totalRequests')}</div>
           </div>
           <div className="text-center">
             <div className="text-lg font-bold text-green-600">
               {Math.max(0, Math.floor((DAILY_LIMIT - dailyUsage) / 1000))}
             </div>
-            <div className="text-xs text-gray-600">残りリクエスト数（推定）</div>
+            <div className="text-xs text-gray-600">{t('au_remainingRequests')}</div>
           </div>
         </div>
       </CardContent>

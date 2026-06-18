@@ -1,4 +1,5 @@
 "use client"
+import { useTranslation } from "@/lib/i18n"
 
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -17,6 +18,7 @@ interface GeminiApiSettingsProps {
 }
 
 export function GeminiApiSettings({ apiKey, model, onApiKeyChange, onModelChange }: GeminiApiSettingsProps) {
+  const { t } = useTranslation()
   const [localApiKey, setLocalApiKey] = useState(apiKey)
   const [localModel, setLocalModel] = useState(model || "gemini-2.5-flash-lite")
   const [isSaving, setIsSaving] = useState(false)
@@ -54,7 +56,7 @@ export function GeminiApiSettings({ apiKey, model, onApiKeyChange, onModelChange
     } catch (error) {
       console.error("❌ Failed to save settings:", error)
       setSaveStatus("error")
-      setErrorMessage(error instanceof Error ? error.message : "設定の保存に失敗しました")
+      setErrorMessage(error instanceof Error ? error.message : t('ga_saveError'))
     } finally {
       setIsSaving(false)
     }
@@ -65,12 +67,12 @@ export function GeminiApiSettings({ apiKey, model, onApiKeyChange, onModelChange
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Key className="h-5 w-5" />
-          Gemini API 設定
+          {t('ga_title')}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="gemini-api-key">API キー</Label>
+          <Label htmlFor="gemini-api-key">{t('ga_apiKeyLabel')}</Label>
           <Input
             id="gemini-api-key"
             type="password"
@@ -88,20 +90,20 @@ export function GeminiApiSettings({ apiKey, model, onApiKeyChange, onModelChange
             >
               Google AI Studio
             </a>
-            でAPIキーを取得できます
+            {t('ga_getKeyLink')}
           </p>
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="gemini-model">モデル</Label>
+          <Label htmlFor="gemini-model">{t('ga_modelLabel')}</Label>
           <Select value={localModel} onValueChange={setLocalModel} disabled={isSaving}>
             <SelectTrigger id="gemini-model">
-              <SelectValue placeholder="モデルを選択" />
+              <SelectValue placeholder={t('ga_modelPlaceholder')} />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="gemini-2.5-flash-lite">
                 <div className="flex flex-col">
-                  <span>Gemini 2.5 Flash-Lite（推奨）</span>
+                  <span>{t('ga_title')} 2.5 Flash-Lite</span>
                   <span className="text-xs text-gray-500">高速・低コスト・バランス型</span>
                 </div>
               </SelectItem>
@@ -143,7 +145,7 @@ export function GeminiApiSettings({ apiKey, model, onApiKeyChange, onModelChange
         {saveStatus === "error" && (
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
-            <AlertDescription>{errorMessage || "設定の保存に失敗しました"}</AlertDescription>
+            <AlertDescription>{errorMessage || t('ga_saveError')}</AlertDescription>
           </Alert>
         )}
 

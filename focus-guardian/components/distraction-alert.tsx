@@ -1,4 +1,5 @@
 "use client"
+import { useTranslation } from "@/lib/i18n"
 
 import { useEffect, useRef } from "react"
 import { Card, CardContent } from "@/components/ui/card"
@@ -22,6 +23,7 @@ interface DistractionAlertProps {
 }
 
 export function DistractionAlert({ result, plannedTask, actualActivity, onDismiss }: DistractionAlertProps) {
+  const { t } = useTranslation()
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
   useEffect(() => {
@@ -106,18 +108,18 @@ export function DistractionAlert({ result, plannedTask, actualActivity, onDismis
           <div className="flex-1 space-y-3">
             <div>
               <div className="font-semibold text-lg">
-                {result.is_distracted ? "🚨 脱線を検知しました" : "✅ 集中して作業中"}
+                {result.is_distracted ? t('da_distractionDetected') : t('da_focused')}
               </div>
               <div className="text-sm text-gray-600 mt-1">{result.reason}</div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-3 bg-white/50 rounded-lg">
               <div>
-                <div className="text-xs font-medium text-gray-500 mb-1">予定していた作業</div>
+                <div className="text-xs font-medium text-gray-500 mb-1">{t('da_plannedTask')}</div>
                 <div className="text-sm">{plannedTask}</div>
               </div>
               <div>
-                <div className="text-xs font-medium text-gray-500 mb-1">実際の活動</div>
+                <div className="text-xs font-medium text-gray-500 mb-1">{t('da_actualActivity')}</div>
                 <div className="text-sm">{actualActivity}</div>
               </div>
             </div>

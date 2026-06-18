@@ -1,4 +1,5 @@
 "use client"
+import { useTranslation } from "@/lib/i18n"
 
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
@@ -18,6 +19,7 @@ export function ScreenCaptureStatus({
   lastCaptureTime,
   mediaStream,
 }: ScreenCaptureStatusProps) {
+  const { t } = useTranslation()
   const getStatusColor = () => {
     if (!isTracking) return "bg-gray-100 text-gray-800"
     if (isAnalyzing) return "bg-orange-100 text-orange-800"
@@ -25,9 +27,9 @@ export function ScreenCaptureStatus({
   }
 
   const getStatusText = () => {
-    if (!isTracking) return "停止中"
-    if (isAnalyzing) return "解析中"
-    return "監視中"
+    if (!isTracking) return t('sc_stopped')
+    if (isAnalyzing) return t('sc_analyzing')
+    return t('sc_monitoring')
   }
 
   const getStatusIcon = () => {
@@ -43,8 +45,8 @@ export function ScreenCaptureStatus({
           <div className="flex items-center gap-3">
             <div className={cn("p-2 rounded-full", getStatusColor())}>{getStatusIcon()}</div>
             <div>
-              <div className="font-medium">画面キャプチャ</div>
-              <div className="text-sm text-gray-600">{isTracking ? "30秒間隔で自動解析" : "画面共有が必要です"}</div>
+              <div className="font-medium">{t('sc_label')}</div>
+              <div className="text-sm text-gray-600">{isTracking ? "30秒間隔で自動解析" : t('sc_needShare')}</div>
             </div>
           </div>
 
@@ -61,13 +63,13 @@ export function ScreenCaptureStatus({
         {isTracking && !mediaStream && (
           <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg flex items-center gap-2">
             <AlertCircle className="h-4 w-4 text-yellow-600" />
-            <span className="text-sm text-yellow-800">画面共有の許可を待っています...</span>
+            <span className="text-sm text-yellow-800">{t('sc_waitingPermission')}</span>
           </div>
         )}
 
         {isTracking && mediaStream && (
           <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
-            <div className="text-sm text-green-800">✅ 画面共有が有効です。30秒間隔で自動キャプチャ中...</div>
+            <div className="text-sm text-green-800">{t('sc_activeMessage', { n: 30 })}</div>
           </div>
         )}
 
@@ -76,10 +78,10 @@ export function ScreenCaptureStatus({
             <div className="text-sm text-orange-800">
               💡 <strong>画面共有の手順:</strong>
               <ol className="mt-2 list-decimal list-inside space-y-1 text-orange-700">
-                <li>「開始」ボタンをクリック</li>
-                <li>ブラウザの許可ダイアログで共有する画面/ウィンドウを選択</li>
-                <li>「共有」ボタンをクリックして許可</li>
-                <li>自動的に30秒間隔でキャプチャが開始されます</li>
+                <li>{t('sc_step1')}</li>
+                <li>{t('sc_step2')}</li>
+                <li>{t('sc_step3')}</li>
+                <li>{t('sc_step4', { n: 30 })}</li>
               </ol>
             </div>
           </div>
