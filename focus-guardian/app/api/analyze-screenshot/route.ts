@@ -111,7 +111,6 @@ ${extractedText.slice(0, 1000)}
         generationConfig: {
           temperature: 1.0,
           maxOutputTokens: 1024,
-          thinkingConfig: { type: "DISABLED" },
         },
       }),
     })

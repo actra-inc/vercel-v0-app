@@ -96,7 +96,6 @@ ${recentLogs[2].distraction_check ? `- 脱線検知: ${recentLogs[2].distraction
         generationConfig: {
           temperature: 1.0,
           maxOutputTokens: 2048,
-          thinkingConfig: { type: "DISABLED" },
         },
       }),
     })
