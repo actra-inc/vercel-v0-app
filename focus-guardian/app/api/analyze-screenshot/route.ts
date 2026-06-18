@@ -2,6 +2,24 @@ import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import { type NextRequest, NextResponse } from "next/server"
 
+const GEMMA_MODEL = "gemma-4-26b-a4b-it"
+const MAX_RETRIES = 3
+
+async function fetchWithRetry(url: string, options: RequestInit): Promise<Response> {
+  let lastResponse: Response | null = null
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    if (attempt > 0) {
+      const delay = 1000 * Math.pow(2, attempt - 1) // 1s, 2s, 4s
+      console.warn(`[Gemma] 500 error on attempt ${attempt}, retrying in ${delay}ms...`)
+      await new Promise((resolve) => setTimeout(resolve, delay))
+    }
+    const response = await fetch(url, options)
+    if (response.status !== 500) return response
+    lastResponse = response
+  }
+  return lastResponse!
+}
+
 export async function POST(request: NextRequest) {
   try {
     const cookieStore = await cookies()
@@ -50,8 +68,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "API key is required" }, { status: 400 })
     }
 
-    const analysisModel = "gemma-4-26b-a4b-it"
-    const analysisUrl = `https://generativelanguage.googleapis.com/v1beta/models/${analysisModel}:generateContent?key=${apiKey}`
+    const analysisUrl = `https://generativelanguage.googleapis.com/v1beta/models/${GEMMA_MODEL}:generateContent?key=${apiKey}`
 
     const categoriesList = categories.join("、")
     const analysisPrompt = `あなたは作業効率モニタリングシステムです。画面情報を分析し、予定作業との一致度を判定してください。
@@ -86,12 +103,16 @@ ${extractedText.slice(0, 1000)}
 
 判定基準：productive=予定作業に関連、distracted=明らかに無関係(ショッピング/SNS/動画等)、neutral=判断が難しい活動`
 
-    const response = await fetch(analysisUrl, {
+    const response = await fetchWithRetry(analysisUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         contents: [{ parts: [{ text: analysisPrompt }] }],
-        generationConfig: { temperature: 0.4, maxOutputTokens: 1024 },
+        generationConfig: {
+          temperature: 1.0,
+          maxOutputTokens: 1024,
+          thinkingConfig: { type: "DISABLED" },
+        },
       }),
     })
 
@@ -122,7 +143,6 @@ ${extractedText.slice(0, 1000)}
     const data = await response.json()
     const textContent = data.candidates?.[0]?.content?.parts?.[0]?.text || ""
 
-    // GemmaのレスポンスからJSONを抽出
     let analysis: any = null
     const jsonMatch = textContent.match(/\{[\s\S]*\}/)
     if (jsonMatch) {
@@ -133,7 +153,6 @@ ${extractedText.slice(0, 1000)}
       }
     }
 
-    // パース失敗時でも必ずログが保存されるようフォールバック
     if (!analysis) {
       console.warn("Gemma JSON parse failed, using extracted text as fallback")
       analysis = {
@@ -147,13 +166,11 @@ ${extractedText.slice(0, 1000)}
       }
     }
 
-    // work_categoryがカテゴリリストに含まれていなければ「その他」にフォールバック
     const validCategory = categories.includes(analysis.work_category)
       ? analysis.work_category
       : "その他"
 
     const taskAlignment = Number(analysis.distraction_check?.task_alignment) || 0.5
-    // 予定作業が設定されており task_alignment が 0.35 未満なら強制的に脱線判定
     const forceDistracted = !!currentTask && taskAlignment < 0.35
     const distractionCheck = analysis.distraction_check
       ? {
