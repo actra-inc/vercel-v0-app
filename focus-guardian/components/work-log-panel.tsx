@@ -197,6 +197,7 @@ export function WorkLogPanel({
         const formData = new FormData()
         formData.append("extractedText", extractedText)
         formData.append("apiKey", apiKey)
+        formData.append("model", model || "gemini-2.5-flash-lite")
         formData.append("currentTask", currentTask || t('wlp_working'))
         formData.append("categories", JSON.stringify(categories))
 
