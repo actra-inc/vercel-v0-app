@@ -42,7 +42,7 @@ interface ActivityBreakdownProps {
   onCategoriesChange: (categories: ActivityCategory[]) => void
 }
 
-function formatDuration(seconds: number): string {
+function formatDuration(seconds: number, t: (key: string, vars?: Record<string, string | number>) => string): string {
   if (seconds < 60) return t('ab_seconds', { n: seconds })
   if (seconds < 3600) return t('ab_minutes', { n: Math.round(seconds / 60) })
   const h = Math.floor(seconds / 3600)
@@ -208,7 +208,7 @@ export function ActivityBreakdown({
                       backgroundColor: item.color,
                       minWidth: item.percentage > 0 ? "4px" : "0",
                     }}
-                    title={`${item.name}: ${item.percentage}% (${formatDuration(item.seconds)})`}
+                    title={`${item.name}: ${item.percentage}% (${formatDuration(item.seconds, t)})`}
                     className={`transition-all duration-500 ${i === 0 ? "rounded-l-full" : ""} ${
                       i === breakdown.length - 1 ? "rounded-r-full" : ""
                     }`}
@@ -216,7 +216,7 @@ export function ActivityBreakdown({
                 ))}
               </div>
               <div className="text-xs text-right text-gray-400">
-                {t('ab_totalTime')} {formatDuration(totalSeconds)}
+                {t('ab_totalTime')} {formatDuration(totalSeconds, t)}
               </div>
             </div>
 
@@ -232,7 +232,7 @@ export function ActivityBreakdown({
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-gray-700 truncate">{item.name}</span>
                       <span className="text-gray-500 text-xs ml-2 flex-shrink-0">
-                        {formatDuration(item.seconds)}（{item.percentage}%）
+                        {formatDuration(item.seconds, t)}（{item.percentage}%）
                       </span>
                     </div>
                     <div className="h-1.5 bg-gray-100 rounded-full mt-0.5 overflow-hidden">
