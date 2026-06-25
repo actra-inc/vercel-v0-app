@@ -101,7 +101,7 @@ export function WorkLogItem({ log, onPlayAlert }: WorkLogItemProps) {
               </Badge>
               {log.focus_score !== undefined && (
                 <Badge variant="outline" className="border-orange-200 text-orange-700 bg-orange-50">
-                  集中度: {log.focus_score}
+                  {t('wli_focusScore')}: {log.focus_score}
                 </Badge>
               )}
             </div>
@@ -112,7 +112,7 @@ export function WorkLogItem({ log, onPlayAlert }: WorkLogItemProps) {
           </div>
           {log.confidence !== undefined && (
             <Badge variant="secondary" className="bg-gray-100 text-gray-700">
-              信頼度: {log.confidence}%
+              {t('wli_confidence')}: {log.confidence}%
             </Badge>
           )}
         </div>
@@ -135,22 +135,22 @@ export function WorkLogItem({ log, onPlayAlert }: WorkLogItemProps) {
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-2">
                   <AlertTriangle className="h-4 w-4 text-red-600" />
-                  <span className="font-medium text-red-800">脱線を検知しました</span>
+                  <span className="font-medium text-red-800">{t('wli_distractionDetected')}</span>
                 </div>
                 <Badge variant="outline" className={getSeverityColor(log.distraction_check.severity)}>
                   {log.distraction_check.severity === "high"
-                    ? "高"
+                    ? t('wli_severity_high')
                     : log.distraction_check.severity === "medium"
-                      ? "中"
-                      : "低"}
+                      ? t('wli_severity_medium')
+                      : t('wli_severity_low')}
                 </Badge>
               </div>
               <div className="text-sm text-red-700 space-y-1">
                 <p>
-                  <strong>理由:</strong> {log.distraction_check.reason}
+                  <strong>{t('wli_reason')}:</strong> {log.distraction_check.reason}
                 </p>
                 <p>
-                  <strong>予定作業:</strong> {log.distraction_check.planned_task}
+                  <strong>{t('wli_plannedTask')}:</strong> {log.distraction_check.planned_task}
                 </p>
               </div>
               <Button
@@ -160,7 +160,7 @@ export function WorkLogItem({ log, onPlayAlert }: WorkLogItemProps) {
                 className="w-full flex items-center justify-center gap-2 border-red-300 text-red-700 hover:bg-red-50 bg-transparent"
               >
                 <Volume2 className="h-4 w-4" />
-                アラート音を再生
+                {t('wli_playAlert')}
               </Button>
             </div>
           )}

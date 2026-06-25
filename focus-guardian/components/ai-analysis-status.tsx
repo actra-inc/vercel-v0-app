@@ -41,7 +41,7 @@ export function AIAnalysisStatus({
           {t('ai_title')}
           {isAnalyzing && (
             <Badge variant="secondary" className="animate-pulse bg-orange-100 text-orange-700 border-orange-200">
-              解析中...
+              {t('ai_analyzing')}
             </Badge>
           )}
         </CardTitle>
@@ -57,7 +57,7 @@ export function AIAnalysisStatus({
               <span className="text-sm font-medium text-gray-700">{t('ai_logsAnalyzed')}</span>
             </div>
             <div className="text-3xl font-bold text-orange-600 mb-1">{totalLogs}</div>
-            <div className="text-xs text-gray-500">件</div>
+            <div className="text-xs text-gray-500">{t('ai_count_unit')}</div>
           </div>
 
           {/* {t('ai_avgFocus')} */}
@@ -94,12 +94,12 @@ export function AIAnalysisStatus({
         {totalLogs > 0 && (
           <div className="mt-4 p-3 bg-orange-50 border border-orange-200 rounded-lg">
             <div className="text-sm text-orange-800">
-              💡 <strong>AI分析結果:</strong>
+              💡 <strong>{t('ai_resultLabel')}</strong>{' '}
               {averageFocusScore >= 70
-                ? " 高い集中力を維持できています！"
+                ? t('ai_highFocusMsg')
                 : averageFocusScore >= 50
-                  ? " {t('ai_mediumFocus')}"
-                  : " {t('ai_lowFocus')}"}
+                  ? t('ai_mediumFocus')
+                  : t('ai_lowFocus')}
             </div>
           </div>
         )}

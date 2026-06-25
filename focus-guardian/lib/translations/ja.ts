@@ -116,6 +116,7 @@ export const ja = {
   rt_confirmDeleteOne: 'このレポートを削除しますか？',
   rt_confirmDeleteOneDesc: 'この操作は取り消せません。レポートが完全に削除されます。',
   rt_reportTitle: '統合レポート #{num}',
+  rt_scoreUnit: '点',
 
   // WorkSummaryReport
   wsr_title: '作業統合レポート（自動生成）',
@@ -138,6 +139,8 @@ export const ja = {
   ai_avgFocus: '平均集中度',
   ai_productivityRate: '生産性率',
   ai_productiveDesc: 'productive活動の割合',
+  ai_resultLabel: 'AI分析結果:',
+  ai_highFocusMsg: '高い集中力を維持できています！',
   ai_highFocus: '💡 **AI分析結果:** 高い集中力を維持できています！',
   ai_mediumFocus: '集中力にムラがあります。定期的な休憩を取りましょう。',
   ai_lowFocus: '集中力が低下しています。環境を見直してみてください。',
@@ -170,6 +173,17 @@ export const ja = {
   pm_client: 'クライアント（任意）',
   pm_clientPlaceholder: '例: 株式会社サンプル',
   pm_color: 'カラー',
+
+  // WorkLogItem
+  wli_focusScore: '集中度',
+  wli_confidence: '信頼度',
+  wli_distractionDetected: '脱線を検知しました',
+  wli_severity_high: '高',
+  wli_severity_medium: '中',
+  wli_severity_low: '低',
+  wli_reason: '理由',
+  wli_plannedTask: '予定作業',
+  wli_playAlert: 'アラート音を再生',
 
   // ActivityBreakdown
   ab_title: '作業種類の内訳',

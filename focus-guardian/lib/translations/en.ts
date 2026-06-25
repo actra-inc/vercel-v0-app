@@ -118,6 +118,7 @@ export const en: Record<TranslationKey, string> = {
   rt_confirmDeleteOne: 'Delete this report?',
   rt_confirmDeleteOneDesc: 'This cannot be undone. The report will be permanently deleted.',
   rt_reportTitle: 'Consolidated Report #{num}',
+  rt_scoreUnit: 'pts',
 
   // WorkSummaryReport
   wsr_title: 'Work Consolidated Report (Auto-generated)',
@@ -140,6 +141,8 @@ export const en: Record<TranslationKey, string> = {
   ai_avgFocus: 'Avg Focus',
   ai_productivityRate: 'Productivity Rate',
   ai_productiveDesc: 'Ratio of productive activities',
+  ai_resultLabel: 'AI Analysis Result:',
+  ai_highFocusMsg: 'Maintaining high focus!',
   ai_highFocus: "💡 **AI Analysis:** You're maintaining high focus!",
   ai_mediumFocus: 'Focus is inconsistent. Try taking regular breaks.',
   ai_lowFocus: 'Focus is declining. Consider reviewing your environment.',
@@ -172,6 +175,17 @@ export const en: Record<TranslationKey, string> = {
   pm_client: 'Client (optional)',
   pm_clientPlaceholder: 'e.g. Sample Corp.',
   pm_color: 'Color',
+
+  // WorkLogItem
+  wli_focusScore: 'Focus',
+  wli_confidence: 'Confidence',
+  wli_distractionDetected: 'Distraction detected',
+  wli_severity_high: 'High',
+  wli_severity_medium: 'Medium',
+  wli_severity_low: 'Low',
+  wli_reason: 'Reason',
+  wli_plannedTask: 'Planned task',
+  wli_playAlert: 'Play alert sound',
 
   // ActivityBreakdown
   ab_title: 'Activity Breakdown',

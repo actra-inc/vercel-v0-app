@@ -42,14 +42,6 @@ interface ActivityBreakdownProps {
   onCategoriesChange: (categories: ActivityCategory[]) => void
 }
 
-function formatDuration(seconds: number, t: (key: string, vars?: Record<string, string | number>) => string): string {
-  if (seconds < 60) return t('ab_seconds', { n: seconds })
-  if (seconds < 3600) return t('ab_minutes', { n: Math.round(seconds / 60) })
-  const h = Math.floor(seconds / 3600)
-  const m = Math.round((seconds % 3600) / 60)
-  return m > 0 ? t('ab_hoursMinutes', { h, m }) : t('ab_hours', { h })
-}
-
 export function ActivityBreakdown({
   workLogs,
   categories,
@@ -57,6 +49,28 @@ export function ActivityBreakdown({
   onCategoriesChange,
 }: ActivityBreakdownProps) {
   const { t } = useTranslation()
+
+  const formatDuration = (seconds: number): string => {
+    if (seconds < 60) return t('ab_seconds', { n: seconds })
+    if (seconds < 3600) return t('ab_minutes', { n: Math.round(seconds / 60) })
+    const h = Math.floor(seconds / 3600)
+    const m = Math.round((seconds % 3600) / 60)
+    return m > 0 ? t('ab_hoursMinutes', { h, m }) : t('ab_hours', { h })
+  }
+
+  const CAT_NAME_TO_KEY: Record<string, 'ab_cat_emailCheck' | 'ab_cat_entertainment' | 'ab_cat_chat' | 'ab_cat_research' | 'ab_cat_meeting' | 'ab_cat_sns' | 'ab_cat_uncategorized'> = {
+    'メールチェック': 'ab_cat_emailCheck',
+    '娯楽': 'ab_cat_entertainment',
+    'チャット': 'ab_cat_chat',
+    'リサーチ': 'ab_cat_research',
+    'ミーティング': 'ab_cat_meeting',
+    '業務以外のSNS': 'ab_cat_sns',
+    '未分類': 'ab_cat_uncategorized',
+  }
+  const catDisplayName = (name: string) => {
+    const key = CAT_NAME_TO_KEY[name]
+    return key ? t(key) : name
+  }
   const [showCategoryEditor, setShowCategoryEditor] = useState(false)
   const [newCategoryName, setNewCategoryName] = useState("")
   const [newCategoryColor, setNewCategoryColor] = useState(COLOR_OPTIONS[0])
@@ -132,7 +146,7 @@ export function ActivityBreakdown({
             onClick={() => setShowCategoryEditor(!showCategoryEditor)}
             className="text-xs"
           >
-            カテゴリ編集
+            {t('ab_editCategories')}
           </Button>
         </div>
       </CardHeader>
@@ -183,7 +197,7 @@ export function ActivityBreakdown({
               />
               <Button size="sm" onClick={handleAddCategory} className="h-8 gap-1 flex-shrink-0">
                 <Plus className="h-3 w-3" />
-                追加
+                {t('common_add')}
               </Button>
             </div>
           </div>
@@ -208,7 +222,7 @@ export function ActivityBreakdown({
                       backgroundColor: item.color,
                       minWidth: item.percentage > 0 ? "4px" : "0",
                     }}
-                    title={`${item.name}: ${item.percentage}% (${formatDuration(item.seconds, t)})`}
+                    title={`${catDisplayName(item.name)}: ${item.percentage}% (${formatDuration(item.seconds)})`}
                     className={`transition-all duration-500 ${i === 0 ? "rounded-l-full" : ""} ${
                       i === breakdown.length - 1 ? "rounded-r-full" : ""
                     }`}
@@ -216,7 +230,7 @@ export function ActivityBreakdown({
                 ))}
               </div>
               <div className="text-xs text-right text-gray-400">
-                {t('ab_totalTime')} {formatDuration(totalSeconds, t)}
+                {t('ab_totalTime')} {formatDuration(totalSeconds)}
               </div>
             </div>
 
@@ -230,9 +244,9 @@ export function ActivityBreakdown({
                   />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-700 truncate">{item.name}</span>
+                      <span className="text-gray-700 truncate">{catDisplayName(item.name)}</span>
                       <span className="text-gray-500 text-xs ml-2 flex-shrink-0">
-                        {formatDuration(item.seconds, t)}（{item.percentage}%）
+                        {formatDuration(item.seconds)}（{item.percentage}%）
                       </span>
                     </div>
                     <div className="h-1.5 bg-gray-100 rounded-full mt-0.5 overflow-hidden">

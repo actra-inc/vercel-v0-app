@@ -114,11 +114,11 @@ export function ReportsTab({ workLogs, userId, onRefresh }: ReportsTabProps) {
           <p className="text-sm text-gray-500 mb-4">
             {t('rt_noReportsDesc')}
             <br />
-            画面解析を開始して作業を記録してください。
+            {t('rt_noReportsHint')}
           </p>
           <Button onClick={onRefresh} variant="outline" className="mt-4 bg-transparent">
             <RefreshCw className="h-4 w-4 mr-2" />
-            更新
+            {t('common_refresh')}
           </Button>
         </CardContent>
       </Card>
@@ -133,13 +133,13 @@ export function ReportsTab({ workLogs, userId, onRefresh }: ReportsTabProps) {
           <FileText className="h-6 w-6 text-orange-600" />
           <h2 className="text-2xl font-bold text-gray-800">{t('rt_title')}</h2>
           <Badge variant="secondary" className="text-lg">
-            {reports.length}件
+            {reports.length}{t('ai_count_unit')}
           </Badge>
         </div>
         <div className="flex items-center gap-2">
           <Button onClick={onRefresh} variant="outline" size="sm">
             <RefreshCw className="h-4 w-4 mr-2" />
-            更新
+            {t('common_refresh')}
           </Button>
           {reports.length > 0 && (
             <AlertDialog>
@@ -151,7 +151,7 @@ export function ReportsTab({ workLogs, userId, onRefresh }: ReportsTabProps) {
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>すべてのレポートを削除しますか？</AlertDialogTitle>
+                  <AlertDialogTitle>{t('rt_confirmDeleteAll')}</AlertDialogTitle>
                   <AlertDialogDescription>
                     {t('rt_confirmDeleteAllDesc')}
                   </AlertDialogDescription>
@@ -163,7 +163,7 @@ export function ReportsTab({ workLogs, userId, onRefresh }: ReportsTabProps) {
                     disabled={deletingAll}
                     className="bg-red-600 hover:bg-red-700"
                   >
-                    {deletingAll ? t('rt_deleting') : "{t('rt_deleteAll')}"}
+                    {deletingAll ? t('rt_deleting') : t('rt_deleteAll')}
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
@@ -191,7 +191,7 @@ export function ReportsTab({ workLogs, userId, onRefresh }: ReportsTabProps) {
                         <FileText className="h-5 w-5 text-white" />
                       </div>
                       <div>
-                        <CardTitle className="text-xl text-gray-800">統合レポート #{reports.length - index}</CardTitle>
+                        <CardTitle className="text-xl text-gray-800">{t('rt_reportTitle', { num: String(reports.length - index) })}</CardTitle>
                         <p className="text-sm text-gray-600 mt-1">
                           <Clock className="h-3 w-3 inline mr-1" />
                           {timestamp.toLocaleString("ja-JP", {
@@ -207,7 +207,7 @@ export function ReportsTab({ workLogs, userId, onRefresh }: ReportsTabProps) {
                     <div className="flex items-center gap-2">
                       <Badge variant="outline" className="border-orange-300 text-orange-700 bg-orange-50 text-lg px-4 py-1">
                         <Target className="h-4 w-4 mr-1" />
-                        {data.overall_score}点
+                        {data.overall_score}{t('rt_scoreUnit')}
                       </Badge>
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
@@ -217,7 +217,7 @@ export function ReportsTab({ workLogs, userId, onRefresh }: ReportsTabProps) {
                         </AlertDialogTrigger>
                         <AlertDialogContent>
                           <AlertDialogHeader>
-                            <AlertDialogTitle>このレポートを削除しますか？</AlertDialogTitle>
+                            <AlertDialogTitle>{t('rt_confirmDeleteOne')}</AlertDialogTitle>
                             <AlertDialogDescription>
                               {t('rt_confirmDeleteOneDesc')}
                             </AlertDialogDescription>
@@ -229,7 +229,7 @@ export function ReportsTab({ workLogs, userId, onRefresh }: ReportsTabProps) {
                               disabled={deletingId === report.id}
                               className="bg-red-600 hover:bg-red-700"
                             >
-                              {deletingId === report.id ? t('rt_deleting') : "削除"}
+                              {deletingId === report.id ? t('rt_deleting') : t('common_delete')}
                             </AlertDialogAction>
                           </AlertDialogFooter>
                         </AlertDialogContent>
@@ -242,7 +242,7 @@ export function ReportsTab({ workLogs, userId, onRefresh }: ReportsTabProps) {
                   <div className="p-4 bg-white rounded-lg border border-orange-100 shadow-sm">
                     <h4 className="font-semibold text-gray-800 mb-2 flex items-center gap-2">
                       <FileText className="h-4 w-4 text-orange-600" />
-                      概要
+                      {t('wsr_overview')}
                     </h4>
                     <p className="text-gray-700">{data.summary}</p>
                   </div>
@@ -251,13 +251,13 @@ export function ReportsTab({ workLogs, userId, onRefresh }: ReportsTabProps) {
                   <div className="p-4 bg-white rounded-lg border border-orange-100 shadow-sm">
                     <h4 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
                       <TrendingUp className="h-4 w-4 text-orange-600" />
-                      時間配分
+                      {t('wsr_timeDistribution')}
                     </h4>
                     <div className="space-y-3">
                       <div className="flex items-center gap-3">
                         <div className="flex-1">
                           <div className="flex justify-between text-sm mb-1">
-                            <span className="text-gray-600">生産的な時間</span>
+                            <span className="text-gray-600">{t('wsr_productiveTime')}</span>
                             <span className="font-semibold text-green-600">
                               {data.time_distribution.productive_time}%
                             </span>
@@ -273,7 +273,7 @@ export function ReportsTab({ workLogs, userId, onRefresh }: ReportsTabProps) {
                       <div className="flex items-center gap-3">
                         <div className="flex-1">
                           <div className="flex justify-between text-sm mb-1">
-                            <span className="text-gray-600">脱線時間</span>
+                            <span className="text-gray-600">{t('wsr_distractionTime')}</span>
                             <span className="font-semibold text-red-600">
                               {data.time_distribution.distracted_time}%
                             </span>
@@ -289,7 +289,7 @@ export function ReportsTab({ workLogs, userId, onRefresh }: ReportsTabProps) {
                       <div className="flex items-center gap-3">
                         <div className="flex-1">
                           <div className="flex justify-between text-sm mb-1">
-                            <span className="text-gray-600">中立時間</span>
+                            <span className="text-gray-600">{t('wsr_neutralTime')}</span>
                             <span className="font-semibold text-gray-600">{data.time_distribution.neutral_time}%</span>
                           </div>
                           <div className="w-full bg-gray-200 rounded-full h-2">
@@ -309,7 +309,7 @@ export function ReportsTab({ workLogs, userId, onRefresh }: ReportsTabProps) {
                     <div className="p-4 bg-white rounded-lg border border-orange-100 shadow-sm">
                       <h4 className="font-semibold text-gray-800 mb-2 flex items-center gap-2">
                         <TrendingUp className="h-4 w-4 text-orange-600" />
-                        生産性分析
+                        {t('wsr_productivityAnalysis')}
                       </h4>
                       <p className="text-sm text-gray-700 leading-relaxed">{data.productivity_analysis}</p>
                     </div>
@@ -318,7 +318,7 @@ export function ReportsTab({ workLogs, userId, onRefresh }: ReportsTabProps) {
                     <div className="p-4 bg-white rounded-lg border border-orange-100 shadow-sm">
                       <h4 className="font-semibold text-gray-800 mb-2 flex items-center gap-2">
                         <Target className="h-4 w-4 text-orange-600" />
-                        集中度の推移
+                        {t('wsr_focusTrend')}
                       </h4>
                       <p className="text-sm text-gray-700 leading-relaxed">{data.focus_trend}</p>
                     </div>
@@ -328,7 +328,7 @@ export function ReportsTab({ workLogs, userId, onRefresh }: ReportsTabProps) {
                   <div className="p-4 bg-white rounded-lg border border-orange-100 shadow-sm">
                     <h4 className="font-semibold text-gray-800 mb-2 flex items-center gap-2">
                       <AlertTriangle className="h-4 w-4 text-orange-600" />
-                      脱線パターン
+                      {t('wsr_distractionPattern')}
                     </h4>
                     <p className="text-sm text-gray-700 leading-relaxed">{data.distraction_summary}</p>
                   </div>
@@ -337,7 +337,7 @@ export function ReportsTab({ workLogs, userId, onRefresh }: ReportsTabProps) {
                   <div className="p-4 bg-white rounded-lg border border-orange-100 shadow-sm">
                     <h4 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
                       <CheckCircle className="h-4 w-4 text-orange-600" />
-                      重要な発見
+                      {t('wsr_keyFindings')}
                     </h4>
                     <ul className="space-y-2">
                       {data.key_findings.map((finding, idx) => (
@@ -353,7 +353,7 @@ export function ReportsTab({ workLogs, userId, onRefresh }: ReportsTabProps) {
                   <div className="p-4 bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg border border-green-200 shadow-sm">
                     <h4 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
                       <Target className="h-4 w-4 text-green-600" />
-                      改善提案
+                      {t('wsr_suggestions')}
                     </h4>
                     <ul className="space-y-2">
                       {data.recommendations.map((recommendation, idx) => (
