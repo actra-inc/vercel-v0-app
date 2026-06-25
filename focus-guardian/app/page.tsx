@@ -236,11 +236,30 @@ const Page = () => {
             </div>
             <div>
               <h1 className="text-xl font-bold text-gray-900">FlowNudge</h1>
-              <p className="text-xs text-gray-500">{user?.email}</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
+            {/* ユーザー情報（Google審査用：取得データの表示） */}
+            <div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5">
+              {user?.avatar_url ? (
+                <img
+                  src={user.avatar_url}
+                  alt={user.name || user.email || ""}
+                  className="h-7 w-7 rounded-full object-cover"
+                />
+              ) : (
+                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-orange-500 text-xs font-bold text-white">
+                  {(user?.name || user?.email || "?")[0].toUpperCase()}
+                </div>
+              )}
+              <div className="hidden sm:block">
+                {user?.name && (
+                  <p className="text-xs font-medium text-gray-800 leading-tight">{user.name}</p>
+                )}
+                <p className="text-xs text-gray-500 leading-tight">{user?.email}</p>
+              </div>
+            </div>
             <Button variant="outline" size="sm" onClick={() => setCurrentTab("settings")} className="gap-2">
               <Settings className="h-4 w-4" />
               {t('page_settings')}
