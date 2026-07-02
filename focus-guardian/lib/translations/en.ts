@@ -119,6 +119,11 @@ export const en: Record<TranslationKey, string> = {
   rt_confirmDeleteOneDesc: 'This cannot be undone. The report will be permanently deleted.',
   rt_reportTitle: 'Consolidated Report #{num}',
   rt_scoreUnit: 'pts',
+  rt_generateReport: 'Generate Report',
+  rt_generating: 'Generating...',
+  rt_generateHint: 'Analyzes the latest 3 work logs to generate a report',
+  rt_needMoreLogs: 'At least 3 work logs are needed to generate a report',
+  rt_generateError: 'Failed to generate report',
 
   // WorkSummaryReport
   wsr_title: 'Work Consolidated Report (Auto-generated)',

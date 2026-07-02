@@ -117,6 +117,11 @@ export const ja = {
   rt_confirmDeleteOneDesc: 'この操作は取り消せません。レポートが完全に削除されます。',
   rt_reportTitle: '統合レポート #{num}',
   rt_scoreUnit: '点',
+  rt_generateReport: 'レポートを生成',
+  rt_generating: '生成中...',
+  rt_generateHint: '直近3件の作業ログを分析してレポートを生成します',
+  rt_needMoreLogs: 'レポートを生成するには最低3件の作業ログが必要です',
+  rt_generateError: 'レポートの生成に失敗しました',
 
   // WorkSummaryReport
   wsr_title: '作業統合レポート（自動生成）',

@@ -142,7 +142,34 @@ const Page = () => {
     setIsLoggedIn(false)
   }, [])
 
+  const handleGenerateReport = useCallback(async () => {
+    const regularLogs = workLogs.filter((log: any) => !log.report_type)
+    if (regularLogs.length < 3) throw new Error("Need at least 3 logs")
+    const apiKey = userSettings?.gemini_api_key
+    if (!apiKey) throw new Error("API key not set")
+
+    const response = await fetch("/api/generate-summary-report", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ workLogs: regularLogs.slice(0, 3), apiKey }),
+    })
+    if (!response.ok) throw new Error(`API error: ${response.status}`)
+    const reportData = await response.json()
+
+    await addWorkLog({
+      user_id: user?.id || "",
+      timestamp: new Date().toISOString(),
+      activity: t('wlp_autoReport'),
+      category: "neutral",
+      details: reportData.summary,
+      applications: [],
+      report_type: "summary",
+      report_data: reportData,
+    })
+  }, [workLogs, userSettings, addWorkLog, t])
+
   const reportsCount = useMemo(() => workLogs.filter((log: any) => log.report_type === "summary").length, [workLogs])
+  const canGenerate = useMemo(() => workLogs.filter((log: any) => !log.report_type).length >= 3, [workLogs])
 
   if (!authChecked) {
     return (
@@ -328,6 +355,8 @@ const Page = () => {
               workLogs={workLogs}
               userId={user?.id || ""}
               onRefresh={refreshData}
+              onGenerateReport={handleGenerateReport}
+              canGenerate={canGenerate}
             />
           </TabsContent>
 

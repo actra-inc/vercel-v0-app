@@ -49,12 +49,29 @@ interface ReportsTabProps {
   workLogs: WorkLogEntry[]
   userId: string
   onRefresh: () => void
+  onGenerateReport?: () => Promise<void>
+  canGenerate?: boolean
 }
 
-export function ReportsTab({ workLogs, userId, onRefresh }: ReportsTabProps) {
+export function ReportsTab({ workLogs, userId, onRefresh, onGenerateReport, canGenerate }: ReportsTabProps) {
   const { t } = useTranslation()
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [deletingAll, setDeletingAll] = useState(false)
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [generateError, setGenerateError] = useState<string | null>(null)
+
+  const handleGenerate = async () => {
+    if (!onGenerateReport) return
+    setIsGenerating(true)
+    setGenerateError(null)
+    try {
+      await onGenerateReport()
+    } catch (e) {
+      setGenerateError(t('rt_generateError'))
+    } finally {
+      setIsGenerating(false)
+    }
+  }
 
   // レポートのみを抽出し、日付順にソート
   const reports = workLogs
@@ -116,10 +133,29 @@ export function ReportsTab({ workLogs, userId, onRefresh }: ReportsTabProps) {
             <br />
             {t('rt_noReportsHint')}
           </p>
-          <Button onClick={onRefresh} variant="outline" className="mt-4 bg-transparent">
-            <RefreshCw className="h-4 w-4 mr-2" />
-            {t('common_refresh')}
-          </Button>
+          {generateError && (
+            <p className="text-sm text-red-500 mb-3">{generateError}</p>
+          )}
+          <div className="flex items-center justify-center gap-3 mt-4">
+            {onGenerateReport && (
+              <Button
+                onClick={handleGenerate}
+                disabled={isGenerating || !canGenerate}
+                className="bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white"
+                title={!canGenerate ? t('rt_needMoreLogs') : t('rt_generateHint')}
+              >
+                <FileText className="h-4 w-4 mr-2" />
+                {isGenerating ? t('rt_generating') : t('rt_generateReport')}
+              </Button>
+            )}
+            <Button onClick={onRefresh} variant="outline" className="bg-transparent">
+              <RefreshCw className="h-4 w-4 mr-2" />
+              {t('common_refresh')}
+            </Button>
+          </div>
+          {!canGenerate && (
+            <p className="text-xs text-gray-400 mt-2">{t('rt_needMoreLogs')}</p>
+          )}
         </CardContent>
       </Card>
     )
