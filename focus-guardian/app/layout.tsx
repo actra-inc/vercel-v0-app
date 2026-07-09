@@ -7,11 +7,14 @@ import './globals.css'
 
 export const metadata: Metadata = {
   title: 'FlowNudge',
-  description: 'FlowNudge - 思考の脱線検知システム',
+  description: 'FlowNudge - AI-Powered Focus & Productivity Tracking',
   generator: 'v0.app',
   icons: {
     icon: '/flownudge-logo.png',
     apple: '/flownudge-logo.png',
+  },
+  verification: {
+    google: 'nQT2ZUu4mak5l1bWii80a0-HshejcR23dJYzt3bB1PE',
   },
 }
 
