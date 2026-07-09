@@ -10,7 +10,7 @@ import { ReportsTab } from "@/components/reports-tab"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Settings, LogOut, Activity, FileText, BarChart3 } from "lucide-react"
+import { Settings, LogOut, Activity, FileText, BarChart3, Camera, Brain, Calendar, Shield, CheckCircle, TrendingUp } from "lucide-react"
 import { ActivityBreakdown, DEFAULT_CATEGORIES, type ActivityCategory } from "@/components/activity-breakdown"
 import { useTranslation } from "@/lib/i18n"
 
@@ -183,60 +183,132 @@ const Page = () => {
   }
 
   if (!isLoggedIn) {
+    const handleSignIn = async () => {
+      try {
+        await signInWithGoogle()
+      } catch (error) {
+        console.error("Login error:", error)
+        alert(t('page_loginError'))
+      }
+    }
+    const GoogleIcon = () => (
+      <svg className="h-5 w-5" viewBox="0 0 24 24">
+        <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+        <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+        <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+        <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+      </svg>
+    )
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-orange-50 to-orange-100 p-4">
-        <Card className="w-full max-w-md shadow-xl">
-          <CardHeader className="space-y-1 text-center">
-            <div className="mx-auto mb-4">
-              <img src="/flownudge-logo.png" alt="FlowNudge" className="h-20 w-20 object-contain" />
+      <div className="min-h-screen bg-white">
+        {/* Header */}
+        <header className="sticky top-0 z-50 border-b bg-white/90 backdrop-blur-md shadow-sm">
+          <div className="container mx-auto flex h-16 items-center justify-between px-6">
+            <div className="flex items-center gap-3">
+              <img src="/flownudge-logo.png" alt="FlowNudge" className="h-9 w-9 object-contain" />
+              <span className="text-xl font-bold text-gray-900">FlowNudge</span>
             </div>
-            <CardTitle className="text-2xl font-bold">FlowNudge</CardTitle>
-            <CardDescription>
-              {t('page_appDescription')}
-              <br />
-              {t('page_loginPrompt')}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Button
-              onClick={async () => {
-                try {
-                  await signInWithGoogle()
-                } catch (error) {
-                  console.error("Login error:", error)
-                  alert(t('page_loginError'))
-                }
-              }}
-              className="w-full bg-white text-gray-800 hover:bg-gray-50 border border-gray-300 shadow-sm"
-              size="lg"
-            >
-              <svg className="mr-2 h-5 w-5" viewBox="0 0 24 24">
-                <path
-                  fill="currentColor"
-                  d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                />
-                <path
-                  fill="currentColor"
-                  d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                />
-                <path
-                  fill="currentColor"
-                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                />
-                <path
-                  fill="currentColor"
-                  d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                />
-              </svg>
-              {t('page_loginButton')}
+            <Button onClick={handleSignIn} className="bg-orange-500 hover:bg-orange-600 text-white gap-2">
+              <GoogleIcon />
+              Sign in with Google
             </Button>
-          </CardContent>
-          <CardFooter className="justify-center gap-4 text-xs text-gray-400 pb-6">
-            <a href="/terms" className="hover:text-gray-600 hover:underline">{t('page_termsOfService')}</a>
-            <span>·</span>
-            <a href="/privacy" className="hover:text-gray-600 hover:underline">{t('page_privacyPolicy')}</a>
-          </CardFooter>
-        </Card>
+          </div>
+        </header>
+
+        {/* Hero */}
+        <section className="bg-gradient-to-br from-orange-50 via-white to-amber-50 py-24 px-6">
+          <div className="container mx-auto max-w-4xl text-center">
+            <img src="/flownudge-logo.png" alt="FlowNudge" className="h-24 w-24 object-contain mx-auto mb-6" />
+            <h1 className="text-5xl font-bold text-gray-900 mb-4">FlowNudge</h1>
+            <p className="text-2xl font-medium text-orange-600 mb-6">AI-Powered Focus & Productivity Tracking</p>
+            <p className="text-lg text-gray-600 mb-10 max-w-2xl mx-auto leading-relaxed">
+              FlowNudge automatically monitors your screen activity, detects distractions using AI,
+              and generates detailed productivity reports to help you stay focused and achieve deep work.
+            </p>
+            <Button onClick={handleSignIn} size="lg" className="bg-white text-gray-800 hover:bg-gray-50 border border-gray-300 shadow-md text-base px-8 py-6 h-auto gap-3">
+              <GoogleIcon />
+              Get Started with Google
+            </Button>
+          </div>
+        </section>
+
+        {/* Features */}
+        <section className="py-20 px-6 bg-white">
+          <div className="container mx-auto max-w-5xl">
+            <h2 className="text-3xl font-bold text-center text-gray-900 mb-4">How FlowNudge Works</h2>
+            <p className="text-center text-gray-500 mb-14 text-lg">Four powerful features to maximize your productivity</p>
+            <div className="grid md:grid-cols-2 gap-8">
+              {[
+                { Icon: Camera, title: "Automatic Screen Analysis", desc: "Captures your screen every 30 seconds and uses OCR to extract text, identifying what you're working on in real time." },
+                { Icon: Brain, title: "AI Distraction Detection", desc: "Gemini AI compares your screen activity with your planned task and alerts you instantly when you go off-track." },
+                { Icon: TrendingUp, title: "Productivity Reports", desc: "Automatically generates consolidated reports every 3 sessions with focus scores, time distribution, and personalized improvement suggestions." },
+                { Icon: Calendar, title: "Google Calendar Integration", desc: "Reads your Google Calendar (read-only) to display today's schedule and help you align your work sessions with your planned tasks." },
+              ].map(({ Icon, title, desc }) => (
+                <div key={title} className="flex gap-5 p-6 rounded-2xl border border-orange-100 bg-orange-50/50">
+                  <div className="flex-shrink-0 flex h-12 w-12 items-center justify-center rounded-xl bg-orange-500 text-white">
+                    <Icon className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">{title}</h3>
+                    <p className="text-gray-600 leading-relaxed">{desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Google Data Usage */}
+        <section className="py-20 px-6 bg-gray-50">
+          <div className="container mx-auto max-w-3xl">
+            <div className="flex items-center justify-center gap-3 mb-4">
+              <Shield className="h-7 w-7 text-orange-500" />
+              <h2 className="text-3xl font-bold text-gray-900">How We Use Your Google Data</h2>
+            </div>
+            <p className="text-center text-gray-500 mb-12 text-lg">FlowNudge requests only the minimum permissions necessary</p>
+            <div className="space-y-5">
+              {[
+                { title: "Google Account (name, email, profile photo)", desc: "Used solely for authentication and to display your account information in the app header. Never shared with third parties." },
+                { title: "Google Calendar (read-only)", desc: "Used only to display today's schedule in the Time Tracker. FlowNudge never creates, modifies, or deletes calendar events. Calendar data is not stored externally." },
+                { title: "Screen Capture (local only)", desc: "Screenshots are analyzed locally in your browser and are never uploaded to external servers. All processing happens on your device." },
+              ].map(({ title, desc }) => (
+                <div key={title} className="flex gap-4 p-5 rounded-xl bg-white border border-gray-200 shadow-sm">
+                  <CheckCircle className="h-6 w-6 text-green-500 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-semibold text-gray-800 mb-1">{title}</p>
+                    <p className="text-gray-600 text-sm leading-relaxed">{desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* CTA */}
+        <section className="py-16 px-6 bg-gradient-to-r from-orange-500 to-amber-500 text-white text-center">
+          <h2 className="text-3xl font-bold mb-4">Ready to boost your focus?</h2>
+          <p className="text-orange-100 mb-8 text-lg">Sign in with your Google account to get started for free.</p>
+          <Button onClick={handleSignIn} size="lg" className="bg-white text-orange-600 hover:bg-orange-50 text-base px-8 py-6 h-auto gap-3 font-semibold">
+            <GoogleIcon />
+            Sign in with Google
+          </Button>
+        </section>
+
+        {/* Footer */}
+        <footer className="border-t bg-white py-8 px-6">
+          <div className="container mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-2">
+              <img src="/flownudge-logo.png" alt="FlowNudge" className="h-6 w-6 object-contain" />
+              <span className="text-sm font-medium text-gray-700">FlowNudge</span>
+              <span className="text-sm text-gray-400">— AI-powered focus tracking</span>
+            </div>
+            <div className="flex items-center gap-6 text-sm text-gray-400">
+              <a href="/privacy" className="hover:text-gray-600 hover:underline">{t('page_privacyPolicy')}</a>
+              <span>·</span>
+              <a href="/terms" className="hover:text-gray-600 hover:underline">{t('page_termsOfService')}</a>
+            </div>
+          </div>
+        </footer>
       </div>
     )
   }
