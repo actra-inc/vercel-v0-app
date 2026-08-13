@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
 
 現在の予定作業: "${currentTask || "未設定"}"
 
-画面情報:
+画面情報（OCRテキスト。文字化けや誤認識が含まれる場合があります）:
 ${extractedText.slice(0, 1000)}
 
 【脱線判定ルール】
@@ -88,20 +88,21 @@ ${extractedText.slice(0, 1000)}
 
 必須回答項目（JSON形式のみ、余計な説明不要）：
 {
-  "activity": "画面で行われている主な活動（日本語、30文字以内）",
+  "activity": "画面で行われている主な活動（日本語、20文字以内。例：「コード編集」「資料作成」「ブラウザ閲覧」）",
   "category": "productive/distracted/neutral のいずれか",
   "work_category": "作業種類（次のいずれかから最も近いものを選択: ${categoriesList}）",
   "confidence": 0.0〜1.0の数値,
-  "apps": ["使用中のアプリ名"],
+  "apps": ["使用中のアプリ名（例：Chrome、VS Code、Slack）"],
   "distraction_check": {
     "is_distracted": true/false,
     "reason": "脱線している場合の具体的な理由（日本語）",
     "task_alignment": 0.0〜1.0（予定作業との一致度。ショッピング・SNS・動画は0.0〜0.2、技術調査・ドキュメント閲覧は0.6〜0.8）
   },
-  "details": "追加の詳細情報（日本語、50文字以内）"
+  "details": "作業内容の簡潔な要約（日本語、40文字以内。OCRテキストをそのまま使わず、内容を自分の言葉で説明すること）"
 }
 
-判定基準：productive=予定作業に関連、distracted=明らかに無関係(ショッピング/SNS/動画等)、neutral=判断が難しい活動`
+判定基準：productive=予定作業に関連、distracted=明らかに無関係(ショッピング/SNS/動画等)、neutral=判断が難しい活動
+重要：detailsフィールドは必ず入力すること。OCRの生テキストをそのまま使用しないこと。`
 
     const response = await fetchWithRetry(analysisUrl, {
       method: "POST",
@@ -153,12 +154,12 @@ ${extractedText.slice(0, 1000)}
     }
 
     if (!analysis) {
-      console.warn("Gemma JSON parse failed, using extracted text as fallback")
+      console.warn("Gemma JSON parse failed, using fallback")
       analysis = {
         activity: "画面解析",
         category: "neutral",
         work_category: categories[categories.length - 1] || "その他",
-        details: extractedText.slice(0, 80),
+        details: currentTask ? `「${currentTask}」の作業中` : "作業内容を解析しました",
         confidence: 0.5,
         apps: [],
         distraction_check: { is_distracted: false, reason: "", task_alignment: 0.5 },
@@ -187,7 +188,7 @@ ${extractedText.slice(0, 1000)}
       activity: analysis.activity || "不明な活動",
       category: forceDistracted ? "distracted" : (analysis.category || "neutral"),
       work_category: validCategory,
-      details: analysis.details || extractedText.slice(0, 80) || "詳細情報なし",
+      details: analysis.details || (currentTask ? `「${currentTask}」の作業中` : "作業内容を解析しました"),
       confidence: Math.round((Number(analysis.confidence) || 0.5) * 100),
       applications: analysis.apps || [],
       focus_score: Math.round(taskAlignment * 100),
