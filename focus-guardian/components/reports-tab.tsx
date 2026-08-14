@@ -213,6 +213,14 @@ export function ReportsTab({ workLogs, userId, onRefresh, onGenerateReport, canG
         <div className="space-y-6 px-6 pb-6">
           {reports.map((report, index) => {
             const data = report.report_data!
+            // AI生成レポートはフィールドが欠けている場合があるため防御的に扱う
+            const timeDistribution = data.time_distribution ?? {
+              productive_time: 0,
+              distracted_time: 0,
+              neutral_time: 0,
+            }
+            const keyFindings = Array.isArray(data.key_findings) ? data.key_findings : []
+            const recommendations = Array.isArray(data.recommendations) ? data.recommendations : []
             const timestamp = new Date(report.timestamp)
 
             return (
@@ -243,7 +251,7 @@ export function ReportsTab({ workLogs, userId, onRefresh, onGenerateReport, canG
                     <div className="flex items-center gap-2">
                       <Badge variant="outline" className="border-orange-300 text-orange-700 bg-orange-50 text-lg px-4 py-1">
                         <Target className="h-4 w-4 mr-1" />
-                        {data.overall_score}{t('rt_scoreUnit')}
+                        {data.overall_score ?? 0}{t('rt_scoreUnit')}
                       </Badge>
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
@@ -295,13 +303,13 @@ export function ReportsTab({ workLogs, userId, onRefresh, onGenerateReport, canG
                           <div className="flex justify-between text-sm mb-1">
                             <span className="text-gray-600">{t('wsr_productiveTime')}</span>
                             <span className="font-semibold text-green-600">
-                              {data.time_distribution.productive_time}%
+                              {timeDistribution.productive_time}%
                             </span>
                           </div>
                           <div className="w-full bg-gray-200 rounded-full h-2">
                             <div
                               className="bg-green-500 h-2 rounded-full transition-all"
-                              style={{ width: `${data.time_distribution.productive_time}%` }}
+                              style={{ width: `${timeDistribution.productive_time}%` }}
                             />
                           </div>
                         </div>
@@ -311,13 +319,13 @@ export function ReportsTab({ workLogs, userId, onRefresh, onGenerateReport, canG
                           <div className="flex justify-between text-sm mb-1">
                             <span className="text-gray-600">{t('wsr_distractionTime')}</span>
                             <span className="font-semibold text-red-600">
-                              {data.time_distribution.distracted_time}%
+                              {timeDistribution.distracted_time}%
                             </span>
                           </div>
                           <div className="w-full bg-gray-200 rounded-full h-2">
                             <div
                               className="bg-red-500 h-2 rounded-full transition-all"
-                              style={{ width: `${data.time_distribution.distracted_time}%` }}
+                              style={{ width: `${timeDistribution.distracted_time}%` }}
                             />
                           </div>
                         </div>
@@ -326,12 +334,12 @@ export function ReportsTab({ workLogs, userId, onRefresh, onGenerateReport, canG
                         <div className="flex-1">
                           <div className="flex justify-between text-sm mb-1">
                             <span className="text-gray-600">{t('wsr_neutralTime')}</span>
-                            <span className="font-semibold text-gray-600">{data.time_distribution.neutral_time}%</span>
+                            <span className="font-semibold text-gray-600">{timeDistribution.neutral_time}%</span>
                           </div>
                           <div className="w-full bg-gray-200 rounded-full h-2">
                             <div
                               className="bg-gray-400 h-2 rounded-full transition-all"
-                              style={{ width: `${data.time_distribution.neutral_time}%` }}
+                              style={{ width: `${timeDistribution.neutral_time}%` }}
                             />
                           </div>
                         </div>
@@ -376,7 +384,7 @@ export function ReportsTab({ workLogs, userId, onRefresh, onGenerateReport, canG
                       {t('wsr_keyFindings')}
                     </h4>
                     <ul className="space-y-2">
-                      {data.key_findings.map((finding, idx) => (
+                      {keyFindings.map((finding, idx) => (
                         <li key={idx} className="flex items-start gap-2 text-sm text-gray-700">
                           <span className="text-orange-600 mt-0.5 flex-shrink-0">•</span>
                           <span className="leading-relaxed">{finding}</span>
@@ -392,7 +400,7 @@ export function ReportsTab({ workLogs, userId, onRefresh, onGenerateReport, canG
                       {t('wsr_suggestions')}
                     </h4>
                     <ul className="space-y-2">
-                      {data.recommendations.map((recommendation, idx) => (
+                      {recommendations.map((recommendation, idx) => (
                         <li key={idx} className="flex items-start gap-2 text-sm text-gray-700">
                           <span className="text-green-600 mt-0.5 flex-shrink-0 font-bold">✓</span>
                           <span className="leading-relaxed font-medium">{recommendation}</span>

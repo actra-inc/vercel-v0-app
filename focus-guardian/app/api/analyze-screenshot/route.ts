@@ -56,9 +56,23 @@ export async function POST(request: NextRequest) {
     const apiKey = formData.get("apiKey") as string
     const currentTask = formData.get("currentTask") as string
     const categoriesJson = formData.get("categories") as string
-    const categories: string[] = categoriesJson
-      ? JSON.parse(categoriesJson).map((c: { name: string }) => c.name)
-      : ["メールチェック", "娯楽", "チャット", "リサーチ", "ミーティング", "業務以外のSNS", "その他"]
+    const DEFAULT_CATEGORY_NAMES = ["メールチェック", "娯楽", "チャット", "リサーチ", "ミーティング", "業務以外のSNS", "未分類"]
+    let categories: string[] = DEFAULT_CATEGORY_NAMES
+    if (categoriesJson) {
+      try {
+        const parsed = JSON.parse(categoriesJson)
+        if (Array.isArray(parsed)) {
+          const names = parsed
+            .map((c: { name?: string }) => c?.name)
+            .filter((n): n is string => typeof n === "string" && n.trim().length > 0)
+          if (names.length > 0) categories = names
+        }
+      } catch {
+        // 不正なJSONはデフォルトカテゴリで続行
+      }
+    }
+    // AIがカテゴリ一覧にない値を返した場合のフォールバック（一覧の末尾＝未分類）
+    const fallbackCategory = categories[categories.length - 1] || "未分類"
 
     if (!extractedText) {
       return NextResponse.json({ error: "extractedText is required" }, { status: 400 })
@@ -158,7 +172,7 @@ ${extractedText.slice(0, 1000)}
       analysis = {
         activity: "画面解析",
         category: "neutral",
-        work_category: categories[categories.length - 1] || "その他",
+        work_category: fallbackCategory,
         details: currentTask ? `「${currentTask}」の作業中` : "作業内容を解析しました",
         confidence: 0.5,
         apps: [],
@@ -168,7 +182,7 @@ ${extractedText.slice(0, 1000)}
 
     const validCategory = categories.includes(analysis.work_category)
       ? analysis.work_category
-      : "その他"
+      : fallbackCategory
 
     const taskAlignment = Number(analysis.distraction_check?.task_alignment) || 0.5
     const forceDistracted = !!currentTask && taskAlignment < 0.35

@@ -107,7 +107,7 @@ export function WorkLogItem({ log, onPlayAlert }: WorkLogItemProps) {
             </div>
             <p className="text-sm text-gray-600 flex items-center gap-1">
               <Clock className="h-3 w-3" />
-              {log.timestamp.toLocaleString("ja-JP")}
+              {new Date(log.timestamp).toLocaleString("ja-JP")}
             </p>
           </div>
           {log.confidence !== undefined && (
@@ -171,6 +171,11 @@ export function WorkLogItem({ log, onPlayAlert }: WorkLogItemProps) {
                 src={log.screenshot_url || "/placeholder.svg"}
                 alt="Screenshot"
                 className="w-full h-auto rounded-lg border border-gray-200 shadow-sm"
+                onError={(e) => {
+                  // blob: URLはリロード後に無効になるため、読み込めない画像は非表示にする
+                  const container = e.currentTarget.parentElement
+                  if (container) container.style.display = "none"
+                }}
               />
             </div>
           )}

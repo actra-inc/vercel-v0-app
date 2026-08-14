@@ -2,8 +2,9 @@ import { NextResponse } from "next/server"
 
 export const runtime = "edge"
 
-let projectsCache: Record<string, string> | null = null
-let projectsCacheTimestamp: number | null = null
+// ワークスペースごとにキャッシュする（単一の共有キャッシュだと
+// 複数ユーザー利用時に他ユーザーのプロジェクト名が返ってしまう）
+const projectsCacheMap = new Map<string, { data: Record<string, string>; timestamp: number }>()
 const CACHE_DURATION = 1000 * 60 * 5 // 5 minutes
 
 // Base64 encode function for Edge runtime
@@ -13,8 +14,10 @@ function base64Encode(str: string): string {
 
 async function getProjects(apiToken: string, workspaceId: string): Promise<Record<string, string>> {
   const now = Date.now()
-  if (projectsCache && projectsCacheTimestamp && now - projectsCacheTimestamp < CACHE_DURATION) {
-    return projectsCache
+  const cacheKey = `${workspaceId}:${apiToken.slice(0, 8)}`
+  const cached = projectsCacheMap.get(cacheKey)
+  if (cached && now - cached.timestamp < CACHE_DURATION) {
+    return cached.data
   }
 
   if (!apiToken || !workspaceId) {
@@ -34,24 +37,22 @@ async function getProjects(apiToken: string, workspaceId: string): Promise<Recor
 
     if (!res.ok) {
       console.error(`Failed to fetch Toggl projects: ${res.status}`)
-      return projectsCache || {}
+      return cached?.data || {}
     }
 
     const list = await res.json()
-    if (!Array.isArray(list)) {
-      projectsCache = {}
-    } else {
-      projectsCache = list.reduce((m: Record<string, string>, p: any) => {
-        m[p.id] = p.name
-        return m
-      }, {})
-    }
+    const data: Record<string, string> = !Array.isArray(list)
+      ? {}
+      : list.reduce((m: Record<string, string>, p: any) => {
+          m[p.id] = p.name
+          return m
+        }, {})
 
-    projectsCacheTimestamp = now
-    return projectsCache
+    projectsCacheMap.set(cacheKey, { data, timestamp: now })
+    return data
   } catch (error) {
     console.error("Error fetching Toggl projects:", error)
-    return projectsCache || {}
+    return cached?.data || {}
   }
 }
 

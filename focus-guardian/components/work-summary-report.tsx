@@ -27,6 +27,14 @@ interface WorkSummaryReportProps {
 
 export function WorkSummaryReport({ timestamp, reportData }: WorkSummaryReportProps) {
   const { t } = useTranslation()
+  // AI生成レポートはフィールドが欠けている場合があるため防御的に扱う
+  const timeDistribution = reportData.time_distribution ?? {
+    productive_time: 0,
+    distracted_time: 0,
+    neutral_time: 0,
+  }
+  const keyFindings = Array.isArray(reportData.key_findings) ? reportData.key_findings : []
+  const recommendations = Array.isArray(reportData.recommendations) ? reportData.recommendations : []
   return (
     <Card className="shadow-xl border-0 bg-gradient-to-br from-orange-50 via-white to-orange-50">
       <CardHeader className="pb-4 bg-gradient-to-r from-orange-100 to-orange-100 rounded-t-lg">
@@ -39,13 +47,13 @@ export function WorkSummaryReport({ timestamp, reportData }: WorkSummaryReportPr
               <CardTitle className="text-xl text-gray-800">{t('wsr_title')}</CardTitle>
               <p className="text-sm text-gray-600 mt-1">
                 <Clock className="h-3 w-3 inline mr-1" />
-                {timestamp.toLocaleString("ja-JP")}
+                {new Date(timestamp).toLocaleString("ja-JP")}
               </p>
             </div>
           </div>
           <Badge variant="outline" className="border-orange-300 text-orange-700 bg-orange-50 text-lg px-4 py-1">
             <Target className="h-4 w-4 mr-1" />
-            {reportData.overall_score}点
+            {reportData.overall_score ?? 0}点
           </Badge>
         </div>
       </CardHeader>
@@ -70,12 +78,12 @@ export function WorkSummaryReport({ timestamp, reportData }: WorkSummaryReportPr
               <div className="flex-1">
                 <div className="flex justify-between text-sm mb-1">
                   <span className="text-gray-600">{t('wsr_productiveTime')}</span>
-                  <span className="font-semibold text-green-600">{reportData.time_distribution.productive_time}%</span>
+                  <span className="font-semibold text-green-600">{timeDistribution.productive_time}%</span>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-2">
                   <div
                     className="bg-green-500 h-2 rounded-full"
-                    style={{ width: `${reportData.time_distribution.productive_time}%` }}
+                    style={{ width: `${timeDistribution.productive_time}%` }}
                   />
                 </div>
               </div>
@@ -84,12 +92,12 @@ export function WorkSummaryReport({ timestamp, reportData }: WorkSummaryReportPr
               <div className="flex-1">
                 <div className="flex justify-between text-sm mb-1">
                   <span className="text-gray-600">{t('wsr_distractionTime')}</span>
-                  <span className="font-semibold text-red-600">{reportData.time_distribution.distracted_time}%</span>
+                  <span className="font-semibold text-red-600">{timeDistribution.distracted_time}%</span>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-2">
                   <div
                     className="bg-red-500 h-2 rounded-full"
-                    style={{ width: `${reportData.time_distribution.distracted_time}%` }}
+                    style={{ width: `${timeDistribution.distracted_time}%` }}
                   />
                 </div>
               </div>
@@ -98,12 +106,12 @@ export function WorkSummaryReport({ timestamp, reportData }: WorkSummaryReportPr
               <div className="flex-1">
                 <div className="flex justify-between text-sm mb-1">
                   <span className="text-gray-600">{t('wsr_neutralTime')}</span>
-                  <span className="font-semibold text-gray-600">{reportData.time_distribution.neutral_time}%</span>
+                  <span className="font-semibold text-gray-600">{timeDistribution.neutral_time}%</span>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-2">
                   <div
                     className="bg-gray-400 h-2 rounded-full"
-                    style={{ width: `${reportData.time_distribution.neutral_time}%` }}
+                    style={{ width: `${timeDistribution.neutral_time}%` }}
                   />
                 </div>
               </div>
@@ -145,7 +153,7 @@ export function WorkSummaryReport({ timestamp, reportData }: WorkSummaryReportPr
             重要な発見
           </h4>
           <ul className="space-y-2">
-            {reportData.key_findings.map((finding, index) => (
+            {keyFindings.map((finding, index) => (
               <li key={index} className="flex items-start gap-2 text-gray-700">
                 <span className="text-orange-600 mt-1">•</span>
                 <span>{finding}</span>
@@ -161,7 +169,7 @@ export function WorkSummaryReport({ timestamp, reportData }: WorkSummaryReportPr
             改善提案
           </h4>
           <ul className="space-y-2">
-            {reportData.recommendations.map((recommendation, index) => (
+            {recommendations.map((recommendation, index) => (
               <li key={index} className="flex items-start gap-2 text-gray-700">
                 <span className="text-green-600 mt-1">✓</span>
                 <span>{recommendation}</span>

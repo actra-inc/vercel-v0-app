@@ -116,8 +116,11 @@ export function useSupabaseData() {
           console.warn("Error loading work logs:", logsError)
         } else if (logsData) {
           const clearedAt = localStorage.getItem(`work_logs_cleared_at_${currentUser.id}`)
+          // レポートはログクリアの対象外なので、クリア時刻より古くても表示する
           const filtered = clearedAt
-            ? logsData.filter((log) => new Date(log.timestamp) > new Date(clearedAt))
+            ? logsData.filter(
+                (log) => log.report_type === "summary" || new Date(log.timestamp) > new Date(clearedAt),
+              )
             : logsData
           setWorkLogs(filtered)
         }
@@ -170,11 +173,12 @@ export function useSupabaseData() {
   }
 
   // Project operations
+  // ※ state更新は関数型で行う（古いクロージャ経由の連続操作で直前の変更が消えないように）
   const addProject = async (project: Omit<Project, "id" | "created_at" | "updated_at">) => {
     const { data, error } = await createProject(project)
     if (error) throw new Error(error.message || "Failed to create project")
     if (data) {
-      setProjects([...projects, data])
+      setProjects((prev) => [...prev, data])
     }
     return data
   }
@@ -183,7 +187,7 @@ export function useSupabaseData() {
     const { data, error } = await updateProject(id, updates)
     if (error) throw new Error(error.message || "Failed to update project")
     if (data) {
-      setProjects(projects.map((p) => (p.id === id ? data : p)))
+      setProjects((prev) => prev.map((p) => (p.id === id ? data : p)))
     }
     return data
   }
@@ -191,7 +195,7 @@ export function useSupabaseData() {
   const removeProject = async (id: string) => {
     const { error } = await deleteProject(id)
     if (error) throw new Error(error.message || "Failed to delete project")
-    setProjects(projects.filter((p) => p.id !== id))
+    setProjects((prev) => prev.filter((p) => p.id !== id))
   }
 
   // Time entry operations
@@ -199,7 +203,7 @@ export function useSupabaseData() {
     const { data, error } = await createTimeEntry(entry)
     if (error) throw new Error(error.message || "Failed to create time entry")
     if (data) {
-      setTimeEntries([data, ...timeEntries])
+      setTimeEntries((prev) => [data, ...prev])
     }
     return data
   }
@@ -208,7 +212,7 @@ export function useSupabaseData() {
     const { data, error } = await updateTimeEntry(id, updates)
     if (error) throw new Error(error.message || "Failed to update time entry")
     if (data) {
-      setTimeEntries(timeEntries.map((e) => (e.id === id ? data : e)))
+      setTimeEntries((prev) => prev.map((e) => (e.id === id ? data : e)))
     }
     return data
   }
@@ -216,7 +220,7 @@ export function useSupabaseData() {
   const removeTimeEntry = async (id: string) => {
     const { error } = await deleteTimeEntry(id)
     if (error) throw new Error(error.message || "Failed to delete time entry")
-    setTimeEntries(timeEntries.filter((e) => e.id !== id))
+    setTimeEntries((prev) => prev.filter((e) => e.id !== id))
   }
 
   // Work log operations
@@ -238,7 +242,12 @@ export function useSupabaseData() {
     if (data) {
       // 新しいログが追加されたら削除タイムスタンプをリセット
       localStorage.removeItem(`work_logs_cleared_at_${user.id}`)
-      setWorkLogs((prev) => [data, ...prev])
+      // blob: のスクリーンショットURLはDBに保存されないため、
+      // セッション中の表示用にローカルの値を補ってstateへ反映する
+      const merged =
+        log.screenshot_url && !data.screenshot_url ? { ...data, screenshot_url: log.screenshot_url } : data
+      setWorkLogs((prev) => [merged, ...prev])
+      return merged
     }
     return data
   }

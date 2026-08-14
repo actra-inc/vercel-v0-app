@@ -1,3 +1,5 @@
+import { createServerClient } from "@supabase/ssr"
+import { cookies } from "next/headers"
 import { type NextRequest, NextResponse } from "next/server"
 
 const GEMMA_MODEL = "gemma-4-26b-a4b-it"
@@ -103,8 +105,68 @@ function generateFallbackReport(logs: WorkLogEntry[]) {
   }
 }
 
+// Gemmaの応答は形式が保証されないため、保存前に必須フィールドを補完する
+// （欠損したままDBに保存されるとレポート表示側がクラッシュする）
+function normalizeReportData(raw: any, logs: WorkLogEntry[]) {
+  const fallback = generateFallbackReport(logs)
+  const num = (v: any, def: number) => {
+    const n = Number(v)
+    return Number.isFinite(n) ? Math.min(100, Math.max(0, n)) : def
+  }
+  const str = (v: any, def: string) => (typeof v === "string" && v.trim() ? v : def)
+  const strArray = (v: any, def: string[]) => {
+    if (!Array.isArray(v)) return def
+    const arr = v.filter((s): s is string => typeof s === "string" && s.trim().length > 0)
+    return arr.length > 0 ? arr : def
+  }
+
+  return {
+    summary: str(raw?.summary, fallback.summary),
+    productivity_analysis: str(raw?.productivity_analysis, fallback.productivity_analysis),
+    focus_trend: str(raw?.focus_trend, fallback.focus_trend),
+    distraction_summary: str(raw?.distraction_summary, fallback.distraction_summary),
+    time_distribution: {
+      productive_time: num(raw?.time_distribution?.productive_time, fallback.time_distribution.productive_time),
+      distracted_time: num(raw?.time_distribution?.distracted_time, fallback.time_distribution.distracted_time),
+      neutral_time: num(raw?.time_distribution?.neutral_time, fallback.time_distribution.neutral_time),
+    },
+    key_findings: strArray(raw?.key_findings, fallback.key_findings),
+    recommendations: strArray(raw?.recommendations, fallback.recommendations),
+    overall_score: num(raw?.overall_score, fallback.overall_score),
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
+    // analyze-screenshot と同様にログイン済みユーザーのみ利用可能にする
+    const cookieStore = await cookies()
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() {
+            return cookieStore.getAll()
+          },
+          setAll(cookiesToSet) {
+            try {
+              cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options))
+            } catch {
+              // Server Componentからの書き込みエラーは無視
+            }
+          },
+        },
+      },
+    )
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized: ログインが必要です" }, { status: 401 })
+    }
+
     const { workLogs, apiKey } = await request.json()
 
     if (!apiKey) {
@@ -200,7 +262,7 @@ ${recentLogs[2].distraction_check ? `- 脱線検知: ${recentLogs[2].distraction
           }
           const reportData = JSON.parse(jsonText)
           console.log("✅ Gemma report generated successfully")
-          return NextResponse.json(reportData)
+          return NextResponse.json(normalizeReportData(reportData, recentLogs))
         }
       } else {
         console.warn(`Gemma API returned ${response.status}, falling back to local report`)

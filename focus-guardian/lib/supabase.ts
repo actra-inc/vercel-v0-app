@@ -333,6 +333,11 @@ export const getWorkLogs = async (userId: string, limit = 500) => {
 
 export const createWorkLog = async (log: Omit<WorkLog, "id" | "created_at">) => {
   const { distraction_check: _dc, ...insertLog } = log as any
+  // blob: URL はセッション限りで無効になるため DB には保存しない
+  // （セッション中の表示は呼び出し側でローカル値をマージして維持する）
+  if (typeof insertLog.screenshot_url === "string" && insertLog.screenshot_url.startsWith("blob:")) {
+    delete insertLog.screenshot_url
+  }
   const { data, error } = await supabase.from("work_logs").insert(insertLog).select().single()
 
   if (data) {
@@ -349,7 +354,9 @@ export const deleteWorkLog = async (id: string) => {
 }
 
 export const deleteAllWorkLogs = async (userId: string) => {
-  const { error } = await supabase.from("work_logs").delete().eq("user_id", userId)
+  // 「作業ログの全クリア」ではレポート（report_type="summary"）は削除しない
+  // （レポートはReportsタブの deleteAllReports で別管理）
+  const { error } = await supabase.from("work_logs").delete().eq("user_id", userId).is("report_type", null)
 
   return { error }
 }

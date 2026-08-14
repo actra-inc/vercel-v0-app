@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback, useRef } from "react"
+import { useState, useCallback, useRef, useEffect } from "react"
 
 interface UseScreenCaptureOptions {
   interval?: number
@@ -19,12 +19,23 @@ export function useScreenCapture(options: UseScreenCaptureOptions = {}) {
 
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
   const isCapturingRef = useRef(false)
+  const streamRef = useRef<MediaStream | null>(null)
+
+  // コールバックは ref 経由で常に最新を参照する
+  // （トラッキング開始後にタスクやカテゴリを変更しても解析に反映されるように）
+  const onCaptureRef = useRef(onCapture)
+  const onErrorRef = useRef(onError)
+  useEffect(() => {
+    onCaptureRef.current = onCapture
+    onErrorRef.current = onError
+  }, [onCapture, onError])
 
   const stopCapture = useCallback(() => {
-    if (mediaStream) {
-      mediaStream.getTracks().forEach((track) => track.stop())
-      setMediaStream(null)
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop())
+      streamRef.current = null
     }
+    setMediaStream(null)
     if (intervalRef.current) {
       clearInterval(intervalRef.current)
       intervalRef.current = null
@@ -32,7 +43,21 @@ export function useScreenCapture(options: UseScreenCaptureOptions = {}) {
     setIsTracking(false)
     setIsCapturing(false)
     console.log("Screen capture stopped.")
-  }, [mediaStream])
+  }, [])
+
+  // アンマウント時（タブ切り替え等）にストリームとインターバルを確実に解放する
+  useEffect(() => {
+    return () => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop())
+        streamRef.current = null
+      }
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current)
+        intervalRef.current = null
+      }
+    }
+  }, [])
 
   const captureFrame = useCallback(
     async (stream: MediaStream): Promise<Blob | null> => {
@@ -100,20 +125,20 @@ export function useScreenCapture(options: UseScreenCaptureOptions = {}) {
 
         if (blob) {
           setLastCaptureTime(new Date())
-          onCapture?.(blob)
+          onCaptureRef.current?.(blob)
           return blob
         }
         return null
       } catch (error) {
         console.error("Failed to capture frame:", error)
-        onError?.(error as Error)
+        onErrorRef.current?.(error as Error)
         return null
       } finally {
         setIsCapturing(false)
         isCapturingRef.current = false
       }
     },
-    [quality, onCapture, onError, stopCapture],
+    [quality, stopCapture],
   )
 
   const checkBrowserSupport = useCallback(() => {
@@ -156,7 +181,7 @@ export function useScreenCapture(options: UseScreenCaptureOptions = {}) {
     const supportCheck = checkBrowserSupport()
     if (!supportCheck.supported) {
       const error = new Error(supportCheck.reason)
-      onError?.(error)
+      onErrorRef.current?.(error)
       alert(supportCheck.reason)
       return
     }
@@ -182,6 +207,7 @@ export function useScreenCapture(options: UseScreenCaptureOptions = {}) {
         stream.getTracks().map((t) => ({ kind: t.kind, label: t.label })),
       )
 
+      streamRef.current = stream
       setMediaStream(stream)
       setIsTracking(true)
 
@@ -216,7 +242,7 @@ export function useScreenCapture(options: UseScreenCaptureOptions = {}) {
         stack: error instanceof Error ? error.stack : undefined,
       })
 
-      onError?.(error as Error)
+      onErrorRef.current?.(error as Error)
 
       if (error instanceof DOMException) {
         switch (error.name) {
@@ -279,7 +305,7 @@ export function useScreenCapture(options: UseScreenCaptureOptions = {}) {
 
       setIsTracking(false)
     }
-  }, [interval, onError, stopCapture, captureFrame, checkBrowserSupport])
+  }, [interval, stopCapture, captureFrame, checkBrowserSupport])
 
   return {
     mediaStream,

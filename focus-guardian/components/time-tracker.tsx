@@ -49,6 +49,7 @@ export function TimeTracker({
   const [isRunning, setIsRunning] = useState(false)
   const [currentEntry, setCurrentEntry] = useState<TimeEntry | null>(null)
   const [currentTime, setCurrentTime] = useState(0)
+  const [localEntries, setLocalEntries] = useState<TimeEntry[]>([])
   const [description, setDescription] = useState("")
   const [selectedEventColor, setSelectedEventColor] = useState<string | null>(null)
   const [showCalendar, setShowCalendar] = useState(false)
@@ -68,6 +69,27 @@ export function TimeTracker({
   useEffect(() => {
     isRunningRef.current = isRunning
   }, [isRunning])
+
+  // 保存済みの手動タイマー履歴を localStorage から復元
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("time_entries")
+      if (!saved) return
+      const parsed = JSON.parse(saved)
+      if (!Array.isArray(parsed)) return
+      setLocalEntries(
+        parsed
+          .filter((e: any) => e && e.startTime)
+          .map((e: any) => ({
+            ...e,
+            startTime: new Date(e.startTime),
+            endTime: e.endTime ? new Date(e.endTime) : undefined,
+          })),
+      )
+    } catch (err) {
+      console.warn("Failed to load saved time entries:", err)
+    }
+  }, [])
 
   // タイマー更新
   useEffect(() => {
@@ -114,13 +136,14 @@ export function TimeTracker({
         setTogglError(data.error || t('tt_togglError'))
         return
       }
-      const entry = data.description
-        ? { description: data.description, project: data.project, is_running: data.is_running, start: data.start ?? null }
+      // 説明が未入力のエントリもあるため、エントリの有無は entry_id で判定する
+      const entry = data.entry_id
+        ? { description: data.description || "", project: data.project, is_running: data.is_running, start: data.start ?? null }
         : null
       setTogglCurrentEntry(entry)
       setTogglLastFetched(new Date())
       // タイマー未実行時のみ説明欄を自動更新
-      if (entry && !isRunningRef.current) {
+      if (entry && entry.description && !isRunningRef.current) {
         setDescription(entry.description)
         setSelectedEventColor(null)
       }
@@ -189,7 +212,8 @@ export function TimeTracker({
         duration,
       }
 
-      const newEntries = [updatedEntry, ...timeEntries]
+      const newEntries = [updatedEntry, ...localEntries]
+      setLocalEntries(newEntries)
       saveToStorage(newEntries)
     }
 
@@ -224,11 +248,14 @@ export function TimeTracker({
 
   const getTodayEntries = () => {
     const today = new Date().toDateString()
-    return timeEntries.filter((entry) => entry.startTime.toDateString() === today)
+    return localEntries.filter(
+      (entry) => entry.startTime instanceof Date && entry.startTime.toDateString() === today,
+    )
   }
 
   const deleteEntry = (entryId: string) => {
-    const newEntries = timeEntries.filter((entry) => entry.id !== entryId)
+    const newEntries = localEntries.filter((entry) => entry.id !== entryId)
+    setLocalEntries(newEntries)
     saveToStorage(newEntries)
   }
 
