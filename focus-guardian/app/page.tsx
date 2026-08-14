@@ -12,6 +12,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Settings, LogOut, Activity, FileText, BarChart3, Camera, Brain, Calendar, Shield, CheckCircle, TrendingUp } from "lucide-react"
 import { ActivityBreakdown, DEFAULT_CATEGORIES, type ActivityCategory } from "@/components/activity-breakdown"
+import { VersionBadge } from "@/components/version-badge"
 import { useTranslation } from "@/lib/i18n"
 
 const Page = () => {
@@ -308,6 +309,9 @@ const Page = () => {
               <a href="/terms" className="hover:text-gray-600 hover:underline">{t('page_termsOfService')}</a>
             </div>
           </div>
+          <div className="container mx-auto mt-4 text-center">
+            <VersionBadge />
+          </div>
         </footer>
       </div>
     )
@@ -467,6 +471,13 @@ const Page = () => {
           </TabsContent>
         </Tabs>
       </main>
+
+      {/* ビルド情報（どのデプロイを見ているかの確認用） */}
+      <footer className="border-t bg-white/60 py-4">
+        <div className="container mx-auto px-4 text-center">
+          <VersionBadge />
+        </div>
+      </footer>
     </div>
   )
 }

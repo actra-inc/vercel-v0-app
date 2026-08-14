@@ -233,6 +233,12 @@ export const ja = {
   as_rec3: 'バッテリー節約: 5分間隔',
   as_language: '言語 / Language',
   as_languageHint: 'アプリの表示言語を切り替えます',
+  as_buildInfo: 'ビルド情報',
+  as_buildInfoHint: 'デプロイが反映されているかの確認に使えます',
+  as_buildVersion: 'バージョン',
+  as_buildCommit: 'コミット',
+  as_buildEnv: '環境',
+  as_buildTime: 'ビルド日時',
 
   // GeminiAPISettings
   ga_title: 'Gemini API 設定',

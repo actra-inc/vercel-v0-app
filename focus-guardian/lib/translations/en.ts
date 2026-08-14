@@ -235,6 +235,12 @@ export const en: Record<TranslationKey, string> = {
   as_rec3: 'Battery saving: 5min',
   as_language: 'Language / 言語',
   as_languageHint: 'Switch the display language of the app',
+  as_buildInfo: 'Build Info',
+  as_buildInfoHint: 'Use this to confirm whether a deployment is reflected',
+  as_buildVersion: 'Version',
+  as_buildCommit: 'Commit',
+  as_buildEnv: 'Environment',
+  as_buildTime: 'Built at',
 
   // GeminiAPISettings
   ga_title: 'Gemini API Settings',

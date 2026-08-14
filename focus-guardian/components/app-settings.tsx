@@ -6,6 +6,7 @@ import { Settings } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
 import { useTranslation, type Language } from "@/lib/i18n"
+import { APP_VERSION, BUILD_COMMIT, BUILD_TIME, ENV_LABEL } from "@/lib/version"
 
 interface AppSettingsProps {
   captureInterval: number
@@ -91,6 +92,25 @@ export function AppSettings({ captureInterval, onCaptureIntervalChange }: AppSet
               <li>{t('as_rec3')}</li>
             </ul>
           </div>
+        </div>
+
+        {/* ビルド情報（デプロイが反映されているかの確認用） */}
+        <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
+          <div className="text-sm font-medium text-gray-700 mb-1">{t('as_buildInfo')}</div>
+          <p className="text-xs text-gray-500 mb-3">{t('as_buildInfoHint')}</p>
+          <dl className="space-y-1.5 text-xs">
+            {[
+              { label: t('as_buildVersion'), value: `v${APP_VERSION}` },
+              { label: t('as_buildCommit'), value: BUILD_COMMIT },
+              { label: t('as_buildEnv'), value: ENV_LABEL },
+              { label: t('as_buildTime'), value: BUILD_TIME },
+            ].map(({ label, value }) => (
+              <div key={label} className="flex items-center justify-between gap-3">
+                <dt className="text-gray-500 flex-shrink-0">{label}</dt>
+                <dd className="font-mono text-gray-800 truncate">{value}</dd>
+              </div>
+            ))}
+          </dl>
         </div>
       </CardContent>
     </Card>
