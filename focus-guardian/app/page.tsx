@@ -169,8 +169,46 @@ const Page = () => {
     })
   }, [workLogs, userSettings, addWorkLog, t])
 
-  const reportsCount = useMemo(() => workLogs.filter((log: any) => log.report_type === "summary").length, [workLogs])
+  // 今日（ローカル日付）の通常ログ。日報生成の素材になる
+  const todayRegularLogs = useMemo(() => {
+    const todayStr = new Date().toDateString()
+    return workLogs.filter(
+      (log: any) => !log.report_type && new Date(log.timestamp).toDateString() === todayStr,
+    )
+  }, [workLogs])
+
+  const handleGenerateDailyReport = useCallback(async () => {
+    const apiKey = userSettings?.gemini_api_key
+    if (!apiKey) throw new Error("API key not set")
+    if (todayRegularLogs.length === 0) throw new Error("No logs today")
+
+    const response = await fetch("/api/generate-daily-report", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        workLogs: todayRegularLogs,
+        apiKey,
+        date: new Date().toLocaleDateString("ja-JP"),
+      }),
+    })
+    if (!response.ok) throw new Error(`API error: ${response.status}`)
+    const reportData = await response.json()
+
+    await addWorkLog({
+      user_id: user?.id || "",
+      timestamp: new Date().toISOString(),
+      activity: t('dr_cardTitle'),
+      category: "neutral",
+      details: reportData.summary,
+      applications: [],
+      report_type: "daily",
+      report_data: reportData,
+    })
+  }, [todayRegularLogs, userSettings, addWorkLog, t])
+
+  const reportsCount = useMemo(() => workLogs.filter((log: any) => !!log.report_type).length, [workLogs])
   const canGenerate = useMemo(() => workLogs.filter((log: any) => !log.report_type).length >= 3, [workLogs])
+  const canGenerateDaily = todayRegularLogs.length > 0
 
   if (!authChecked) {
     return (
@@ -433,6 +471,8 @@ const Page = () => {
               onRefresh={refreshData}
               onGenerateReport={handleGenerateReport}
               canGenerate={canGenerate}
+              onGenerateDailyReport={handleGenerateDailyReport}
+              canGenerateDaily={canGenerateDaily}
             />
           </TabsContent>
 

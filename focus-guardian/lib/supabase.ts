@@ -347,24 +347,38 @@ export const createWorkLog = async (log: Omit<WorkLog, "id" | "created_at">) => 
   return { data, error }
 }
 
+// 注意: RLSのDELETEポリシーが無い環境では、Supabaseはエラーを返さず
+// 「0行削除」で成功扱いになる。.select("id") で削除された行を返させ、
+// 削除件数を呼び出し側で検証できるようにする。
 export const deleteWorkLog = async (id: string) => {
-  const { error } = await supabase.from("work_logs").delete().eq("id", id)
+  const { data, error } = await supabase.from("work_logs").delete().eq("id", id).select("id")
 
-  return { error }
+  return { error, deletedCount: data?.length ?? 0 }
 }
 
 export const deleteAllWorkLogs = async (userId: string) => {
-  // 「作業ログの全クリア」ではレポート（report_type="summary"）は削除しない
+  // 「作業ログの全クリア」ではレポート（report_type付きの行）は削除しない
   // （レポートはReportsタブの deleteAllReports で別管理）
-  const { error } = await supabase.from("work_logs").delete().eq("user_id", userId).is("report_type", null)
+  const { data, error } = await supabase
+    .from("work_logs")
+    .delete()
+    .eq("user_id", userId)
+    .is("report_type", null)
+    .select("id")
 
-  return { error }
+  return { error, deletedCount: data?.length ?? 0 }
 }
 
 export const deleteAllReports = async (userId: string) => {
-  const { error } = await supabase.from("work_logs").delete().eq("user_id", userId).eq("report_type", "summary")
+  // summary（集中レポート）と daily（日報）の両方を対象にする
+  const { data, error } = await supabase
+    .from("work_logs")
+    .delete()
+    .eq("user_id", userId)
+    .not("report_type", "is", null)
+    .select("id")
 
-  return { error }
+  return { error, deletedCount: data?.length ?? 0 }
 }
 
 export const getReports = async (userId: string, limit = 20) => {

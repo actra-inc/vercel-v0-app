@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label"
 import { useTranslation, type Language } from "@/lib/i18n"
 import { APP_VERSION, BUILD_COMMIT, BUILD_TIME, ENV_LABEL } from "@/lib/version"
+import { isDistractionNotificationEnabled, setDistractionNotificationEnabled } from "@/lib/notification"
 
 interface AppSettingsProps {
   captureInterval: number
@@ -16,11 +17,19 @@ interface AppSettingsProps {
 export function AppSettings({ captureInterval, onCaptureIntervalChange }: AppSettingsProps) {
   const { t, language, setLanguage } = useTranslation()
   const [mounted, setMounted] = useState(false)
+  const [notifEnabled, setNotifEnabled] = useState(true)
 
   useEffect(() => {
     setMounted(true)
+    setNotifEnabled(isDistractionNotificationEnabled())
     return () => setMounted(false)
   }, [])
+
+  const handleNotifChange = (value: string) => {
+    const enabled = value === "on"
+    setNotifEnabled(enabled)
+    setDistractionNotificationEnabled(enabled)
+  }
 
   if (!mounted) {
     return (
@@ -81,6 +90,21 @@ export function AppSettings({ captureInterval, onCaptureIntervalChange }: AppSet
             </SelectContent>
           </Select>
           <p className="text-xs text-gray-500">{t('as_intervalHint')}</p>
+        </div>
+
+        {/* 脱線のブラウザ通知 */}
+        <div className="space-y-2">
+          <Label htmlFor="distraction-notification">{t('as_distractionNotification')}</Label>
+          <Select value={notifEnabled ? "on" : "off"} onValueChange={handleNotifChange}>
+            <SelectTrigger id="distraction-notification">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="on">{t('as_notifEnabled')}</SelectItem>
+              <SelectItem value="off">{t('as_notifDisabled')}</SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-gray-500">{t('as_distractionNotificationHint')}</p>
         </div>
 
         <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg">

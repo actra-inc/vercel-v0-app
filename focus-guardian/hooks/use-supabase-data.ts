@@ -116,10 +116,10 @@ export function useSupabaseData() {
           console.warn("Error loading work logs:", logsError)
         } else if (logsData) {
           const clearedAt = localStorage.getItem(`work_logs_cleared_at_${currentUser.id}`)
-          // レポートはログクリアの対象外なので、クリア時刻より古くても表示する
+          // レポート（summary/daily等）はログクリアの対象外なので、クリア時刻より古くても表示する
           const filtered = clearedAt
             ? logsData.filter(
-                (log) => log.report_type === "summary" || new Date(log.timestamp) > new Date(clearedAt),
+                (log) => !!log.report_type || new Date(log.timestamp) > new Date(clearedAt),
               )
             : logsData
           setWorkLogs(filtered)
@@ -260,7 +260,8 @@ export function useSupabaseData() {
     // 削除タイムスタンプを先に記録（DB削除が失敗しても再表示されないよう）
     const clearedAt = new Date().toISOString()
     localStorage.setItem(`work_logs_cleared_at_${user.id}`, clearedAt)
-    setWorkLogs([])
+    // レポート（summary/daily）はクリア対象外なので残す
+    setWorkLogs((prev) => prev.filter((log) => !!log.report_type))
 
     // DB削除はベストエフォート（失敗してもlocalStorageで隠蔽）
     try {

@@ -11,6 +11,8 @@ import { Upload, Play, Pause, Camera, Zap, Trash2, AlertCircle } from "lucide-re
 import { WorkLogItem } from "@/components/work-log-item"
 import { AIAnalysisStatus } from "@/components/ai-analysis-status"
 import { AudioPermissionManager } from "@/components/audio-permission-manager"
+import { NotificationPermissionManager } from "@/components/notification-permission-manager"
+import { showDistractionNotification } from "@/lib/notification"
 import { useScreenCapture } from "@/hooks/use-screen-capture"
 import { cn } from "@/lib/utils"
 import { useTranslation } from "@/lib/i18n"
@@ -260,10 +262,17 @@ export function WorkLogPanel({
 
         await addWorkLog(logEntry)
 
-        // 脱線検知時に自動アラート音を再生
+        // 脱線検知時に自動アラート音 + ブラウザ通知
+        // （脱線中はこのタブを見ていないことが多いため、OS通知でも気づけるようにする）
         if (result.distraction_check?.is_distracted) {
           console.log("🚨 Distraction detected! Playing alert sound...")
           playAlertSound()
+          showDistractionNotification({
+            title: t('notif_distractionTitle'),
+            body: currentTask
+              ? t('notif_distractionBody', { task: currentTask })
+              : t('notif_distractionBodyNoTask'),
+          })
         }
 
         console.log("✅ Work log added successfully")
@@ -454,6 +463,9 @@ export function WorkLogPanel({
     <div className="space-y-4">
       {/* 音声アラート設定 */}
       <AudioPermissionManager onPermissionGranted={() => console.log("Audio permission granted")} />
+
+      {/* ブラウザ通知の許可（未許可のときだけ表示される） */}
+      <NotificationPermissionManager />
 
       {/* 画面解析コントロール */}
       <Card className="shadow-lg border-0 bg-white/90 backdrop-blur-sm">

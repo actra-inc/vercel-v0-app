@@ -17,7 +17,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import { FileText, TrendingUp, AlertTriangle, CheckCircle, Target, Clock, Trash2, RefreshCw } from "lucide-react"
+import { FileText, TrendingUp, AlertTriangle, CheckCircle, Target, Clock, Trash2, RefreshCw, CalendarDays, Copy, Check, Wrench, ArrowRight } from "lucide-react"
 import { deleteWorkLog, deleteAllReports } from "@/lib/supabase"
 
 interface ReportData {
@@ -35,6 +35,18 @@ interface ReportData {
   overall_score: number
 }
 
+// 日報（report_type='daily'）の report_data 構造
+interface DailyReportData {
+  date: string
+  summary: string
+  timeline: { time: string; activity: string; detail: string }[]
+  achievements: string[]
+  tools_used: string[]
+  blockers: string[]
+  tomorrow: string[]
+  markdown: string
+}
+
 interface WorkLogEntry {
   id: string
   timestamp: Date | string
@@ -42,7 +54,7 @@ interface WorkLogEntry {
   category: "productive" | "distracted" | "neutral"
   details: string
   report_type?: string
-  report_data?: ReportData
+  report_data?: ReportData | DailyReportData | any
 }
 
 interface ReportsTabProps {
@@ -51,14 +63,28 @@ interface ReportsTabProps {
   onRefresh: () => void
   onGenerateReport?: () => Promise<void>
   canGenerate?: boolean
+  onGenerateDailyReport?: () => Promise<void>
+  canGenerateDaily?: boolean
 }
 
-export function ReportsTab({ workLogs, userId, onRefresh, onGenerateReport, canGenerate }: ReportsTabProps) {
+export function ReportsTab({
+  workLogs,
+  userId,
+  onRefresh,
+  onGenerateReport,
+  canGenerate,
+  onGenerateDailyReport,
+  canGenerateDaily,
+}: ReportsTabProps) {
   const { t } = useTranslation()
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [deletingAll, setDeletingAll] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
+  const [isGeneratingDaily, setIsGeneratingDaily] = useState(false)
   const [generateError, setGenerateError] = useState<string | null>(null)
+  // 削除成功したレポートを即座に画面から消すためのローカル状態
+  // （onRefreshの再取得を待たずにUIへ反映する）
+  const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set())
 
   const handleGenerate = async () => {
     if (!onGenerateReport) return
@@ -73,10 +99,29 @@ export function ReportsTab({ workLogs, userId, onRefresh, onGenerateReport, canG
     }
   }
 
+  const handleGenerateDaily = async () => {
+    if (!onGenerateDailyReport) return
+    setIsGeneratingDaily(true)
+    setGenerateError(null)
+    try {
+      await onGenerateDailyReport()
+    } catch (e) {
+      console.error("Daily report generation error:", e)
+      alert(t('dr_generateError'))
+    } finally {
+      setIsGeneratingDaily(false)
+    }
+  }
+
   // レポートのみを抽出し、日付順にソート
+  // （summary=集中レポート、daily=日報。削除済みIDはローカルで即時除外）
   const reports = workLogs
     .filter((log) => {
-      return log.report_type === "summary" && log.report_data != null
+      return (
+        (log.report_type === "summary" || log.report_type === "daily") &&
+        log.report_data != null &&
+        !deletedIds.has(log.id)
+      )
     })
     .sort((a, b) => {
       const dateA = new Date(a.timestamp).getTime()
@@ -87,12 +132,22 @@ export function ReportsTab({ workLogs, userId, onRefresh, onGenerateReport, canG
   const handleDeleteReport = async (reportId: string) => {
     try {
       setDeletingId(reportId)
-      const { error } = await deleteWorkLog(reportId)
+      const { error, deletedCount } = await deleteWorkLog(reportId)
 
       if (error) {
         throw new Error(error.message || "Failed to delete report")
       }
+      // RLSのDELETEポリシー欠如などで「エラーなし・0行削除」になるケースを検知
+      if (deletedCount === 0) {
+        throw new Error(t('rt_deleteNoPermission'))
+      }
 
+      // 再取得を待たずに画面から即時に消す
+      setDeletedIds((prev) => {
+        const next = new Set(prev)
+        next.add(reportId)
+        return next
+      })
       alert(t('rt_deleted'))
       onRefresh()
     } catch (error) {
@@ -106,12 +161,21 @@ export function ReportsTab({ workLogs, userId, onRefresh, onGenerateReport, canG
   const handleDeleteAllReports = async () => {
     try {
       setDeletingAll(true)
-      const { error } = await deleteAllReports(userId)
+      const { error, deletedCount } = await deleteAllReports(userId)
 
       if (error) {
         throw new Error(error.message || "Failed to delete all reports")
       }
+      if (deletedCount === 0) {
+        throw new Error(t('rt_deleteNoPermission'))
+      }
 
+      // 表示中の全レポートを即時に消す
+      setDeletedIds((prev) => {
+        const next = new Set(prev)
+        reports.forEach((r) => next.add(r.id))
+        return next
+      })
       alert(t('rt_allDeleted'))
       onRefresh()
     } catch (error) {
@@ -136,7 +200,7 @@ export function ReportsTab({ workLogs, userId, onRefresh, onGenerateReport, canG
           {generateError && (
             <p className="text-sm text-red-500 mb-3">{generateError}</p>
           )}
-          <div className="flex items-center justify-center gap-3 mt-4">
+          <div className="flex items-center justify-center gap-3 mt-4 flex-wrap">
             {onGenerateReport && (
               <Button
                 onClick={handleGenerate}
@@ -146,6 +210,18 @@ export function ReportsTab({ workLogs, userId, onRefresh, onGenerateReport, canG
               >
                 <FileText className="h-4 w-4 mr-2" />
                 {isGenerating ? t('rt_generating') : t('rt_generateReport')}
+              </Button>
+            )}
+            {onGenerateDailyReport && (
+              <Button
+                onClick={handleGenerateDaily}
+                disabled={isGeneratingDaily || !canGenerateDaily}
+                variant="outline"
+                className="border-orange-300 text-orange-700 hover:bg-orange-50 bg-transparent"
+                title={!canGenerateDaily ? t('dr_noLogsToday') : t('dr_generateHint')}
+              >
+                <CalendarDays className="h-4 w-4 mr-2" />
+                {isGeneratingDaily ? t('dr_generating') : t('dr_generateButton')}
               </Button>
             )}
             <Button onClick={onRefresh} variant="outline" className="bg-transparent">
@@ -173,6 +249,19 @@ export function ReportsTab({ workLogs, userId, onRefresh, onGenerateReport, canG
           </Badge>
         </div>
         <div className="flex items-center gap-2">
+          {onGenerateDailyReport && (
+            <Button
+              onClick={handleGenerateDaily}
+              disabled={isGeneratingDaily || !canGenerateDaily}
+              variant="outline"
+              size="sm"
+              className="border-orange-300 text-orange-700 hover:bg-orange-50 bg-transparent"
+              title={!canGenerateDaily ? t('dr_noLogsToday') : t('dr_generateHint')}
+            >
+              <CalendarDays className="h-4 w-4 mr-2" />
+              {isGeneratingDaily ? t('dr_generating') : t('dr_generateButton')}
+            </Button>
+          )}
           <Button onClick={onRefresh} variant="outline" size="sm">
             <RefreshCw className="h-4 w-4 mr-2" />
             {t('common_refresh')}
@@ -212,6 +301,18 @@ export function ReportsTab({ workLogs, userId, onRefresh, onGenerateReport, canG
       <ScrollArea className="h-[750px]">
         <div className="space-y-6 px-6 pb-6">
           {reports.map((report, index) => {
+            // 日報は専用カードで表示
+            if (report.report_type === "daily") {
+              return (
+                <DailyReportCard
+                  key={report.id}
+                  report={report}
+                  onDelete={() => handleDeleteReport(report.id)}
+                  deleting={deletingId === report.id}
+                />
+              )
+            }
+
             const data = report.report_data!
             // AI生成レポートはフィールドが欠けている場合があるため防御的に扱う
             const timeDistribution = data.time_distribution ?? {
@@ -219,8 +320,8 @@ export function ReportsTab({ workLogs, userId, onRefresh, onGenerateReport, canG
               distracted_time: 0,
               neutral_time: 0,
             }
-            const keyFindings = Array.isArray(data.key_findings) ? data.key_findings : []
-            const recommendations = Array.isArray(data.recommendations) ? data.recommendations : []
+            const keyFindings: string[] = Array.isArray(data.key_findings) ? data.key_findings : []
+            const recommendations: string[] = Array.isArray(data.recommendations) ? data.recommendations : []
             const timestamp = new Date(report.timestamp)
 
             return (
@@ -415,5 +516,193 @@ export function ReportsTab({ workLogs, userId, onRefresh, onGenerateReport, canG
         </div>
       </ScrollArea>
     </div>
+  )
+}
+
+// 日報カード（report_type='daily' の表示。既存レポートカードのデザイン言語を踏襲）
+function DailyReportCard({
+  report,
+  onDelete,
+  deleting,
+}: {
+  report: WorkLogEntry
+  onDelete: () => void
+  deleting: boolean
+}) {
+  const { t } = useTranslation()
+  const [copied, setCopied] = useState(false)
+  const data = (report.report_data ?? {}) as DailyReportData
+
+  const timeline = Array.isArray(data.timeline) ? data.timeline : []
+  const achievements = Array.isArray(data.achievements) ? data.achievements : []
+  const toolsUsed = Array.isArray(data.tools_used) ? data.tools_used : []
+  const blockers = Array.isArray(data.blockers) ? data.blockers : []
+  const tomorrow = Array.isArray(data.tomorrow) ? data.tomorrow : []
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(data.markdown || data.summary || "")
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch (err) {
+      console.error("Copy failed:", err)
+    }
+  }
+
+  return (
+    <Card className="shadow-lg border-0 bg-gradient-to-br from-orange-50 via-white to-orange-50">
+      <CardHeader className="pb-4 bg-gradient-to-r from-orange-100 to-orange-100 rounded-t-lg">
+        <div className="flex items-start justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-orange-500 rounded-lg">
+              <CalendarDays className="h-5 w-5 text-white" />
+            </div>
+            <div>
+              <CardTitle className="text-xl text-gray-800">
+                {t('dr_cardTitle')} {data.date || ""}
+              </CardTitle>
+              <p className="text-sm text-gray-600 mt-1">
+                <Clock className="h-3 w-3 inline mr-1" />
+                {new Date(report.timestamp).toLocaleString("ja-JP")}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleCopy}
+              className="border-orange-300 text-orange-700 hover:bg-orange-50 bg-transparent"
+            >
+              {copied ? <Check className="h-4 w-4 mr-1" /> : <Copy className="h-4 w-4 mr-1" />}
+              {copied ? t('dr_copied') : t('dr_copyMarkdown')}
+            </Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700">
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>{t('rt_confirmDeleteOne')}</AlertDialogTitle>
+                  <AlertDialogDescription>{t('rt_confirmDeleteOneDesc')}</AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>{t('common_cancel')}</AlertDialogCancel>
+                  <AlertDialogAction onClick={onDelete} disabled={deleting} className="bg-red-600 hover:bg-red-700">
+                    {deleting ? t('rt_deleting') : t('common_delete')}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-6 pt-6">
+        {/* サマリー */}
+        {data.summary && (
+          <div className="p-4 bg-white rounded-lg border border-orange-100 shadow-sm">
+            <h4 className="font-semibold text-gray-800 mb-2 flex items-center gap-2">
+              <FileText className="h-4 w-4 text-orange-600" />
+              {t('dr_summary')}
+            </h4>
+            <p className="text-gray-700">{data.summary}</p>
+          </div>
+        )}
+
+        {/* タイムライン */}
+        {timeline.length > 0 && (
+          <div className="p-4 bg-white rounded-lg border border-orange-100 shadow-sm">
+            <h4 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+              <Clock className="h-4 w-4 text-orange-600" />
+              {t('dr_timeline')}
+            </h4>
+            <ul className="space-y-2">
+              {timeline.map((item, idx) => (
+                <li key={idx} className="flex items-start gap-3 text-sm text-gray-700">
+                  <span className="font-mono text-orange-700 flex-shrink-0 mt-0.5">{item.time}</span>
+                  <span className="leading-relaxed">
+                    <span className="font-medium">{item.activity}</span>
+                    {item.detail && <span className="text-gray-500"> — {item.detail}</span>}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* 本日の成果 */}
+        {achievements.length > 0 && (
+          <div className="p-4 bg-white rounded-lg border border-orange-100 shadow-sm">
+            <h4 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+              <CheckCircle className="h-4 w-4 text-orange-600" />
+              {t('dr_achievements')}
+            </h4>
+            <ul className="space-y-2">
+              {achievements.map((item, idx) => (
+                <li key={idx} className="flex items-start gap-2 text-sm text-gray-700">
+                  <span className="text-orange-600 mt-0.5 flex-shrink-0">•</span>
+                  <span className="leading-relaxed">{item}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* 詰まった点・課題 */}
+        {blockers.length > 0 && (
+          <div className="p-4 bg-white rounded-lg border border-orange-100 shadow-sm">
+            <h4 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-orange-600" />
+              {t('dr_blockers')}
+            </h4>
+            <ul className="space-y-2">
+              {blockers.map((item, idx) => (
+                <li key={idx} className="flex items-start gap-2 text-sm text-gray-700">
+                  <span className="text-orange-600 mt-0.5 flex-shrink-0">•</span>
+                  <span className="leading-relaxed">{item}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* 明日の予定 */}
+        {tomorrow.length > 0 && (
+          <div className="p-4 bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg border border-green-200 shadow-sm">
+            <h4 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+              <ArrowRight className="h-4 w-4 text-green-600" />
+              {t('dr_tomorrow')}
+            </h4>
+            <ul className="space-y-2">
+              {tomorrow.map((item, idx) => (
+                <li key={idx} className="flex items-start gap-2 text-sm text-gray-700">
+                  <span className="text-green-600 mt-0.5 flex-shrink-0 font-bold">✓</span>
+                  <span className="leading-relaxed font-medium">{item}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* 使用ツール */}
+        {toolsUsed.length > 0 && (
+          <div className="p-4 bg-white rounded-lg border border-orange-100 shadow-sm">
+            <h4 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+              <Wrench className="h-4 w-4 text-orange-600" />
+              {t('dr_toolsUsed')}
+            </h4>
+            <div className="flex flex-wrap gap-1">
+              {toolsUsed.map((tool, idx) => (
+                <Badge key={idx} variant="outline" className="text-xs border-gray-300 text-gray-600 bg-gray-50">
+                  {tool}
+                </Badge>
+              ))}
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   )
 }

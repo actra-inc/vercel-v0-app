@@ -103,6 +103,7 @@ export const ja = {
   // ReportsTab
   rt_deleted: 'レポートを削除しました',
   rt_deleteError: 'レポートの削除中にエラーが発生しました',
+  rt_deleteNoPermission: '削除できませんでした。データベースの削除権限（RLSのDELETEポリシー）が設定されていない可能性があります。scripts/ensure-work-logs-delete-policy.sql を実行してください。',
   rt_allDeleted: 'すべてのレポートを削除しました',
   rt_allDeleteError: 'すべてのレポートの削除中にエラーが発生しました',
   rt_noReports: 'レポートがまだありません',
@@ -122,6 +123,37 @@ export const ja = {
   rt_generateHint: '直近3件の作業ログを分析してレポートを生成します',
   rt_needMoreLogs: 'レポートを生成するには最低3件の作業ログが必要です',
   rt_generateError: 'レポートの生成に失敗しました',
+
+  // 日報（Daily Report）
+  dr_generateButton: '日報を作成',
+  dr_generating: '日報を作成中...',
+  dr_generateHint: '今日の作業ログから、そのまま提出できる日報を作成します',
+  dr_noLogsToday: '今日の作業ログがまだありません。画面解析を開始してログを貯めてください。',
+  dr_generateError: '日報の作成に失敗しました',
+  dr_cardTitle: '日報',
+  dr_summary: 'サマリー',
+  dr_timeline: 'タイムライン',
+  dr_achievements: '本日の成果',
+  dr_blockers: '詰まった点・課題',
+  dr_tomorrow: '明日の予定',
+  dr_toolsUsed: '使用ツール',
+  dr_copyMarkdown: 'Markdownをコピー',
+  dr_copied: 'コピーしました',
+
+  // ブラウザ通知（脱線アラート）
+  np_promptTitle: '脱線をブラウザ通知でも受け取れます',
+  np_promptDesc: '別のタブやアプリを見ているときも「脱線していませんか？」と通知でお知らせします。',
+  np_enableButton: 'ブラウザ通知を有効にする',
+  np_deniedTitle: 'ブラウザ通知がブロックされています',
+  np_deniedDesc: 'ブラウザのサイト設定（アドレスバーの鍵アイコン）から通知を許可してください。macOSではシステム設定 > 通知 でブラウザの通知許可も必要です。',
+  np_enabledMsg: 'ブラウザ通知が有効です',
+  notif_distractionTitle: '脱線していませんか？',
+  notif_distractionBody: '予定していた作業: {task}',
+  notif_distractionBodyNoTask: '予定していた作業に戻りましょう',
+  as_distractionNotification: '脱線のブラウザ通知',
+  as_distractionNotificationHint: '脱線検知時に、音と合わせてブラウザ通知も表示します',
+  as_notifEnabled: '有効',
+  as_notifDisabled: '無効',
 
   // WorkSummaryReport
   wsr_title: '作業統合レポート（自動生成）',

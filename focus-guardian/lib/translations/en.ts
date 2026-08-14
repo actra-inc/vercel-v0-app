@@ -105,6 +105,7 @@ export const en: Record<TranslationKey, string> = {
   // ReportsTab
   rt_deleted: 'Report deleted',
   rt_deleteError: 'Error occurred while deleting report',
+  rt_deleteNoPermission: 'Could not delete. The database may be missing a DELETE policy (RLS). Please run scripts/ensure-work-logs-delete-policy.sql.',
   rt_allDeleted: 'All reports deleted',
   rt_allDeleteError: 'Error occurred while deleting all reports',
   rt_noReports: 'No reports yet',
@@ -124,6 +125,37 @@ export const en: Record<TranslationKey, string> = {
   rt_generateHint: 'Analyzes the latest 3 work logs to generate a report',
   rt_needMoreLogs: 'At least 3 work logs are needed to generate a report',
   rt_generateError: 'Failed to generate report',
+
+  // Daily Report
+  dr_generateButton: 'Create Daily Report',
+  dr_generating: 'Creating daily report...',
+  dr_generateHint: "Creates a ready-to-submit daily report from today's work logs",
+  dr_noLogsToday: "No work logs for today yet. Start screen analysis to collect logs.",
+  dr_generateError: 'Failed to create daily report',
+  dr_cardTitle: 'Daily Report',
+  dr_summary: 'Summary',
+  dr_timeline: 'Timeline',
+  dr_achievements: "Today's Achievements",
+  dr_blockers: 'Blockers / Issues',
+  dr_tomorrow: 'Plans for Tomorrow',
+  dr_toolsUsed: 'Tools Used',
+  dr_copyMarkdown: 'Copy as Markdown',
+  dr_copied: 'Copied!',
+
+  // Browser Notification (distraction alert)
+  np_promptTitle: 'Get distraction alerts as browser notifications',
+  np_promptDesc: 'Even when you are on another tab or app, we can notify you: "Are you getting distracted?"',
+  np_enableButton: 'Enable Browser Notifications',
+  np_deniedTitle: 'Browser notifications are blocked',
+  np_deniedDesc: 'Allow notifications from the site settings (lock icon in the address bar). On macOS, also allow browser notifications in System Settings > Notifications.',
+  np_enabledMsg: 'Browser notifications are enabled',
+  notif_distractionTitle: 'Are you getting distracted?',
+  notif_distractionBody: 'Planned task: {task}',
+  notif_distractionBodyNoTask: "Let's get back to your planned task",
+  as_distractionNotification: 'Distraction browser notification',
+  as_distractionNotificationHint: 'Shows a browser notification along with the sound when a distraction is detected',
+  as_notifEnabled: 'Enabled',
+  as_notifDisabled: 'Disabled',
 
   // WorkSummaryReport
   wsr_title: 'Work Consolidated Report (Auto-generated)',
