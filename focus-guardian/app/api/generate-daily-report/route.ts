@@ -94,7 +94,8 @@ function buildMarkdown(report: Omit<DailyReportData, "markdown">): string {
 }
 
 // AIが使えない場合でも、ログから機械的に日報の骨組みを作る
-function generateFallbackReport(logs: WorkLogEntry[], date: string): DailyReportData {
+// totalCount: 間引き前の実ログ件数（サマリーの件数表示に使う）
+function generateFallbackReport(logs: WorkLogEntry[], date: string, totalCount: number = logs.length): DailyReportData {
   const sorted = [...logs].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
 
   const timeline: TimelineItem[] = sorted.map((log) => ({
@@ -109,7 +110,7 @@ function generateFallbackReport(logs: WorkLogEntry[], date: string): DailyReport
   const distracted = sorted.filter((l) => l.category === "distracted").length
 
   const summary =
-    `本日は${sorted.length}件の作業記録がありました。` +
+    `本日は${totalCount}件の作業記録がありました。` +
     `主な作業: ${productiveActivities.slice(0, 3).join("、") || sorted[0]?.activity || "-"}。` +
     (distracted > 0 ? `脱線の記録が${distracted}件ありました。` : "集中して作業できました。")
 
@@ -127,8 +128,8 @@ function generateFallbackReport(logs: WorkLogEntry[], date: string): DailyReport
 }
 
 // Gemmaの応答は形式が保証されないため、必須フィールドを補完する
-function normalizeDailyReport(raw: any, logs: WorkLogEntry[], date: string): DailyReportData {
-  const fallback = generateFallbackReport(logs, date)
+function normalizeDailyReport(raw: any, logs: WorkLogEntry[], date: string, totalCount: number = logs.length): DailyReportData {
+  const fallback = generateFallbackReport(logs, date, totalCount)
   const str = (v: any, def: string) => (typeof v === "string" && v.trim() ? v : def)
   const strArray = (v: any, def: string[]) => {
     if (!Array.isArray(v)) return def
@@ -208,10 +209,21 @@ export async function POST(request: NextRequest) {
         ? date
         : new Date().toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" })
 
-    // 古い順に並べ、上限件数に制限
-    const logs: WorkLogEntry[] = [...workLogs]
-      .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
-      .slice(-MAX_LOGS)
+    // 古い順に並べる
+    const sortedLogs: WorkLogEntry[] = [...workLogs].sort(
+      (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
+    )
+    const totalCount = sortedLogs.length
+
+    // 上限超過時は末尾を切り出すのではなく、1日全体から均等に間引く
+    // （末尾のみ残すと短いキャプチャ間隔の日に午前の作業が日報から丸ごと欠落するため）
+    let logs: WorkLogEntry[] = sortedLogs
+    if (sortedLogs.length > MAX_LOGS) {
+      const stride = sortedLogs.length / MAX_LOGS
+      logs = Array.from({ length: MAX_LOGS }, (_, i) => sortedLogs[Math.floor(i * stride)])
+      // 最終ログ（終業時刻側）は必ず含める
+      logs[logs.length - 1] = sortedLogs[sortedLogs.length - 1]
+    }
 
     // Gemmaでリッチな日報を試みる
     try {
@@ -277,7 +289,7 @@ ${logLines}
           }
           const raw = JSON.parse(jsonText)
           console.log("✅ Gemma daily report generated successfully")
-          return NextResponse.json(normalizeDailyReport(raw, logs, reportDate))
+          return NextResponse.json(normalizeDailyReport(raw, logs, reportDate, totalCount))
         }
       } else {
         console.warn(`Gemma API returned ${response.status}, falling back to local daily report`)
@@ -288,7 +300,7 @@ ${logLines}
 
     // Gemma失敗時はログから機械的に日報を生成
     console.log("📊 Generating fallback daily report from log data...")
-    return NextResponse.json(generateFallbackReport(logs, reportDate))
+    return NextResponse.json(generateFallbackReport(logs, reportDate, totalCount))
   } catch (error) {
     console.error("Daily report generation error:", error)
     return NextResponse.json(

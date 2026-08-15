@@ -240,8 +240,12 @@ export function useSupabaseData() {
       throw new Error(msg || "Failed to create work log")
     }
     if (data) {
-      // 新しいログが追加されたら削除タイムスタンプをリセット
-      localStorage.removeItem(`work_logs_cleared_at_${user.id}`)
+      // 通常ログの追加時のみ削除タイムスタンプをリセットする
+      // （レポート/日報の保存でリセットすると、DB削除が効いていない環境で
+      //   クリア済みのログが次回ロード時に全件復活してしまう）
+      if (!log.report_type) {
+        localStorage.removeItem(`work_logs_cleared_at_${user.id}`)
+      }
       // blob: のスクリーンショットURLはDBに保存されないため、
       // セッション中の表示用にローカルの値を補ってstateへ反映する
       const merged =
@@ -252,10 +256,12 @@ export function useSupabaseData() {
     return data
   }
 
-  const clearWorkLogs = async () => {
+  const clearWorkLogs = async (): Promise<{ dbDeleteFailed: boolean }> => {
     if (!user) {
       throw new Error("User not authenticated")
     }
+
+    const regularCount = workLogs.filter((log) => !log.report_type).length
 
     // 削除タイムスタンプを先に記録（DB削除が失敗しても再表示されないよう）
     const clearedAt = new Date().toISOString()
@@ -264,11 +270,17 @@ export function useSupabaseData() {
     setWorkLogs((prev) => prev.filter((log) => !!log.report_type))
 
     // DB削除はベストエフォート（失敗してもlocalStorageで隠蔽）
+    // ただし0件削除（RLSのDELETEポリシー未設定）は呼び出し側に伝えて警告できるようにする
     try {
-      const { error } = await deleteAllWorkLogs(user.id)
-      if (error) console.warn("DB delete work logs warning:", error.message)
+      const { error, deletedCount } = await deleteAllWorkLogs(user.id)
+      if (error) {
+        console.warn("DB delete work logs warning:", error.message)
+        return { dbDeleteFailed: true }
+      }
+      return { dbDeleteFailed: regularCount > 0 && deletedCount === 0 }
     } catch (err) {
       console.warn("DB delete work logs failed:", err)
+      return { dbDeleteFailed: true }
     }
   }
 
