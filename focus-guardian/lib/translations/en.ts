@@ -366,5 +366,6 @@ export const en: Record<TranslationKey, string> = {
   sp_tabToggl: 'Toggl Integration',
   sp_tabProjects: 'Projects',
   sp_tabOther: 'Other',
+  sp_tabVersion: 'Version',
   sp_projectLoadError: 'Could not load project management',
 }

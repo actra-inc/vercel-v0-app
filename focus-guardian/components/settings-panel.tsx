@@ -5,11 +5,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Loader2, AlertCircle, X, Settings, Key, Link, FolderOpen } from "lucide-react"
+import { Loader2, AlertCircle, X, Settings, Key, Link, FolderOpen, Info } from "lucide-react"
 import { GeminiApiSettings } from "@/components/gemini-api-settings"
 import { TogglSettings } from "@/components/toggl-settings"
 import { ProjectManager } from "@/components/project-manager"
 import { AppSettings } from "@/components/app-settings"
+import { VersionInfo } from "@/components/version-info"
 import { useTranslation } from "@/lib/i18n"
 
 interface SettingsPanelProps {
@@ -112,7 +113,7 @@ export function SettingsPanel({
         </CardHeader>
         <CardContent className="pt-6">
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="gemini" className="flex items-center gap-2">
                 <Key className="h-4 w-4" />
                 {t('sp_tabGemini')}
@@ -128,6 +129,10 @@ export function SettingsPanel({
               <TabsTrigger value="app" className="flex items-center gap-2">
                 <Settings className="h-4 w-4" />
                 {t('sp_tabOther')}
+              </TabsTrigger>
+              <TabsTrigger value="version" className="flex items-center gap-2">
+                <Info className="h-4 w-4" />
+                {t('sp_tabVersion')}
               </TabsTrigger>
             </TabsList>
 
@@ -163,6 +168,10 @@ export function SettingsPanel({
 
             <TabsContent value="app" className="mt-6">
               <AppSettings captureInterval={captureInterval} onCaptureIntervalChange={onCaptureIntervalChange} />
+            </TabsContent>
+
+            <TabsContent value="version" className="mt-6">
+              <VersionInfo />
             </TabsContent>
           </Tabs>
         </CardContent>

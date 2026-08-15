@@ -364,6 +364,7 @@ export const ja = {
   sp_tabToggl: 'Toggl連携',
   sp_tabProjects: 'プロジェクト',
   sp_tabOther: 'その他',
+  sp_tabVersion: 'バージョン情報',
   sp_projectLoadError: 'プロジェクト管理機能を読み込めませんでした',
 } as const
 
