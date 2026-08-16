@@ -50,25 +50,36 @@ export interface DistractionNotificationOptions {
   body: string
 }
 
-// 脱線通知を表示する。表示できた場合 true を返す
-export const showDistractionNotification = ({ title, body }: DistractionNotificationOptions): boolean => {
-  if (!isNotificationSupported()) return false
-  if (Notification.permission !== "granted") return false
-  if (!isDistractionNotificationEnabled()) return false
+// 通知が出せなかった理由。通知が届かないときの切り分けに使う
+export type NotificationSkipReason =
+  | "unsupported"
+  | "not-granted"
+  | "disabled-in-app"
+  | "cooldown"
+  | "error"
 
-  const now = Date.now()
-  if (now - lastNotifiedAt < COOLDOWN_MS) {
-    console.log("[notification] Skipped (cooldown)")
-    return false
-  }
-  lastNotifiedAt = now
+export interface ShowNotificationResult {
+  shown: boolean
+  reason?: NotificationSkipReason
+}
 
+// 実際に通知を出す共通処理
+const createNotification = (
+  title: string,
+  body: string,
+  tag = "flownudge-distraction",
+): ShowNotificationResult => {
   try {
     const notification = new Notification(title, {
       body,
       icon: "/flownudge-logo.png",
-      tag: "flownudge-distraction", // 同種の通知は積み上げず置き換える
-    })
+      tag, // 同種の通知は積み上げず置き換える
+      // 脱線通知は「席を外している／別アプリを見ている」ときに気づかせるためのもの。
+      // 自動で消すと通知センターからも消えて気づけないため、ユーザーが閉じるまで残す。
+      requireInteraction: true,
+      // 同じ tag でも再度アラートする（2回目以降が無音で差し替わるのを防ぐ）
+      renotify: true,
+    } as NotificationOptions)
 
     // 通知クリックでアプリのタブへ戻す
     notification.onclick = () => {
@@ -80,11 +91,51 @@ export const showDistractionNotification = ({ title, body }: DistractionNotifica
       notification.close()
     }
 
-    // 10秒で自動クローズ（残り続けないように）
-    setTimeout(() => notification.close(), 10 * 1000)
-    return true
+    notification.onerror = (event) => {
+      console.warn("[notification] Notification error event:", event)
+    }
+
+    console.log("[notification] Shown:", title)
+    return { shown: true }
   } catch (error) {
     console.warn("[notification] Failed to show notification:", error)
-    return false
+    return { shown: false, reason: "error" }
   }
+}
+
+// 脱線通知を表示する。出せなかった場合は理由を返す
+export const showDistractionNotification = ({
+  title,
+  body,
+}: DistractionNotificationOptions): ShowNotificationResult => {
+  if (!isNotificationSupported()) {
+    console.warn("[notification] Skipped: このブラウザは通知に未対応です")
+    return { shown: false, reason: "unsupported" }
+  }
+  if (Notification.permission !== "granted") {
+    console.warn(`[notification] Skipped: ブラウザの通知許可が ${Notification.permission} です`)
+    return { shown: false, reason: "not-granted" }
+  }
+  if (!isDistractionNotificationEnabled()) {
+    console.warn("[notification] Skipped: アプリ設定で脱線通知がオフです")
+    return { shown: false, reason: "disabled-in-app" }
+  }
+
+  const now = Date.now()
+  if (now - lastNotifiedAt < COOLDOWN_MS) {
+    console.log("[notification] Skipped (cooldown)")
+    return { shown: false, reason: "cooldown" }
+  }
+  lastNotifiedAt = now
+
+  return createNotification(title, body)
+}
+
+// 設定画面から「通知が届くか」を確かめるためのテスト通知。
+// クールダウンとアプリ内オン/オフの影響を受けない（許可状態だけを検証する）
+export const sendTestNotification = (title: string, body: string): ShowNotificationResult => {
+  if (!isNotificationSupported()) return { shown: false, reason: "unsupported" }
+  if (Notification.permission !== "granted") return { shown: false, reason: "not-granted" }
+  // 実際の脱線通知を上書きしないよう別タグにする
+  return createNotification(title, body, "flownudge-test")
 }

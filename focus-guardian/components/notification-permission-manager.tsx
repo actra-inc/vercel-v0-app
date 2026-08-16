@@ -19,8 +19,28 @@ export function NotificationPermissionManager() {
   const { t } = useTranslation()
   const [permission, setPermission] = useState<NotificationPermissionState>("unsupported")
 
+  // 許可状態は設定画面やブラウザ側からも変わるため、マウント時の1回だけでなく
+  // フォーカス復帰時と Permissions API の変化イベントでも取り直す
   useEffect(() => {
-    setPermission(getNotificationPermission())
+    const sync = () => setPermission(getNotificationPermission())
+    sync()
+    window.addEventListener("focus", sync)
+
+    let status: PermissionStatus | null = null
+    navigator.permissions
+      ?.query({ name: "notifications" as PermissionName })
+      .then((s) => {
+        status = s
+        s.addEventListener("change", sync)
+      })
+      .catch(() => {
+        // Permissions API 未対応ブラウザではフォーカス復帰時の再取得のみで動く
+      })
+
+    return () => {
+      window.removeEventListener("focus", sync)
+      status?.removeEventListener("change", sync)
+    }
   }, [])
 
   const handleRequest = async () => {

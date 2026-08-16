@@ -5,8 +5,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Settings } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
+import { Button } from "@/components/ui/button"
 import { useTranslation, type Language } from "@/lib/i18n"
-import { isDistractionNotificationEnabled, setDistractionNotificationEnabled } from "@/lib/notification"
+import {
+  isDistractionNotificationEnabled,
+  setDistractionNotificationEnabled,
+  getNotificationPermission,
+  requestNotificationPermission,
+  sendTestNotification,
+  type NotificationPermissionState,
+} from "@/lib/notification"
 
 interface AppSettingsProps {
   captureInterval: number
@@ -17,10 +25,13 @@ export function AppSettings({ captureInterval, onCaptureIntervalChange }: AppSet
   const { t, language, setLanguage } = useTranslation()
   const [mounted, setMounted] = useState(false)
   const [notifEnabled, setNotifEnabled] = useState(true)
+  const [notifPermission, setNotifPermission] = useState<NotificationPermissionState>("unsupported")
+  const [testResult, setTestResult] = useState<string | null>(null)
 
   useEffect(() => {
     setMounted(true)
     setNotifEnabled(isDistractionNotificationEnabled())
+    setNotifPermission(getNotificationPermission())
     return () => setMounted(false)
   }, [])
 
@@ -28,6 +39,18 @@ export function AppSettings({ captureInterval, onCaptureIntervalChange }: AppSet
     const enabled = value === "on"
     setNotifEnabled(enabled)
     setDistractionNotificationEnabled(enabled)
+  }
+
+  const handleRequestPermission = async () => {
+    const result = await requestNotificationPermission()
+    setNotifPermission(result)
+  }
+
+  // 通知が実際に届くかをその場で確認する（届かない場合の切り分け用）
+  const handleTestNotification = () => {
+    const result = sendTestNotification(t('as_notifTestTitle'), t('as_notifTestBody'))
+    setNotifPermission(getNotificationPermission())
+    setTestResult(result.shown ? t('as_notifTestSent') : t('as_notifTestFailed'))
   }
 
   if (!mounted) {
@@ -104,6 +127,50 @@ export function AppSettings({ captureInterval, onCaptureIntervalChange }: AppSet
             </SelectContent>
           </Select>
           <p className="text-xs text-gray-500">{t('as_distractionNotificationHint')}</p>
+
+          {/* ブラウザ側の許可状態。アプリ設定を「有効」にしていても
+              ブラウザが未許可だと通知は一切出ないため、ここで状態と対処を示す */}
+          <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 space-y-2">
+            <div className="flex items-center gap-2 text-xs">
+              <span className="text-gray-600">{t('as_notifPermissionLabel')}</span>
+              <span
+                className={
+                  notifPermission === "granted"
+                    ? "font-medium text-green-700"
+                    : notifPermission === "denied"
+                      ? "font-medium text-red-700"
+                      : "font-medium text-orange-700"
+                }
+              >
+                {notifPermission === "granted"
+                  ? t('as_notifPermGranted')
+                  : notifPermission === "denied"
+                    ? t('as_notifPermDenied')
+                    : notifPermission === "unsupported"
+                      ? t('as_notifPermUnsupported')
+                      : t('as_notifPermDefault')}
+              </span>
+            </div>
+
+            {notifPermission === "default" && (
+              <Button size="sm" variant="outline" onClick={handleRequestPermission}>
+                {t('as_notifRequestButton')}
+              </Button>
+            )}
+
+            {notifPermission === "denied" && (
+              <p className="text-xs text-red-700">{t('as_notifDeniedHelp')}</p>
+            )}
+
+            {notifPermission === "granted" && (
+              <div className="space-y-1">
+                <Button size="sm" variant="outline" onClick={handleTestNotification}>
+                  {t('as_notifTestButton')}
+                </Button>
+                {testResult && <p className="text-xs text-gray-600">{testResult}</p>}
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg">

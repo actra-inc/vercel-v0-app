@@ -15,10 +15,37 @@ export function AudioPermissionManager({ onPermissionGranted }: AudioPermissionM
   const { t } = useTranslation()
   const [audioPermission, setAudioPermission] = useState<"granted" | "denied" | "prompt" | "unknown">("unknown")
   const [isTestingAudio, setIsTestingAudio] = useState(false)
+  // 音が出ないときの手順はOSごとに違うため、実行環境に合わせて出し分ける
+  const [os, setOs] = useState<"mac" | "windows" | "other">("other")
 
   useEffect(() => {
     checkAudioPermission()
+    setOs(detectOs())
   }, [])
+
+  const detectOs = (): "mac" | "windows" | "other" => {
+    if (typeof navigator === "undefined") return "other"
+    const ua = navigator.userAgent
+    if (/Mac|iPhone|iPad|iPod/.test(ua)) return "mac"
+    if (/Windows/.test(ua)) return "windows"
+    return "other"
+  }
+
+  const troubleshooting =
+    os === "mac"
+      ? {
+          title: t('ap_macTitle'),
+          steps: [t('ap_macStep1'), t('ap_macStep2'), t('ap_macStep3'), t('ap_macStep4')],
+        }
+      : os === "windows"
+        ? {
+            title: t('ap_winTitle'),
+            steps: [t('ap_winStep1'), t('ap_winStep2'), t('ap_winStep3'), t('ap_winStep4')],
+          }
+        : {
+            title: t('ap_genericTitle'),
+            steps: [t('ap_genericStep1'), t('ap_genericStep2'), t('ap_genericStep3')],
+          }
 
   const checkAudioPermission = async () => {
     try {
@@ -174,12 +201,11 @@ export function AudioPermissionManager({ onPermissionGranted }: AudioPermissionM
             </Button>
 
             <div className="text-sm text-gray-600">
-              <div className="font-medium mb-2">{t('ap_macTitle')}</div>
+              <div className="font-medium mb-2">{troubleshooting.title}</div>
               <ul className="list-disc list-inside space-y-1 text-xs">
-                <li>{t('ap_macStep1')}</li>
-                <li>{t('ap_macStep2')}</li>
-                <li>{t('ap_macStep3')}</li>
-                <li>{t('ap_macStep4')}</li>
+                {troubleshooting.steps.map((step) => (
+                  <li key={step}>{step}</li>
+                ))}
               </ul>
             </div>
           </div>

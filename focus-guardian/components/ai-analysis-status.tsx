@@ -58,6 +58,7 @@ export function AIAnalysisStatus({
             </div>
             <div className="text-3xl font-bold text-orange-600 mb-1">{totalLogs}</div>
             <div className="text-xs text-gray-500">{t('ai_count_unit')}</div>
+            <div className="mt-2 text-[11px] leading-snug text-gray-500">{t('ai_logsAnalyzedBasis')}</div>
           </div>
 
           {/* {t('ai_avgFocus')} */}
@@ -73,6 +74,10 @@ export function AIAnalysisStatus({
             </div>
             <div className="text-xs text-gray-500 mb-2">/100</div>
             <Progress value={averageFocusScore} className="h-3 bg-gray-200" />
+            {/* 何をどう計算した数字なのかが分からないという指摘への対応 */}
+            <div className="mt-2 text-[11px] leading-snug text-gray-500">
+              {t('ai_avgFocusBasis', { count: totalLogs })}
+            </div>
           </div>
 
           {/* {t('ai_productivityRate')} */}
@@ -88,6 +93,9 @@ export function AIAnalysisStatus({
             </div>
             <div className="text-xs text-gray-500 mb-2">{t('ai_productiveDesc')}</div>
             <Progress value={productivePercentage} className="h-3 bg-gray-200" />
+            <div className="mt-2 text-[11px] leading-snug text-gray-500">
+              {t('ai_productivityBasis', { count: totalLogs })}
+            </div>
           </div>
         </div>
 

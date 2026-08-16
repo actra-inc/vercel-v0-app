@@ -378,15 +378,25 @@ export function WorkLogPanel({
     onError: handleError,
   })
 
+  // 実際のトラッキング状態の変化だけを親に通知する。
+  // ボタン操作時に手動で通知していたため、
+  //  ・共有ダイアログをキャンセルしても「開始」扱いになる
+  //  ・ブラウザの「共有を停止」で止めたときに「停止」が通知されない
+  // という取りこぼしがあった。
+  const prevTrackingRef = useRef(false)
+  useEffect(() => {
+    if (prevTrackingRef.current === isTracking) return
+    prevTrackingRef.current = isTracking
+    onTrackingChange?.(isTracking, isTracking ? new Date() : null)
+  }, [isTracking, onTrackingChange])
+
   const handleToggleTracking = async () => {
     if (isTracking) {
       console.log("⏹️ Stopping screen capture...")
       stopCapture()
-      onTrackingChange?.(false, null)
     } else {
       console.log("▶️ Starting screen capture...")
       await startAutoCapture()
-      onTrackingChange?.(true, new Date())
     }
   }
 
@@ -478,12 +488,22 @@ export function WorkLogPanel({
           <CardTitle className="flex items-center gap-2 text-gray-800">
             <Camera className="h-5 w-5 text-amber-600" />
             {t('wlp_captureTitle')}
-            <div
+            {/* 状態は色だけでなくラベルでも示す（色覚特性・意味の不明瞭さの解消） */}
+            <span
               className={cn(
-                "w-3 h-3 rounded-full shadow-sm",
-                isTracking ? "bg-green-500 animate-pulse" : "bg-gray-400",
+                "flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium",
+                isTracking ? "bg-green-50 text-green-700" : "bg-gray-100 text-gray-600",
               )}
-            />
+              title={isTracking ? t('wlp_statusTrackingHint') : t('wlp_statusStoppedHint')}
+            >
+              <span
+                className={cn(
+                  "w-2 h-2 rounded-full shadow-sm",
+                  isTracking ? "bg-green-500 animate-pulse" : "bg-gray-400",
+                )}
+              />
+              {isTracking ? t('wlp_statusTracking') : t('wlp_statusStopped')}
+            </span>
             <Badge variant="outline" className="ml-auto border-amber-200 text-amber-700 bg-amber-50">
               <Zap className="h-3 w-3 mr-1" />
               {captureInterval < 60 ? t('wlp_intervalSeconds', { count: captureInterval }) : t('wlp_intervalMinutes', { count: captureInterval / 60 })}
@@ -565,16 +585,6 @@ export function WorkLogPanel({
               )}
             </Button>
 
-            <Button
-              variant="outline"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={isAnalyzing || !isApiKeyValid}
-              className="flex items-center gap-2 shadow-md border-gray-300 hover:bg-gray-50 transition-all duration-200"
-            >
-              <Upload className="h-4 w-4" />
-              {isAnalyzing ? t('wlp_analyzing') : t('wlp_screenshot')}
-            </Button>
-
             <input
               ref={fileInputRef}
               type="file"
@@ -584,8 +594,24 @@ export function WorkLogPanel({
             />
           </div>
 
+          {/* 主導線は「解析開始」。手動アップロードは補助機能として下げて置く */}
+          <div className="text-xs text-gray-500">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isAnalyzing || !isApiKeyValid}
+              className="h-7 px-2 text-xs text-gray-600 hover:bg-gray-100"
+            >
+              <Upload className="h-3.5 w-3.5 mr-1.5" />
+              {isAnalyzing ? t('wlp_analyzing') : t('wlp_screenshot')}
+            </Button>
+            <span className="ml-1">{t('wlp_screenshotHint')}</span>
+          </div>
+
           <div className="text-sm text-gray-600">
-            {t('wlp_featureTitle')}
+            <strong className="font-medium text-gray-700">{t('wlp_featureTitle')}</strong>{' '}
+            {t('wlp_featureDesc')}
           </div>
 
           {currentTask ? (
@@ -599,7 +625,7 @@ export function WorkLogPanel({
           ) : (
             <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
               <div className="text-sm text-gray-600">
-                {t('wlp_noTaskSet')}
+                <span className="font-medium">{t('wlp_noTaskSet')}</span>
                 <div className="text-xs mt-1">
                   {t('wlp_noTaskSetDesc')}
                 </div>

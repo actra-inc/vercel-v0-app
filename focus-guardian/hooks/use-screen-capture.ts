@@ -171,7 +171,8 @@ export function useScreenCapture(options: UseScreenCaptureOptions = {}) {
   }, [])
 
   // ユーザーアクションから直接呼び出される関数
-  const startAutoCapture = useCallback(async () => {
+  // 開始できたかどうかを返す（キャンセル・失敗時に呼び出し側がセッションを記録しないように）
+  const startAutoCapture = useCallback(async (): Promise<boolean> => {
     console.log("=== Screen Capture Start Requested ===")
     console.log("User agent:", navigator.userAgent)
     console.log("Location:", location.href)
@@ -183,7 +184,7 @@ export function useScreenCapture(options: UseScreenCaptureOptions = {}) {
       const error = new Error(supportCheck.reason)
       onErrorRef.current?.(error)
       alert(supportCheck.reason)
-      return
+      return false
     }
 
     try {
@@ -234,6 +235,7 @@ export function useScreenCapture(options: UseScreenCaptureOptions = {}) {
       }, interval)
 
       console.log("✅ Screen capture started successfully")
+      return true
     } catch (error) {
       console.error("❌ Failed to get display media:", error)
       console.error("Error details:", {
@@ -304,6 +306,7 @@ export function useScreenCapture(options: UseScreenCaptureOptions = {}) {
       }
 
       setIsTracking(false)
+      return false
     }
   }, [interval, stopCapture, captureFrame, checkBrowserSupport])
 

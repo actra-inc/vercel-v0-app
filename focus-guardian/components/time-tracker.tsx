@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
-import { Play, Pause, Square, Clock, Trash2, RefreshCw, Loader2, Calendar, ChevronDown, ChevronUp, ToggleLeft, Monitor } from "lucide-react"
+import { Play, Pause, Square, Clock, Trash2, RefreshCw, Loader2, Calendar, ChevronDown, ChevronUp, ToggleLeft, Monitor, Settings } from "lucide-react"
 import { useGoogleCalendar, getEventColor } from "@/hooks/use-google-calendar"
 import { useTranslation } from "@/lib/i18n"
 
@@ -34,6 +34,8 @@ interface TimeTrackerProps {
   screenSessions?: ScreenSession[]
   togglApiToken?: string
   togglWorkspaceId?: string
+  /** Toggl設定画面を開く（未設定のときの導線） */
+  onOpenTogglSettings?: () => void
 }
 
 type TaskSource = "calendar" | "toggl"
@@ -45,13 +47,19 @@ export function TimeTracker({
   screenSessions = [],
   togglApiToken = "",
   togglWorkspaceId = "",
+  onOpenTogglSettings,
 }: TimeTrackerProps) {
+  const isTogglConfigured = Boolean(togglApiToken && togglWorkspaceId)
   const [isRunning, setIsRunning] = useState(false)
   const [currentEntry, setCurrentEntry] = useState<TimeEntry | null>(null)
   const [currentTime, setCurrentTime] = useState(0)
   const [localEntries, setLocalEntries] = useState<TimeEntry[]>([])
   const [description, setDescription] = useState("")
   const [selectedEventColor, setSelectedEventColor] = useState<string | null>(null)
+  // カレンダーから選んだ予定の開始時刻。開始済みの予定なら、その時刻を計測の起点にする
+  const [selectedEventStart, setSelectedEventStart] = useState<Date | null>(null)
+  // 停止直後に経過時間のプレビューが復活しないようにするフラグ
+  const [suppressStartPreview, setSuppressStartPreview] = useState(false)
   const [showCalendar, setShowCalendar] = useState(false)
   const [taskSource, setTaskSource] = useState<TaskSource>("calendar")
   const [togglCurrentEntry, setTogglCurrentEntry] = useState<{ description: string; project: string | null; is_running: boolean; start: string | null } | null>(null)
@@ -91,27 +99,42 @@ export function TimeTracker({
     }
   }, [])
 
-  // タイマー更新
+  // 「開始」を押す前に、どの時刻から計測されるかを表示するための値。
+  // 依存配列で使うため Date ではなくミリ秒で保持する
+  // （毎レンダーで新しい Date を作ると useEffect が張り直され続けてしまうため）
+  const pendingStartMs = suppressStartPreview
+    ? null
+    : taskSource === "toggl" && togglCurrentEntry?.is_running && togglCurrentEntry.start
+      ? new Date(togglCurrentEntry.start).getTime()
+      : taskSource === "calendar" && selectedEventStart
+        ? selectedEventStart.getTime()
+        : null
+
+  // タイマー更新。
+  // 計測中は実際の開始時刻から、未開始でも起点が決まっていれば
+  // その時刻からの経過時間をプレビュー表示する（0:00 のままにしない）
   useEffect(() => {
-    if (isRunning && currentEntry) {
-      intervalRef.current = setInterval(() => {
-        const now = new Date()
-        const elapsed = Math.floor((now.getTime() - currentEntry.startTime.getTime()) / 1000)
-        setCurrentTime(elapsed)
-      }, 1000)
-    } else {
+    const originMs =
+      isRunning && currentEntry ? currentEntry.startTime.getTime() : pendingStartMs
+
+    if (originMs === null) {
+      setCurrentTime(0)
+      return
+    }
+
+    const tick = () => {
+      setCurrentTime(Math.max(0, Math.floor((Date.now() - originMs) / 1000)))
+    }
+    tick()
+    intervalRef.current = setInterval(tick, 1000)
+
+    return () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current)
         intervalRef.current = null
       }
     }
-
-    return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current)
-      }
-    }
-  }, [isRunning, currentEntry])
+  }, [isRunning, currentEntry, pendingStartMs])
 
   // 現在のタスクを親コンポーネントに通知
   useEffect(() => {
@@ -154,9 +177,9 @@ export function TimeTracker({
     }
   }, [togglApiToken, togglWorkspaceId])
 
-  // Togglモード時に3分ごと自動ポーリング
+  // Togglモード時に3分ごと自動ポーリング（未設定のときは叩かない）
   useEffect(() => {
-    if (taskSource !== "toggl") {
+    if (taskSource !== "toggl" || !isTogglConfigured) {
       if (togglIntervalRef.current) {
         clearInterval(togglIntervalRef.current)
         togglIntervalRef.current = null
@@ -171,20 +194,30 @@ export function TimeTracker({
         togglIntervalRef.current = null
       }
     }
-  }, [taskSource, fetchTogglCurrentEntry])
+  }, [taskSource, isTogglConfigured, fetchTogglCurrentEntry])
 
   const saveToStorage = (entries: TimeEntry[]) => {
     localStorage.setItem("time_entries", JSON.stringify(entries))
   }
 
+  // 計測の起点。「開始」を押した時刻ではなく、実際に作業が始まった時刻に合わせる
+  //  - Toggl: 実行中エントリの開始時刻
+  //  - カレンダー: 選択した（すでに始まっている）予定の開始時刻
+  //  - どちらでもない手入力: 「開始」を押した時刻
+  const resolveStartTime = (): Date => {
+    if (taskSource === "toggl" && togglCurrentEntry?.is_running && togglCurrentEntry.start) {
+      return new Date(togglCurrentEntry.start)
+    }
+    if (taskSource === "calendar" && selectedEventStart) {
+      return selectedEventStart
+    }
+    return new Date()
+  }
+
   const startTimer = () => {
     const taskDescription = description || t('tt_working')
 
-    // Togglモードで実行中エントリがある場合はTogglの開始時刻を使い、経過時間を同期する
-    const startTime =
-      taskSource === "toggl" && togglCurrentEntry?.is_running && togglCurrentEntry.start
-        ? new Date(togglCurrentEntry.start)
-        : new Date()
+    const startTime = resolveStartTime()
 
     const newEntry: TimeEntry = {
       id: Date.now().toString(),
@@ -220,12 +253,16 @@ export function TimeTracker({
     setCurrentEntry(null)
     setIsRunning(false)
     setCurrentTime(0)
+    // 停止したのに経過時間プレビューが復活しないようにする
+    setSuppressStartPreview(true)
     onTimeEntryChange(null)
   }
 
   const stopTimer = () => {
     pauseTimer()
     setDescription("")
+    setSelectedEventStart(null)
+    setSelectedEventColor(null)
   }
 
   const formatDuration = (seconds: number) => {
@@ -280,9 +317,26 @@ export function TimeTracker({
         <CardContent className="space-y-4 pt-6">
           {/* 現在のタイマー表示 */}
           <div className="text-center py-6 bg-gradient-to-b from-orange-50 to-white rounded-lg border border-orange-100">
-            <div className="text-6xl font-mono font-bold text-orange-600 mb-3">{formatDuration(currentTime)}</div>
+            <div
+              className={`text-6xl font-mono font-bold mb-3 ${
+                !isRunning && pendingStartMs !== null ? "text-orange-400" : "text-orange-600"
+              }`}
+            >
+              {formatDuration(currentTime)}
+            </div>
+
+            {/* いつを起点に数えているのかを明示する
+                （「開始」を押した時刻ではなく、実際に作業を始めた時刻から数えるため） */}
+            <div className="text-xs text-gray-500">
+              {isRunning && currentEntry
+                ? t('tt_elapsedSince', { time: formatTime(currentEntry.startTime) })
+                : pendingStartMs !== null
+                  ? t('tt_willCountFrom', { time: formatTime(new Date(pendingStartMs)) })
+                  : t('tt_notStarted')}
+            </div>
+
             {currentEntry && (
-              <div className="flex items-center justify-center gap-2 text-sm text-gray-600">
+              <div className="flex items-center justify-center gap-2 text-sm text-gray-600 mt-1">
                 {selectedEventColor && (
                   <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: selectedEventColor }} />
                 )}
@@ -294,7 +348,10 @@ export function TimeTracker({
           {/* タスクソース切り替え */}
           <div className="flex rounded-lg border border-gray-200 overflow-hidden">
             <button
-              onClick={() => setTaskSource("calendar")}
+              onClick={() => {
+                setTaskSource("calendar")
+                setSuppressStartPreview(false)
+              }}
               disabled={isRunning}
               className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium transition-colors ${
                 taskSource === "calendar"
@@ -306,7 +363,10 @@ export function TimeTracker({
               {t('tt_googleCalendar')}
             </button>
             <button
-              onClick={() => setTaskSource("toggl")}
+              onClick={() => {
+                setTaskSource("toggl")
+                setSuppressStartPreview(false)
+              }}
               disabled={isRunning}
               className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium transition-colors ${
                 taskSource === "toggl"
@@ -388,6 +448,13 @@ export function TimeTracker({
                         onClick={() => {
                           setDescription(event.summary)
                           setSelectedEventColor(color)
+                          // すでに始まっている予定なら、予定の開始時刻を計測の起点にする
+                          // （「開始」を押した時刻ではなく、実際に作業を始めた時刻から数える）
+                          const eventStart = event.start.dateTime ? new Date(event.start.dateTime) : null
+                          setSelectedEventStart(
+                            eventStart && eventStart.getTime() <= Date.now() ? eventStart : null,
+                          )
+                          setSuppressStartPreview(false)
                           setShowCalendar(false)
                         }}
                         className={`w-full text-left rounded-md px-3 py-2 text-sm transition-colors ${
@@ -412,50 +479,84 @@ export function TimeTracker({
           {/* Toggl連携（自動同期） */}
           {taskSource === "toggl" && (
             <div className="border border-orange-100 rounded-lg p-3 bg-orange-50 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-orange-800">
-                  {t('tt_togglAutoSync')}
-                  {togglLastFetched && (
-                    <span className="ml-2 text-orange-500 font-normal">
-                      {t('tt_lastFetched')} {togglLastFetched.toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" })}
-                    </span>
+              {/* 未設定のときはエラーを出し続けるのではなく、設定への導線を主役にする */}
+              {!isTogglConfigured ? (
+                <div className="space-y-2 py-1">
+                  <div className="text-xs text-orange-800">{t('tt_togglSetupPrompt')}</div>
+                  {onOpenTogglSettings && (
+                    <Button
+                      size="sm"
+                      onClick={onOpenTogglSettings}
+                      className="w-full bg-orange-500 hover:bg-orange-600 text-white"
+                    >
+                      <Settings className="h-3.5 w-3.5 mr-1.5" />
+                      {t('tt_togglSetupButton')}
+                    </Button>
                   )}
-                </span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={fetchTogglCurrentEntry}
-                  disabled={togglLoading || isRunning}
-                  className="h-6 px-2 text-xs text-orange-700 hover:bg-orange-100"
-                >
-                  {togglLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
-                </Button>
-              </div>
+                </div>
+              ) : (
+                <>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-orange-800">
+                    {t('tt_togglAutoSync')}
+                    {togglLastFetched && (
+                      <span className="ml-2 text-orange-500 font-normal">
+                        {t('tt_lastFetched')} {togglLastFetched.toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" })}
+                      </span>
+                    )}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={fetchTogglCurrentEntry}
+                    disabled={togglLoading || isRunning}
+                    className="h-6 px-2 text-xs text-orange-700 hover:bg-orange-100"
+                  >
+                    {togglLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+                  </Button>
+                </div>
 
-              {togglError && (
-                <div className="text-xs text-red-600 bg-red-50 rounded p-2">{togglError}</div>
-              )}
+                {/* 何が同期されるのかを明示（作業内容だけを取り込む片方向連携） */}
+                <div className="text-[11px] leading-snug text-orange-700">{t('tt_togglSyncScope')}</div>
 
-              {!togglLoading && !togglError && !togglCurrentEntry && (
-                <div className="text-xs text-gray-500 text-center py-2">{t('tt_noTogglEntry')}</div>
-              )}
-
-              {togglCurrentEntry && (
-                <div className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm ${
-                  togglCurrentEntry.is_running
-                    ? "bg-orange-200 border border-orange-400 text-orange-900"
-                    : "bg-white border border-gray-200 text-gray-700"
-                }`}>
-                  {togglCurrentEntry.is_running && (
-                    <div className="w-2 h-2 rounded-full bg-orange-500 animate-pulse flex-shrink-0" />
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium truncate">{togglCurrentEntry.description || t('tt_noDescription')}</div>
-                    {togglCurrentEntry.project && (
-                      <div className="text-xs text-gray-500 mt-0.5">{togglCurrentEntry.project}</div>
+                {togglError && (
+                  <div className="text-xs text-red-600 bg-red-50 rounded p-2 space-y-2">
+                    <div>{togglError}</div>
+                    {onOpenTogglSettings && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={onOpenTogglSettings}
+                        className="h-7 text-xs bg-white"
+                      >
+                        {t('tt_togglSetupButton')}
+                      </Button>
                     )}
                   </div>
-                </div>
+                )}
+
+                {!togglLoading && !togglError && !togglCurrentEntry && (
+                  <div className="text-xs text-gray-500 text-center py-2">{t('tt_noTogglEntry')}</div>
+                )}
+
+                {togglCurrentEntry && (
+                  <div className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm ${
+                    togglCurrentEntry.is_running
+                      ? "bg-orange-200 border border-orange-400 text-orange-900"
+                      : "bg-white border border-gray-200 text-gray-700"
+                  }`}>
+                    {togglCurrentEntry.is_running && (
+                      <div className="w-2 h-2 rounded-full bg-orange-500 animate-pulse flex-shrink-0" />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium truncate">{togglCurrentEntry.description || t('tt_noDescription')}</div>
+                      {togglCurrentEntry.project && (
+                        <div className="text-xs text-gray-500 mt-0.5">{togglCurrentEntry.project}</div>
+                      )}
+                    </div>
+                  </div>
+                )}
+                </>
               )}
             </div>
           )}
@@ -560,6 +661,8 @@ export function TimeTracker({
             <Monitor className="h-4 w-4 text-orange-500" />
             {t('tt_screenSessions')}
           </CardTitle>
+          {/* 何が記録されるカードなのかが分からないという指摘への対応 */}
+          <p className="text-xs text-gray-500 mt-1">{t('tt_screenSessionsDesc')}</p>
         </CardHeader>
         <CardContent className="pt-4">
           <div className="space-y-3 max-h-64 overflow-y-auto">

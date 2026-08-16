@@ -24,6 +24,8 @@ interface SettingsPanelProps {
   onTogglCredentialsChange: (token: string, workspaceId: string) => void
   onCaptureIntervalChange: (interval: number) => void
   onClose: () => void
+  /** 開いたときに選択しておくタブ（他画面から「Toggl設定へ」などで飛べるように） */
+  initialTab?: string
   projects?: any[]
   onProjectsChange?: (projects: any[]) => void
   addProject?: (project: any) => Promise<any>
@@ -42,6 +44,7 @@ export function SettingsPanel({
   onTogglCredentialsChange,
   onCaptureIntervalChange,
   onClose,
+  initialTab = "gemini",
   projects = [],
   onProjectsChange = () => {},
   addProject,
@@ -51,7 +54,12 @@ export function SettingsPanel({
   const { t } = useTranslation()
   const [mounted, setMounted] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState("gemini")
+  const [activeTab, setActiveTab] = useState(initialTab)
+
+  // 呼び出し元が開きたいタブを指定してきたら追従する
+  useEffect(() => {
+    setActiveTab(initialTab)
+  }, [initialTab])
 
   useEffect(() => {
     try {

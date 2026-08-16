@@ -25,6 +25,15 @@ const Page = () => {
   // ログイン失敗の理由（/auth/callback から ?auth_error= で渡される）
   const [authError, setAuthError] = useState<{ code: string; detail: string } | null>(null)
   const [screenSessions, setScreenSessions] = useState<Array<{ id: string; startTime: Date; endTime?: Date; task: string }>>([])
+  // 他タブ表示中も解析が続いていることをヘッダーで示すためのフラグ
+  const [isScreenTracking, setIsScreenTracking] = useState(false)
+  // 設定画面を開くときに、どのタブを選択した状態で開くか
+  const [settingsInitialTab, setSettingsInitialTab] = useState("gemini")
+
+  const openSettings = useCallback((tab: string = "gemini") => {
+    setSettingsInitialTab(tab)
+    setCurrentTab("settings")
+  }, [])
   const screenSessionStartRef = useRef<{ time: Date; task: string } | null>(null)
   const togglApiToken = typeof window !== "undefined" ? localStorage.getItem("toggl_api_token") || "" : ""
   const togglWorkspaceId = typeof window !== "undefined" ? localStorage.getItem("toggl_workspace_id") || "" : ""
@@ -47,6 +56,7 @@ const Page = () => {
   }, [])
 
   const handleTrackingChange = useCallback((isTracking: boolean, startTime: Date | null) => {
+    setIsScreenTracking(isTracking)
     if (isTracking && startTime) {
       screenSessionStartRef.current = { time: startTime, task: currentTask }
     } else {
@@ -453,6 +463,19 @@ const Page = () => {
           </div>
 
           <div className="flex items-center gap-3">
+            {/* 解析中インジケーター（他タブに移動しても継続していることを示す） */}
+            {isScreenTracking && (
+              <button
+                type="button"
+                onClick={() => setCurrentTab("logs")}
+                className="flex items-center gap-2 rounded-full border border-green-200 bg-green-50 px-3 py-1.5 text-xs font-medium text-green-700 hover:bg-green-100"
+                title={t('page_trackingBadgeHint')}
+              >
+                <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+                {t('page_trackingBadge')}
+              </button>
+            )}
+
             {/* ユーザー情報（Google審査用：取得データの表示） */}
             <div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5">
               {user?.avatar_url ? (
@@ -473,7 +496,7 @@ const Page = () => {
                 <p className="text-xs text-gray-500 leading-tight">{user?.email}</p>
               </div>
             </div>
-            <Button variant="outline" size="sm" onClick={() => setCurrentTab("settings")} className="gap-2">
+            <Button variant="outline" size="sm" onClick={() => openSettings("gemini")} className="gap-2">
               <Settings className="h-4 w-4" />
               {t('page_settings')}
             </Button>
@@ -505,7 +528,11 @@ const Page = () => {
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="logs" className="space-y-4">
+          {/* forceMount + CSSで非表示にすることで、他タブに移動しても
+              画面共有ストリームと自動キャプチャのタイマーが止まらないようにする
+              （TabsContentは既定で非アクティブ時にアンマウントされ、
+                useScreenCaptureのクリーンアップがストリームを停止してしまう） */}
+          <TabsContent value="logs" forceMount className="space-y-4 data-[state=inactive]:hidden">
             <div className="grid gap-6 lg:grid-cols-[400px_1fr]">
               {/* 左側: タイムトラッカー */}
               <div>
@@ -516,6 +543,7 @@ const Page = () => {
                   screenSessions={screenSessions}
                   togglApiToken={togglApiToken}
                   togglWorkspaceId={togglWorkspaceId}
+                  onOpenTogglSettings={() => openSettings("toggl")}
                 />
               </div>
 
@@ -560,6 +588,7 @@ const Page = () => {
           <TabsContent value="settings">
             <SettingsPanel
               onClose={() => setCurrentTab("logs")}
+              initialTab={settingsInitialTab}
               apiKey={userSettings?.gemini_api_key || ""}
               model={userSettings?.gemini_model || "gemini-2.5-flash-lite"}
               captureInterval={userSettings?.capture_interval || 30}
