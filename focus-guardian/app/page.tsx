@@ -22,6 +22,8 @@ const Page = () => {
   const isLoggedInRef = useRef(false)
   const [currentTask, setCurrentTask] = useState("")
   const [currentTab, setCurrentTab] = useState("logs")
+  // ログイン失敗の理由（/auth/callback から ?auth_error= で渡される）
+  const [authError, setAuthError] = useState<{ code: string; detail: string } | null>(null)
   const [screenSessions, setScreenSessions] = useState<Array<{ id: string; startTime: Date; endTime?: Date; task: string }>>([])
   const screenSessionStartRef = useRef<{ time: Date; task: string } | null>(null)
   const togglApiToken = typeof window !== "undefined" ? localStorage.getItem("toggl_api_token") || "" : ""
@@ -75,6 +77,20 @@ const Page = () => {
     clearWorkLogs,
     refreshData,
   } = useSupabaseData()
+
+  // ログイン失敗理由をURLから拾って表示する（拾ったらURLからは消す）
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const params = new URLSearchParams(window.location.search)
+    const code = params.get("auth_error") || params.get("error")
+    if (!code) return
+    setAuthError({ code, detail: params.get("auth_detail") || params.get("error_description") || "" })
+    const url = new URL(window.location.href)
+    ;["auth_error", "auth_detail", "error", "error_description", "error_code"].forEach((k) =>
+      url.searchParams.delete(k),
+    )
+    window.history.replaceState({}, "", url.toString())
+  }, [])
 
   useEffect(() => {
     let mounted = true
@@ -253,6 +269,22 @@ const Page = () => {
             </Button>
           </div>
         </header>
+
+        {/* ログイン失敗時のみ表示（成功時は何も出ないので通常の見た目は変わらない） */}
+        {authError && (
+          <div className="border-b border-red-200 bg-red-50 px-6 py-3">
+            <div className="container mx-auto max-w-4xl text-sm text-red-800">
+              <span className="font-semibold">ログインに失敗しました</span>
+              <span className="ml-2 font-mono text-xs">[{authError.code}]</span>
+              {authError.detail && <div className="mt-1 text-xs text-red-700">{authError.detail}</div>}
+              <div className="mt-1 text-xs text-red-600">
+                {authError.code === "no_code"
+                  ? "Supabase の Redirect URLs にこのドメインが登録されていない可能性があります。"
+                  : "ブラウザのCookieを削除して再度お試しください。解決しない場合は設定をご確認ください。"}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Hero */}
         <section className="bg-gradient-to-br from-orange-50 via-white to-amber-50 py-24 px-6">
