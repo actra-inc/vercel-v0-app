@@ -92,6 +92,46 @@ const Page = () => {
     window.history.replaceState({}, "", url.toString())
   }, [])
 
+  // Supabaseの Redirect URLs にコールバックURLが未登録だと、認証コードが
+  // /auth/callback ではなくトップページ（Site URL）に ?code= で届く。
+  // その場合でもログインを成立させるため、ここでも交換を試みる。
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const params = new URLSearchParams(window.location.search)
+    const code = params.get("code")
+    if (!code) return
+
+    const stripCode = () => {
+      const url = new URL(window.location.href)
+      url.searchParams.delete("code")
+      window.history.replaceState({}, "", url.toString())
+    }
+
+    supabase.auth
+      .exchangeCodeForSession(code)
+      .then(({ data, error }) => {
+        stripCode()
+        if (error || !data?.session) {
+          // 別ドメインへ飛ばされた場合、PKCEのcode_verifierが無いので必ずここに来る
+          setAuthError({
+            code: "code_on_root",
+            detail:
+              error?.message ||
+              "認証コードがトップページに届きましたが、セッションを作成できませんでした。",
+          })
+          return
+        }
+        setIsLoggedIn(true)
+        isLoggedInRef.current = true
+        setAuthChecked(true)
+        refreshData()
+      })
+      .catch((err) => {
+        stripCode()
+        setAuthError({ code: "code_on_root", detail: String(err?.message || err) })
+      })
+  }, [])
+
   useEffect(() => {
     let mounted = true
 
@@ -278,8 +318,8 @@ const Page = () => {
               <span className="ml-2 font-mono text-xs">[{authError.code}]</span>
               {authError.detail && <div className="mt-1 text-xs text-red-700">{authError.detail}</div>}
               <div className="mt-1 text-xs text-red-600">
-                {authError.code === "no_code"
-                  ? "Supabase の Redirect URLs にこのドメインが登録されていない可能性があります。"
+                {authError.code === "no_code" || authError.code === "code_on_root"
+                  ? `Supabase の Authentication → URL Configuration → Redirect URLs に ${typeof window !== "undefined" ? window.location.origin : ""}/auth/callback を追加してください。`
                   : "ブラウザのCookieを削除して再度お試しください。解決しない場合は設定をご確認ください。"}
               </div>
             </div>
