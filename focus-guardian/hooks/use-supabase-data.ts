@@ -72,7 +72,7 @@ export function useSupabaseData() {
         } else {
           // Create default settings if none exist
           const defaultSettings = {
-            gemini_model: "gemini-2.5-flash-lite",
+            gemini_model: "gemini-3.5-flash-lite",
             capture_interval: 180,
             auto_sync_toggl: false,
           }

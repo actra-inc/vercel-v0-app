@@ -557,7 +557,7 @@ const Page = () => {
                 <WorkLogPanel
                   currentTask={currentTask}
                   apiKey={userSettings?.gemini_api_key || ""}
-                  model={userSettings?.gemini_model || "gemini-2.5-flash-lite"}
+                  model={userSettings?.gemini_model || "gemini-3.5-flash-lite"}
                   captureInterval={userSettings?.capture_interval || 60}
                   workLogs={workLogs as any}
                   categories={categories}
@@ -595,7 +595,7 @@ const Page = () => {
               onClose={() => setCurrentTab("logs")}
               initialTab={settingsInitialTab}
               apiKey={userSettings?.gemini_api_key || ""}
-              model={userSettings?.gemini_model || "gemini-2.5-flash-lite"}
+              model={userSettings?.gemini_model || "gemini-3.5-flash-lite"}
               captureInterval={userSettings?.capture_interval || 60}
               togglApiToken={userSettings?.toggl_api_token || ""}
               togglWorkspaceId={userSettings?.toggl_workspace_id || ""}

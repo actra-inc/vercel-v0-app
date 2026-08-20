@@ -310,7 +310,7 @@ export function WorkLogPanel({
           body: JSON.stringify({
             workLogs: regularLogs.slice(0, 3), // workLogsは新しい順なので先頭3件が最新
             apiKey,
-            model: model || "gemini-2.5-flash-lite",
+            model: model || "gemini-3.5-flash-lite",
           }),
         })
 

@@ -2,7 +2,7 @@ import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import { type NextRequest, NextResponse } from "next/server"
 
-const GEMINI_MODEL = "gemini-2.5-flash-lite"
+const GEMINI_MODEL = "gemini-3.5-flash-lite"
 const MAX_RETRIES = 2
 
 async function fetchWithRetry(url: string, options: RequestInit): Promise<Response> {
