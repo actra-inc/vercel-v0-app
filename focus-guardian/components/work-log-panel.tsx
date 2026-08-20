@@ -210,13 +210,17 @@ export function WorkLogPanel({
         console.log("[v0] Response ok:", response.ok)
 
         if (!response.ok) {
-          const errorData = await response.json()
+          const errorData = await response.json().catch(() => ({}))
           console.error("[v0] API error response:", errorData)
 
           if (errorData.error === "quota_exceeded") {
-            alert(
-              errorData.userMessage || t('wlp_quotaError'),
-            )
+            alert(errorData.userMessage || t('wlp_quotaError'))
+            return
+          }
+
+          // 503/502はサーバー一時過負荷 → アラートなしでスキップ（次回キャプチャ時に再試行）
+          if (response.status === 503 || response.status === 502) {
+            console.warn(`⚠️ Gemini API temporarily unavailable (${response.status}), skipping this capture`)
             return
           }
 

@@ -10,11 +10,11 @@ async function fetchWithRetry(url: string, options: RequestInit): Promise<Respon
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     if (attempt > 0) {
       const delay = 1000 * Math.pow(2, attempt - 1)
-      console.warn(`[Gemini] 500 error on attempt ${attempt}, retrying in ${delay}ms...`)
+      console.warn(`[Gemini] ${lastResponse?.status} error on attempt ${attempt}, retrying in ${delay}ms...`)
       await new Promise((resolve) => setTimeout(resolve, delay))
     }
     const response = await fetch(url, options)
-    if (response.status !== 500) return response
+    if (response.status !== 500 && response.status !== 503) return response
     lastResponse = response
   }
   return lastResponse!
