@@ -2,15 +2,15 @@ import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import { type NextRequest, NextResponse } from "next/server"
 
-const GEMMA_MODEL = "gemma-4-26b-a4b-it"
+const GEMINI_MODEL = "gemini-2.5-flash-lite"
 const MAX_RETRIES = 3
 
 async function fetchWithRetry(url: string, options: RequestInit): Promise<Response> {
   let lastResponse: Response | null = null
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     if (attempt > 0) {
-      const delay = 1000 * Math.pow(2, attempt - 1) // 1s, 2s, 4s
-      console.warn(`[Gemma] 500 error on attempt ${attempt}, retrying in ${delay}ms...`)
+      const delay = 1000 * Math.pow(2, attempt - 1)
+      console.warn(`[Gemini] 500 error on attempt ${attempt}, retrying in ${delay}ms...`)
       await new Promise((resolve) => setTimeout(resolve, delay))
     }
     const response = await fetch(url, options)
@@ -52,7 +52,8 @@ export async function POST(request: NextRequest) {
     }
 
     const formData = await request.formData()
-    const extractedText = formData.get("extractedText") as string
+    const imageData = formData.get("imageData") as string
+    const mimeType = (formData.get("mimeType") as string) || "image/jpeg"
     const apiKey = formData.get("apiKey") as string
     const currentTask = formData.get("currentTask") as string
     const categoriesJson = formData.get("categories") as string
@@ -74,23 +75,20 @@ export async function POST(request: NextRequest) {
     // AIがカテゴリ一覧にない値を返した場合のフォールバック（一覧の末尾＝未分類）
     const fallbackCategory = categories[categories.length - 1] || "未分類"
 
-    if (!extractedText) {
-      return NextResponse.json({ error: "extractedText is required" }, { status: 400 })
+    if (!imageData) {
+      return NextResponse.json({ error: "imageData is required" }, { status: 400 })
     }
 
     if (!apiKey) {
       return NextResponse.json({ error: "API key is required" }, { status: 400 })
     }
 
-    const analysisUrl = `https://generativelanguage.googleapis.com/v1beta/models/${GEMMA_MODEL}:generateContent?key=${apiKey}`
+    const analysisUrl = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`
 
     const categoriesList = categories.join("、")
-    const analysisPrompt = `あなたは作業効率モニタリングシステムです。画面情報を分析し、予定作業との一致度を判定してください。
+    const analysisPrompt = `あなたは作業効率モニタリングシステムです。このスクリーンショットを分析し、ユーザーが何をしているかを判定してください。
 
 現在の予定作業: "${currentTask || "未設定"}"
-
-画面情報（OCRテキスト。文字化けや誤認識が含まれる場合があります）:
-${extractedText.slice(0, 1000)}
 
 【脱線判定ルール】
 - 以下は予定作業に関わらず必ず distracted 扱い:
@@ -106,25 +104,34 @@ ${extractedText.slice(0, 1000)}
   "category": "productive/distracted/neutral のいずれか",
   "work_category": "作業種類（次のいずれかから最も近いものを選択: ${categoriesList}）",
   "confidence": 0.0〜1.0の数値,
-  "apps": ["使用中のアプリ名（例：Chrome、VS Code、Slack）"],
+  "apps": ["画面に表示されているアプリ・サービス名（例：Chrome、VS Code、Slack、YouTube）"],
   "distraction_check": {
     "is_distracted": true/false,
     "reason": "脱線している場合の具体的な理由（日本語）",
     "task_alignment": 0.0〜1.0（予定作業との一致度。ショッピング・SNS・動画は0.0〜0.2、技術調査・ドキュメント閲覧は0.6〜0.8）
   },
-  "details": "作業内容の簡潔な要約（日本語、40文字以内。OCRテキストをそのまま使わず、内容を自分の言葉で説明すること）"
+  "details": "画面の内容を自分の言葉で簡潔に説明（日本語、40文字以内）"
 }
 
-判定基準：productive=予定作業に関連、distracted=明らかに無関係(ショッピング/SNS/動画等)、neutral=判断が難しい活動
-重要：detailsフィールドは必ず入力すること。OCRの生テキストをそのまま使用しないこと。`
+判定基準：productive=予定作業に関連、distracted=明らかに無関係(ショッピング/SNS/動画等)、neutral=判断が難しい活動`
 
     const response = await fetchWithRetry(analysisUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: analysisPrompt }] }],
+        contents: [{
+          parts: [
+            {
+              inline_data: {
+                mime_type: mimeType,
+                data: imageData,
+              },
+            },
+            { text: analysisPrompt },
+          ],
+        }],
         generationConfig: {
-          temperature: 1.0,
+          temperature: 0.2,
           maxOutputTokens: 1024,
         },
       }),
@@ -132,7 +139,7 @@ ${extractedText.slice(0, 1000)}
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => null)
-      console.error("Gemma API error:", errorData)
+      console.error("Gemini API error:", errorData)
       if (response.status === 429) {
         const retryAfter = errorData?.error?.details?.find(
           (d: any) => d["@type"] === "type.googleapis.com/google.rpc.RetryInfo",
@@ -140,16 +147,16 @@ ${extractedText.slice(0, 1000)}
         return NextResponse.json(
           {
             error: "quota_exceeded",
-            message: "Gemma APIの利用制限に達しました",
+            message: "Gemini APIの利用制限に達しました",
             details: errorData?.error?.message || "利用制限を超えています",
             retryAfter: retryAfter || "しばらく時間をおいてから再試行してください",
-            userMessage: `Gemma API の制限に達しました。\n\n${retryAfter ? `約${Number.parseInt(retryAfter)}秒後に再試行できます。` : "しばらく時間をおいてから再度お試しください。"}`,
+            userMessage: `Gemini API の制限に達しました。\n\n${retryAfter ? `約${Number.parseInt(retryAfter)}秒後に再試行できます。` : "しばらく時間をおいてから再度お試しください。"}`,
           },
           { status: 429 },
         )
       }
       return NextResponse.json(
-        { error: "api_error", message: `Gemma API error: ${response.status}`, details: errorData?.error?.message || "不明なエラー" },
+        { error: "api_error", message: `Gemini API error: ${response.status}`, details: errorData?.error?.message || "不明なエラー" },
         { status: response.status },
       )
     }
@@ -163,12 +170,12 @@ ${extractedText.slice(0, 1000)}
       try {
         analysis = JSON.parse(jsonMatch[0])
       } catch (parseError) {
-        console.error("Failed to parse Gemma JSON:", parseError)
+        console.error("Failed to parse Gemini JSON:", parseError)
       }
     }
 
     if (!analysis) {
-      console.warn("Gemma JSON parse failed, using fallback")
+      console.warn("Gemini JSON parse failed, using fallback")
       analysis = {
         activity: "画面解析",
         category: "neutral",
@@ -207,7 +214,6 @@ ${extractedText.slice(0, 1000)}
       applications: analysis.apps || [],
       focus_score: Math.round(taskAlignment * 100),
       distraction_check: distractionCheck,
-      extracted_text: extractedText,
     })
   } catch (error) {
     console.error("Screenshot analysis error:", error)

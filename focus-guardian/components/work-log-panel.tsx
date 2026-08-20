@@ -82,29 +82,25 @@ export function WorkLogPanel({
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [isApiKeyValid, setIsApiKeyValid] = useState(false)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
-  const [isOcrLoading, setIsOcrLoading] = useState(false)
   const prevImageDataRef = useRef<ImageData | null>(null)
-  const tesseractWorkerRef = useRef<any>(null)
 
-  // Tesseract workerの初期化（初回のみ）
-  const getOcrWorker = useCallback(async () => {
-    if (tesseractWorkerRef.current) return tesseractWorkerRef.current
-    setIsOcrLoading(true)
-    try {
-      const { createWorker } = await import("tesseract.js")
-      const worker = await createWorker(["jpn", "eng"])
-      tesseractWorkerRef.current = worker
-      return worker
-    } finally {
-      setIsOcrLoading(false)
-    }
-  }, [])
-
-  // アンマウント時にworkerを解放
-  useEffect(() => {
-    return () => {
-      tesseractWorkerRef.current?.terminate()
-    }
+  const resizeAndEncodeImage = useCallback(async (blob: Blob, maxWidth: number): Promise<string> => {
+    return new Promise((resolve) => {
+      const img = new Image()
+      const url = URL.createObjectURL(blob)
+      img.onload = () => {
+        const scale = Math.min(1, maxWidth / img.width)
+        const canvas = document.createElement("canvas")
+        canvas.width = Math.floor(img.width * scale)
+        canvas.height = Math.floor(img.height * scale)
+        const ctx = canvas.getContext("2d")!
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+        URL.revokeObjectURL(url)
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.7)
+        resolve(dataUrl.split(",")[1])
+      }
+      img.src = url
+    })
   }, [])
 
   const getImageData = useCallback(async (blob: Blob): Promise<ImageData> => {
@@ -179,11 +175,11 @@ export function WorkLogPanel({
       setIsAnalyzing(true)
 
       try {
-        // 前回と画面が変わっていなければAPIをスキップ（閾値3%）
+        // 前回と画面が変わっていなければAPIをスキップ（閾値5%）
         const currentImageData = await getImageData(blob)
         if (prevImageDataRef.current) {
           const diff = calculateDiff(prevImageDataRef.current, currentImageData)
-          if (diff < 0.03) {
+          if (diff < 0.05) {
             console.log(`[v0] Screen unchanged (diff=${(diff * 100).toFixed(1)}%), skipping API call`)
             setIsAnalyzing(false)
             return
@@ -192,27 +188,18 @@ export function WorkLogPanel({
         }
         prevImageDataRef.current = currentImageData
 
-        // ブラウザ側でOCR実行（Gemini API不要）
-        console.log("🔍 Running OCR with Tesseract.js...")
-        let extractedText = t('wlp_screenInfoError')
-        try {
-          const worker = await getOcrWorker()
-          const { data: { text: ocrText } } = await worker.recognize(blob)
-          extractedText = ocrText.trim() || extractedText
-          console.log(`[v0] OCR extracted ${extractedText.length} chars`)
-        } catch (ocrError) {
-          console.warn("[v0] OCR failed, using fallback:", ocrError)
-          // OCR失敗時は現在の作業情報だけで分析を続行
-          extractedText = `${t('wlp_working')}: ${currentTask || t('wlp_unknown')}`
-        }
+        // 画像をリサイズしてbase64エンコード
+        console.log("🖼️ Resizing and encoding screenshot...")
+        const imageData = await resizeAndEncodeImage(blob, 768)
 
         const formData = new FormData()
-        formData.append("extractedText", extractedText)
+        formData.append("imageData", imageData)
+        formData.append("mimeType", "image/jpeg")
         formData.append("apiKey", apiKey)
         formData.append("currentTask", currentTask || t('wlp_working'))
         formData.append("categories", JSON.stringify(categories))
 
-        console.log("[v0] Sending OCR text to /api/analyze-screenshot")
+        console.log("[v0] Sending image to /api/analyze-screenshot")
 
         const response = await fetch("/api/analyze-screenshot", {
           method: "POST",
@@ -289,7 +276,7 @@ export function WorkLogPanel({
         setIsAnalyzing(false)
       }
     },
-    [apiKey, currentTask, model, addWorkLog, getOcrWorker, categories],
+    [apiKey, currentTask, model, addWorkLog, resizeAndEncodeImage, categories],
   ) // 必要最小限の依存関係のみ
 
   const handleAutoGenerateReport = useCallback(
@@ -562,12 +549,7 @@ export function WorkLogPanel({
                   : "bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 shadow-orange-200",
               )}
             >
-              {isOcrLoading ? (
-                <>
-                  <Camera className="h-4 w-4 animate-pulse" />
-                  {t('wlp_ocrInit')}
-                </>
-              ) : isCapturing ? (
+              {isCapturing ? (
                 <>
                   <Camera className="h-4 w-4 animate-pulse" />
                   {t('wlp_capturing')}

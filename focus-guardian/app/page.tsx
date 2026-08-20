@@ -553,7 +553,7 @@ const Page = () => {
                   currentTask={currentTask}
                   apiKey={userSettings?.gemini_api_key || ""}
                   model={userSettings?.gemini_model || "gemini-2.5-flash-lite"}
-                  captureInterval={userSettings?.capture_interval || 30}
+                  captureInterval={userSettings?.capture_interval || 60}
                   workLogs={workLogs as any}
                   categories={categories}
                   addWorkLog={addWorkLog}
@@ -580,7 +580,7 @@ const Page = () => {
             <ActivityBreakdown
               workLogs={workLogs as any}
               categories={categories}
-              captureInterval={userSettings?.capture_interval || 30}
+              captureInterval={userSettings?.capture_interval || 60}
               onCategoriesChange={handleCategoriesChange}
             />
           </TabsContent>
@@ -591,7 +591,7 @@ const Page = () => {
               initialTab={settingsInitialTab}
               apiKey={userSettings?.gemini_api_key || ""}
               model={userSettings?.gemini_model || "gemini-2.5-flash-lite"}
-              captureInterval={userSettings?.capture_interval || 30}
+              captureInterval={userSettings?.capture_interval || 60}
               togglApiToken={userSettings?.toggl_api_token || ""}
               togglWorkspaceId={userSettings?.toggl_workspace_id || ""}
               onApiKeyChange={handleApiKeyChange}
