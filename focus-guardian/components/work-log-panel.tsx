@@ -321,13 +321,18 @@ export function WorkLogPanel({
         const reportData = await response.json()
         console.log("✅ Report generated:", reportData)
 
+        const sourceLogs = regularLogs.slice(0, 3)
+        const sourceScreenshots = sourceLogs
+          .map(log => log.screenshot_url)
+          .filter((url): url is string => typeof url === "string" && url.length > 0)
+
         await addWorkLog({
           timestamp: new Date().toISOString(),
           activity: t('wlp_autoReport'),
           category: "neutral",
           details: reportData.summary,
           report_type: "summary",
-          report_data: reportData,
+          report_data: { ...reportData, source_screenshots: sourceScreenshots },
         })
 
         console.log("✅ Auto-generated report added to logs")

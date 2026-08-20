@@ -215,13 +215,18 @@ const Page = () => {
     const apiKey = userSettings?.gemini_api_key
     if (!apiKey) throw new Error("API key not set")
 
+    const sourceLogs = regularLogs.slice(0, 3)
     const response = await fetch("/api/generate-summary-report", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ workLogs: regularLogs.slice(0, 3), apiKey }),
+      body: JSON.stringify({ workLogs: sourceLogs, apiKey }),
     })
     if (!response.ok) throw new Error(`API error: ${response.status}`)
     const reportData = await response.json()
+
+    const sourceScreenshots = sourceLogs
+      .map((log: any) => log.screenshot_url)
+      .filter((url: any): url is string => typeof url === "string" && url.length > 0)
 
     await addWorkLog({
       user_id: user?.id || "",
@@ -231,7 +236,7 @@ const Page = () => {
       details: reportData.summary,
       applications: [],
       report_type: "summary",
-      report_data: reportData,
+      report_data: { ...reportData, source_screenshots: sourceScreenshots },
     })
   }, [workLogs, userSettings, addWorkLog, t])
 

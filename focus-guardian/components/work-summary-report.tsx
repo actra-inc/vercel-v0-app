@@ -18,6 +18,7 @@ interface ReportData {
   key_findings: string[]
   recommendations: string[]
   overall_score: number
+  source_screenshots?: string[]
 }
 
 interface WorkSummaryReportProps {
@@ -58,6 +59,28 @@ export function WorkSummaryReport({ timestamp, reportData }: WorkSummaryReportPr
         </div>
       </CardHeader>
       <CardContent className="space-y-6 pt-6">
+        {/* 解析元スクリーンショット */}
+        {Array.isArray(reportData.source_screenshots) && reportData.source_screenshots.length > 0 && (
+          <div className="p-4 bg-white rounded-lg border border-orange-100 shadow-sm">
+            <h4 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+              <FileText className="h-4 w-4 text-orange-600" />
+              解析元スクリーンショット
+            </h4>
+            <div className="grid grid-cols-3 gap-2">
+              {reportData.source_screenshots.map((url, index) => (
+                <a key={index} href={url} target="_blank" rel="noopener noreferrer">
+                  <img
+                    src={url}
+                    alt={`スクリーンショット ${index + 1}`}
+                    className="w-full rounded border border-gray-200 object-cover aspect-video hover:opacity-80 transition-opacity"
+                  />
+                </a>
+              ))}
+            </div>
+            <p className="text-xs text-gray-400 mt-2">※ 画像はセッション中のみ表示されます</p>
+          </div>
+        )}
+
         {/* サマリー */}
         <div className="p-4 bg-white rounded-lg border border-orange-100 shadow-sm">
           <h4 className="font-semibold text-gray-800 mb-2 flex items-center gap-2">
