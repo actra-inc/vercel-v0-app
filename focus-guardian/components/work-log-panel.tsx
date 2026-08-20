@@ -183,18 +183,17 @@ export function WorkLogPanel({
       setIsAnalyzing(true)
 
       try {
-        // 前回と画面が変わっていなければAPIをスキップ（閾値5%）
+        // 前回と画面が変わっていなければAPIをスキップ（閾値2%）
         const currentImageData = await getImageData(blob)
         if (prevImageDataRef.current) {
           const diff = calculateDiff(prevImageDataRef.current, currentImageData)
-          if (diff < 0.05) {
+          if (diff < 0.02) {
             console.log(`[v0] Screen unchanged (diff=${(diff * 100).toFixed(1)}%), skipping API call`)
             setIsAnalyzing(false)
             return
           }
           console.log(`[v0] Screen changed (diff=${(diff * 100).toFixed(1)}%), calling API`)
         }
-        prevImageDataRef.current = currentImageData
 
         // 画像をリサイズしてbase64エンコード
         console.log("🖼️ Resizing and encoding screenshot...")
@@ -244,6 +243,8 @@ export function WorkLogPanel({
         }
 
         setLastAnalysisError(null)
+        // API成功後に比較ベースを更新する（失敗時は前回の成功時点の画像で比較を続ける）
+        prevImageDataRef.current = currentImageData
         const imageUrl = URL.createObjectURL(blob)
 
         const logEntry = {
