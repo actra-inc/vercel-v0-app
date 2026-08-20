@@ -82,23 +82,31 @@ export function WorkLogPanel({
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [isApiKeyValid, setIsApiKeyValid] = useState(false)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
+  const [lastAnalysisError, setLastAnalysisError] = useState<string | null>(null)
   const prevImageDataRef = useRef<ImageData | null>(null)
 
   const resizeAndEncodeImage = useCallback(async (blob: Blob, maxWidth: number): Promise<string> => {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       const img = new Image()
       const url = URL.createObjectURL(blob)
       img.onload = () => {
-        const scale = Math.min(1, maxWidth / img.width)
-        const canvas = document.createElement("canvas")
-        canvas.width = Math.floor(img.width * scale)
-        canvas.height = Math.floor(img.height * scale)
-        const ctx = canvas.getContext("2d")!
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
-        URL.revokeObjectURL(url)
-        const dataUrl = canvas.toDataURL("image/jpeg", 0.7)
-        resolve(dataUrl.split(",")[1])
+        try {
+          const scale = Math.min(1, maxWidth / img.width)
+          const canvas = document.createElement("canvas")
+          canvas.width = Math.floor(img.width * scale)
+          canvas.height = Math.floor(img.height * scale)
+          const ctx = canvas.getContext("2d")
+          if (!ctx) { URL.revokeObjectURL(url); reject(new Error("Canvas context unavailable")); return }
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+          URL.revokeObjectURL(url)
+          const dataUrl = canvas.toDataURL("image/jpeg", 0.7)
+          resolve(dataUrl.split(",")[1])
+        } catch (e) {
+          URL.revokeObjectURL(url)
+          reject(e)
+        }
       }
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Failed to load captured image for encoding")) }
       img.src = url
     })
   }, [])
@@ -218,9 +226,10 @@ export function WorkLogPanel({
             return
           }
 
-          // 503/502はサーバー一時過負荷 → アラートなしでスキップ（次回キャプチャ時に再試行）
+          // 503/502はサーバー一時過負荷 → インライン表示してスキップ
           if (response.status === 503 || response.status === 502) {
-            console.warn(`⚠️ Gemini API temporarily unavailable (${response.status}), skipping this capture`)
+            console.warn(`⚠️ Gemini API temporarily unavailable (${response.status})`)
+            setLastAnalysisError(`API一時エラー(${response.status}) - 次回自動リトライ`)
             return
           }
 
@@ -234,6 +243,7 @@ export function WorkLogPanel({
           throw new Error(result.error)
         }
 
+        setLastAnalysisError(null)
         const imageUrl = URL.createObjectURL(blob)
 
         const logEntry = {
@@ -254,7 +264,6 @@ export function WorkLogPanel({
         await addWorkLog(logEntry)
 
         // 脱線検知時に自動アラート音 + ブラウザ通知
-        // （脱線中はこのタブを見ていないことが多いため、OS通知でも気づけるようにする）
         if (result.distraction_check?.is_distracted) {
           console.log("🚨 Distraction detected! Playing alert sound...")
           playAlertSound()
@@ -272,6 +281,7 @@ export function WorkLogPanel({
         // ネットワーク一時エラーはオーバーレイを出さずにwarnのみ
         if (errorMessage.includes("Failed to fetch") || errorMessage.includes("fetch")) {
           console.warn("⚠️ Network error (work log save):", errorMessage)
+          setLastAnalysisError("ネットワークエラー - 次回自動リトライ")
         } else {
           console.error("❌ Analysis error:", error)
           alert(t('wlp_captureError', { msg: errorMessage }))
@@ -502,6 +512,13 @@ export function WorkLogPanel({
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          {lastAnalysisError && (
+            <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg flex items-start gap-2">
+              <AlertCircle className="h-4 w-4 text-orange-600 mt-0.5 shrink-0" />
+              <div className="text-sm text-orange-800">{lastAnalysisError}</div>
+            </div>
+          )}
+
           {!isApiKeyValid && (
             <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg flex items-start gap-2">
               <AlertCircle className="h-4 w-4 text-yellow-600 mt-0.5" />

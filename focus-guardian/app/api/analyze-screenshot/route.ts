@@ -3,7 +3,7 @@ import { cookies } from "next/headers"
 import { type NextRequest, NextResponse } from "next/server"
 
 const GEMINI_MODEL = "gemini-2.5-flash-lite"
-const MAX_RETRIES = 3
+const MAX_RETRIES = 2
 
 async function fetchWithRetry(url: string, options: RequestInit): Promise<Response> {
   let lastResponse: Response | null = null
