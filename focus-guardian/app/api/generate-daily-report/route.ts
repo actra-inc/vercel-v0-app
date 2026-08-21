@@ -2,7 +2,13 @@ import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import { type NextRequest, NextResponse } from "next/server"
 
-const GEMMA_MODEL = "gemma-4-26b-a4b-it"
+// クライアントが model を指定しなかった場合のフォールバック既定モデル。
+// 既定を Gemini 系へ切り替えるかはプロダクト判断のため、ここでは変更しない
+const DEFAULT_REPORT_MODEL = "gemma-4-26b-a4b-it"
+
+// URLのパス断片に埋め込むため、モデルIDとして妥当な文字列だけを通す
+const isValidModelId = (m: unknown): m is string =>
+  typeof m === "string" && /^[a-zA-Z0-9._-]+$/.test(m)
 const MAX_RETRIES = 3
 const MAX_LOGS = 60 // トークン量を抑えるための上限
 
@@ -194,7 +200,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized: ログインが必要です" }, { status: 401 })
     }
 
-    const { workLogs, apiKey, date } = await request.json()
+    const { workLogs, apiKey, date, model } = await request.json()
+    // 設定画面で選んだモデルを尊重する（未指定時はこれまで通り既定モデル）
+    const reportModel = isValidModelId(model) ? model : DEFAULT_REPORT_MODEL
 
     if (!apiKey) {
       return NextResponse.json({ error: "API key is required" }, { status: 400 })
@@ -262,7 +270,7 @@ ${logLines}
 }
 `
 
-      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${GEMMA_MODEL}:generateContent?key=${apiKey}`
+      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${reportModel}:generateContent?key=${apiKey}`
 
       const response = await fetchWithRetry(apiUrl, {
         method: "POST",
