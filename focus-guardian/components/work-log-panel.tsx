@@ -363,6 +363,10 @@ export function WorkLogPanel({
 
   const handleError = useCallback((error: Error) => {
     console.error("❌ Screen capture error:", error)
+    // 共有ダイアログのキャンセル(AbortError)・拒否(NotAllowedError)は開始前の
+    // ユーザー操作起点エラーで、useScreenCapture 側が適切に案内する（キャンセルは無通知）。
+    // ここで「次回キャプチャで再試行します」と出すと虚偽になるためスキップする
+    if (error.name === "AbortError" || error.name === "NotAllowedError") return
     // キャプチャ失敗は次回インターバルで再試行される。ストリーム自体が死んだ場合は
     // useScreenCapture 側が stopCapture するのでステータス表示が「停止中」に変わる。
     setLastAnalysisError(t('wlp_errCapture', { msg: error.message }))
