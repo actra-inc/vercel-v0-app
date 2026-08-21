@@ -14,6 +14,7 @@ import { Settings, LogOut, Activity, FileText, BarChart3, Camera, Brain, Calenda
 import { ActivityBreakdown, DEFAULT_CATEGORIES, type ActivityCategory } from "@/components/activity-breakdown"
 import { VersionBadge } from "@/components/version-badge"
 import { useTranslation } from "@/lib/i18n"
+import { DEFAULT_CAPTURE_INTERVAL_SECONDS } from "@/lib/config"
 
 const Page = () => {
   const { t } = useTranslation()
@@ -561,7 +562,7 @@ const Page = () => {
                   currentTask={currentTask}
                   apiKey={userSettings?.gemini_api_key || ""}
                   model={userSettings?.gemini_model || "gemini-3.5-flash-lite"}
-                  captureInterval={userSettings?.capture_interval || 60}
+                  captureInterval={userSettings?.capture_interval || DEFAULT_CAPTURE_INTERVAL_SECONDS}
                   workLogs={workLogs as any}
                   categories={categories}
                   addWorkLog={addWorkLog}
@@ -588,7 +589,7 @@ const Page = () => {
             <ActivityBreakdown
               workLogs={workLogs as any}
               categories={categories}
-              captureInterval={userSettings?.capture_interval || 60}
+              captureInterval={userSettings?.capture_interval || DEFAULT_CAPTURE_INTERVAL_SECONDS}
               onCategoriesChange={handleCategoriesChange}
             />
           </TabsContent>
@@ -599,7 +600,7 @@ const Page = () => {
               initialTab={settingsInitialTab}
               apiKey={userSettings?.gemini_api_key || ""}
               model={userSettings?.gemini_model || "gemini-3.5-flash-lite"}
-              captureInterval={userSettings?.capture_interval || 60}
+              captureInterval={userSettings?.capture_interval || DEFAULT_CAPTURE_INTERVAL_SECONDS}
               togglApiToken={userSettings?.toggl_api_token || ""}
               togglWorkspaceId={userSettings?.toggl_workspace_id || ""}
               onApiKeyChange={handleApiKeyChange}

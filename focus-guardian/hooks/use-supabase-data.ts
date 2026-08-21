@@ -22,6 +22,7 @@ import {
   type WorkLog,
   type UserSettings,
 } from "@/lib/supabase"
+import { DEFAULT_CAPTURE_INTERVAL_SECONDS } from "@/lib/config"
 
 export function useSupabaseData() {
   const [user, setUser] = useState<User | null>(null)
@@ -73,7 +74,7 @@ export function useSupabaseData() {
           // Create default settings if none exist
           const defaultSettings = {
             gemini_model: "gemini-3.5-flash-lite",
-            capture_interval: 180,
+            capture_interval: DEFAULT_CAPTURE_INTERVAL_SECONDS,
             auto_sync_toggl: false,
           }
           const { data: newSettings } = await updateUserSettings(currentUser.id, defaultSettings)
