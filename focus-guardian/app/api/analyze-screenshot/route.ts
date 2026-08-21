@@ -3,19 +3,59 @@ import { cookies } from "next/headers"
 import { type NextRequest, NextResponse } from "next/server"
 
 const GEMINI_MODEL = "gemini-3.5-flash-lite"
-const MAX_RETRIES = 2
+// 合計試行回数（初回 + リトライ1回）。旧名 MAX_RETRIES は「リトライ回数」と紛らわしかった
+const MAX_ATTEMPTS = 2
+// 429リトライで待つ最大秒数。これを超える待ちはサーバー側で抱え込まず即座に返す
+// （クライアントは次回キャプチャで自動再試行するため、長い待ちに意味がない。
+//   vercel.json の maxDuration=30s の範囲にも収める。確信が持てないため10秒を採用）
+const MAX_429_WAIT_SECONDS = 10
+
+// Gemini の 429 レスポンスから RetryInfo.retryDelay（例: "27s"）の秒数を取り出す。
+// clone() で読むため、呼び出し側は返された Response の本文をそのまま消費できる
+async function extractRetryDelaySeconds(response: Response): Promise<number | null> {
+  try {
+    const data = await response.clone().json()
+    const retryDelay = data?.error?.details?.find(
+      (d: any) => d["@type"] === "type.googleapis.com/google.rpc.RetryInfo",
+    )?.retryDelay
+    if (typeof retryDelay !== "string") return null
+    const seconds = Number.parseFloat(retryDelay)
+    return Number.isFinite(seconds) && seconds >= 0 ? seconds : null
+  } catch {
+    return null
+  }
+}
 
 async function fetchWithRetry(url: string, options: RequestInit): Promise<Response> {
   let lastResponse: Response | null = null
-  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-    if (attempt > 0) {
-      const delay = 1000 * Math.pow(2, attempt - 1)
-      console.warn(`[Gemini] ${lastResponse?.status} error on attempt ${attempt}, retrying in ${delay}ms...`)
-      await new Promise((resolve) => setTimeout(resolve, delay))
-    }
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     const response = await fetch(url, options)
-    if (response.status !== 500 && response.status !== 503) return response
     lastResponse = response
+
+    // 500/503: サーバー一時エラー → 指数バックオフで再試行
+    if (response.status === 500 || response.status === 503) {
+      if (attempt < MAX_ATTEMPTS) {
+        const delay = 1000 * Math.pow(2, attempt - 1)
+        console.warn(`[Gemini] ${response.status} on attempt ${attempt}, retrying in ${delay}ms...`)
+        await new Promise((resolve) => setTimeout(resolve, delay))
+        continue
+      }
+      return response
+    }
+
+    // 429: レート制限 → サーバーが示す retryDelay が短いときだけ1回待って再試行。
+    // retryDelay 不明・長すぎる場合はリトライせず即返す（quota_exceeded として整形される）
+    if (response.status === 429) {
+      const delaySeconds = attempt < MAX_ATTEMPTS ? await extractRetryDelaySeconds(response) : null
+      if (delaySeconds === null || delaySeconds > MAX_429_WAIT_SECONDS) {
+        return response
+      }
+      console.warn(`[Gemini] 429 on attempt ${attempt}, honoring retryDelay=${delaySeconds}s before retrying...`)
+      await new Promise((resolve) => setTimeout(resolve, delaySeconds * 1000))
+      continue
+    }
+
+    return response
   }
   return lastResponse!
 }
