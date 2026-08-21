@@ -221,14 +221,22 @@ export function WorkLogPanel({
           console.error("[v0] API error response:", errorData)
 
           if (errorData.error === "quota_exceeded") {
-            alert(errorData.userMessage || t('wlp_quotaError'))
+            // alert()はメインスレッドをブロックし、閉じるまで定期キャプチャごと
+            // 止まってしまうため使わない（「数回の解析で止まる」の主因だった）。
+            // サーバーが返す retryAfter（例: "27s"）があれば再開の目安を出す。
+            const delayMatch = /^(\d+)/.exec(String(errorData.retryAfter ?? ""))
+            setLastAnalysisError(
+              delayMatch
+                ? t('wlp_errQuotaWithDelay', { seconds: delayMatch[1] })
+                : t('wlp_errQuotaNoDelay'),
+            )
             return
           }
 
           // 503/502はサーバー一時過負荷 → インライン表示してスキップ
           if (response.status === 503 || response.status === 502) {
             console.warn(`⚠️ Gemini API temporarily unavailable (${response.status})`)
-            setLastAnalysisError(`API一時エラー(${response.status}) - 次回自動リトライ`)
+            setLastAnalysisError(t('wlp_errTemporary', { status: response.status }))
             return
           }
 
@@ -282,10 +290,11 @@ export function WorkLogPanel({
         // ネットワーク一時エラーはオーバーレイを出さずにwarnのみ
         if (errorMessage.includes("Failed to fetch") || errorMessage.includes("fetch")) {
           console.warn("⚠️ Network error (work log save):", errorMessage)
-          setLastAnalysisError("ネットワークエラー - 次回自動リトライ")
+          setLastAnalysisError(t('wlp_errNetwork'))
         } else {
           console.error("❌ Analysis error:", error)
-          alert(t('wlp_captureError', { msg: errorMessage }))
+          // 想定外エラーもモーダルで止めず、解析継続中であることを添えて表示する
+          setLastAnalysisError(t('wlp_errUnexpected', { msg: errorMessage }))
         }
       } finally {
         setIsAnalyzing(false)
@@ -354,7 +363,9 @@ export function WorkLogPanel({
 
   const handleError = useCallback((error: Error) => {
     console.error("❌ Screen capture error:", error)
-    alert(t('wlp_captureError', { msg: error.message }))
+    // キャプチャ失敗は次回インターバルで再試行される。ストリーム自体が死んだ場合は
+    // useScreenCapture 側が stopCapture するのでステータス表示が「停止中」に変わる。
+    setLastAnalysisError(t('wlp_errCapture', { msg: error.message }))
   }, [])
 
   const handleScreenshotUpload = useCallback(

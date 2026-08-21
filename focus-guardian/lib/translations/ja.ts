@@ -114,6 +114,12 @@ export const ja = {
   wlp_autoReport: '作業統合レポート（自動生成）',
   wlp_autoReportAdded: '自動生成レポート追加',
   wlp_captureError: '画面キャプチャエラー: {msg}',
+  wlp_errQuotaWithDelay: '⚠️ Gemini APIの利用制限に達しました。約{seconds}秒後のキャプチャから自動で再開します',
+  wlp_errQuotaNoDelay: '⚠️ Gemini APIの利用制限に達しました。制限が解除されると次回キャプチャから自動で再開します',
+  wlp_errTemporary: 'API一時エラー（{status}）- 次回キャプチャで自動リトライします',
+  wlp_errNetwork: 'ネットワークエラー - 次回キャプチャで自動リトライします',
+  wlp_errUnexpected: '解析エラー: {msg} - 解析は継続中です。次回キャプチャで再試行します',
+  wlp_errCapture: '画面キャプチャエラー: {msg} - 次回キャプチャで再試行します。繰り返す場合は解析を停止し、「解析開始」からやり直してください',
 
   // ReportsTab
   rt_deleted: 'レポートを削除しました',

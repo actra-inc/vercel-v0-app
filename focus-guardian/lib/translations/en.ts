@@ -116,6 +116,12 @@ export const en: Record<TranslationKey, string> = {
   wlp_autoReport: 'Work Consolidated Report (Auto-generated)',
   wlp_autoReportAdded: 'Auto-generated report added',
   wlp_captureError: 'Screen capture error: {msg}',
+  wlp_errQuotaWithDelay: '⚠️ Gemini API rate limit reached. Analysis resumes automatically in about {seconds}s',
+  wlp_errQuotaNoDelay: '⚠️ Gemini API rate limit reached. Analysis resumes automatically once the limit clears',
+  wlp_errTemporary: 'Temporary API error ({status}) - will retry on the next capture',
+  wlp_errNetwork: 'Network error - will retry on the next capture',
+  wlp_errUnexpected: 'Analysis error: {msg} - analysis is still running and will retry on the next capture',
+  wlp_errCapture: 'Screen capture error: {msg} - will retry on the next capture. If it keeps happening, stop and restart the analysis',
 
   // ReportsTab
   rt_deleted: 'Report deleted',
