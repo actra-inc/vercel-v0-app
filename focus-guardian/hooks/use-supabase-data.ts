@@ -247,10 +247,23 @@ export function useSupabaseData() {
       if (!log.report_type) {
         localStorage.removeItem(`work_logs_cleared_at_${user.id}`)
       }
-      // blob: のスクリーンショットURLはDBに保存されないため、
-      // セッション中の表示用にローカルの値を補ってstateへ反映する
-      const merged =
-        log.screenshot_url && !data.screenshot_url ? { ...data, screenshot_url: log.screenshot_url } : data
+      // DBに保存されない/加工されるフィールドを、セッション中の表示用に
+      // ローカルの値で補ってstateへ反映する:
+      //  - screenshot_url: blob: URLはinsert前に除去される
+      //  - distraction_check: insert前に常に除去されるため、補わないと
+      //    脱線詳細パネル（理由・重大度）が追加直後から一切表示されない
+      //  - report_data: source_screenshots の blob: が除去されるため、
+      //    セッション中はローカル版を使ってサムネイルを表示する
+      let merged: typeof data = data
+      if (log.screenshot_url && !data.screenshot_url) {
+        merged = { ...merged, screenshot_url: log.screenshot_url }
+      }
+      if (log.distraction_check && !merged.distraction_check) {
+        merged = { ...merged, distraction_check: log.distraction_check }
+      }
+      if (log.report_data) {
+        merged = { ...merged, report_data: log.report_data }
+      }
       setWorkLogs((prev) => [merged, ...prev])
       return merged
     }

@@ -338,6 +338,15 @@ export const createWorkLog = async (log: Omit<WorkLog, "id" | "created_at">) => 
   if (typeof insertLog.screenshot_url === "string" && insertLog.screenshot_url.startsWith("blob:")) {
     delete insertLog.screenshot_url
   }
+  // report_data.source_screenshots 内の blob: URL も同様にDBへ入れない
+  // （リロード後・他端末では必ず壊れ画像になる。セッション中の表示は
+  //   addWorkLog のローカルマージで維持される）
+  if (Array.isArray(insertLog.report_data?.source_screenshots)) {
+    const persistable = insertLog.report_data.source_screenshots.filter(
+      (u: unknown) => typeof u === "string" && !u.startsWith("blob:"),
+    )
+    insertLog.report_data = { ...insertLog.report_data, source_screenshots: persistable }
+  }
   const { data, error } = await supabase.from("work_logs").insert(insertLog).select().single()
 
   if (data) {

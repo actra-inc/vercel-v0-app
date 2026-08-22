@@ -68,11 +68,17 @@ export function WorkSummaryReport({ timestamp, reportData }: WorkSummaryReportPr
             </h4>
             <div className="grid grid-cols-3 gap-2">
               {reportData.source_screenshots.map((url, index) => (
+                {/* 過去に保存された blob: URL はリロード後に必ず死ぬため、
+                    読み込みに失敗した画像はリンクごと非表示にする */}
                 <a key={index} href={url} target="_blank" rel="noopener noreferrer">
                   <img
                     src={url}
                     alt={`スクリーンショット ${index + 1}`}
                     className="w-full rounded border border-gray-200 object-cover aspect-video hover:opacity-80 transition-opacity"
+                    onError={(e) => {
+                      const anchor = e.currentTarget.closest("a")
+                      if (anchor) anchor.style.display = "none"
+                    }}
                   />
                 </a>
               ))}
