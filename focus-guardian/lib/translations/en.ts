@@ -122,6 +122,7 @@ export const en: Record<TranslationKey, string> = {
   wlp_errNetwork: 'Network error - will retry on the next capture',
   wlp_errUnexpected: 'Analysis error: {msg} - analysis is still running and will retry on the next capture',
   wlp_errCapture: 'Screen capture error: {msg} - will retry on the next capture. If it keeps happening, stop and restart the analysis',
+  wlp_skipStreak: 'Skipping analysis because the screen has not changed ({count} in a row). It resumes automatically on a change or after {max} skips',
 
   // ReportsTab
   rt_deleted: 'Report deleted',

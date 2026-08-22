@@ -120,6 +120,7 @@ export const ja = {
   wlp_errNetwork: 'ネットワークエラー - 次回キャプチャで自動リトライします',
   wlp_errUnexpected: '解析エラー: {msg} - 解析は継続中です。次回キャプチャで再試行します',
   wlp_errCapture: '画面キャプチャエラー: {msg} - 次回キャプチャで再試行します。繰り返す場合は解析を停止し、「解析開始」からやり直してください',
+  wlp_skipStreak: '画面に変化がないため解析をスキップ中（連続{count}回）。変化を検知するか{max}回に達すると自動で再解析します',
 
   // ReportsTab
   rt_deleted: 'レポートを削除しました',
