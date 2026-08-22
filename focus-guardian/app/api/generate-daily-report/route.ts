@@ -54,8 +54,21 @@ interface DailyReportData {
   markdown: string
 }
 
-const formatTime = (iso: string) =>
-  new Date(iso).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Tokyo" })
+// クライアントから渡されたIANAタイムゾーンが不正でも落ちないよう検証する
+function resolveTimeZone(tz: unknown): string {
+  if (typeof tz === "string" && tz) {
+    try {
+      new Intl.DateTimeFormat("ja-JP", { timeZone: tz })
+      return tz
+    } catch {
+      // 不正なタイムゾーン名は既定へフォールバック
+    }
+  }
+  return "Asia/Tokyo"
+}
+
+const formatTime = (iso: string, timeZone: string) =>
+  new Date(iso).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit", timeZone })
 
 // 構造化データから提出用Markdownを決定的に組み立てる
 // （AIにMarkdownまで書かせると構造とズレるため、サーバー側で生成する）
@@ -101,11 +114,16 @@ function buildMarkdown(report: Omit<DailyReportData, "markdown">): string {
 
 // AIが使えない場合でも、ログから機械的に日報の骨組みを作る
 // totalCount: 間引き前の実ログ件数（サマリーの件数表示に使う）
-function generateFallbackReport(logs: WorkLogEntry[], date: string, totalCount: number = logs.length): DailyReportData {
+function generateFallbackReport(
+  logs: WorkLogEntry[],
+  date: string,
+  totalCount: number = logs.length,
+  timeZone = "Asia/Tokyo",
+): DailyReportData {
   const sorted = [...logs].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
 
   const timeline: TimelineItem[] = sorted.map((log) => ({
-    time: formatTime(log.timestamp),
+    time: formatTime(log.timestamp, timeZone),
     activity: log.activity || "作業",
     detail: (log.details || "").slice(0, 80),
   }))
@@ -134,8 +152,14 @@ function generateFallbackReport(logs: WorkLogEntry[], date: string, totalCount: 
 }
 
 // Gemmaの応答は形式が保証されないため、必須フィールドを補完する
-function normalizeDailyReport(raw: any, logs: WorkLogEntry[], date: string, totalCount: number = logs.length): DailyReportData {
-  const fallback = generateFallbackReport(logs, date, totalCount)
+function normalizeDailyReport(
+  raw: any,
+  logs: WorkLogEntry[],
+  date: string,
+  totalCount: number = logs.length,
+  timeZone = "Asia/Tokyo",
+): DailyReportData {
+  const fallback = generateFallbackReport(logs, date, totalCount, timeZone)
   const str = (v: any, def: string) => (typeof v === "string" && v.trim() ? v : def)
   const strArray = (v: any, def: string[]) => {
     if (!Array.isArray(v)) return def
@@ -200,7 +224,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized: ログインが必要です" }, { status: 401 })
     }
 
-    const { workLogs, apiKey, date, model } = await request.json()
+    const { workLogs, apiKey, date, model, timeZone: tzParam } = await request.json()
+    // 利用者のブラウザから送られたタイムゾーンで時刻を整形する
+    // （以前はAsia/Tokyo固定で、他地域の利用者の日報がずれていた）
+    const timeZone = resolveTimeZone(tzParam)
     if (!Array.isArray(workLogs)) {
       return NextResponse.json({ error: "workLogs must be an array" }, { status: 400 })
     }
@@ -218,7 +245,7 @@ export async function POST(request: NextRequest) {
     const reportDate: string =
       typeof date === "string" && date.trim()
         ? date
-        : new Date().toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" })
+        : new Date().toLocaleDateString("ja-JP", { timeZone })
 
     // 古い順に並べる
     const sortedLogs: WorkLogEntry[] = [...workLogs].sort(
@@ -240,7 +267,7 @@ export async function POST(request: NextRequest) {
     try {
       const logLines = logs
         .map((log) => {
-          const time = formatTime(log.timestamp)
+          const time = formatTime(log.timestamp, timeZone)
           const apps = log.applications?.length ? ` [使用アプリ: ${log.applications.join(", ")}]` : ""
           return `- ${time} 【${log.activity}】(${log.category}${log.work_category ? `/${log.work_category}` : ""}) ${(log.details || "").slice(0, 120)}${apps}`
         })
@@ -304,7 +331,7 @@ ${logLines}
           if (braceMatch) jsonText = braceMatch[0]
           const raw = JSON.parse(jsonText)
           console.log(`✅ Daily report generated successfully (${reportModel})`)
-          return NextResponse.json(normalizeDailyReport(raw, logs, reportDate, totalCount))
+          return NextResponse.json(normalizeDailyReport(raw, logs, reportDate, totalCount, timeZone))
         }
       } else {
         console.warn(`Report model ${reportModel} returned ${response.status}, falling back to local daily report`)
@@ -315,7 +342,7 @@ ${logLines}
 
     // Gemma失敗時はログから機械的に日報を生成
     console.log("📊 Generating fallback daily report from log data...")
-    return NextResponse.json(generateFallbackReport(logs, reportDate, totalCount))
+    return NextResponse.json(generateFallbackReport(logs, reportDate, totalCount, timeZone))
   } catch (error) {
     console.error("Daily report generation error:", error)
     return NextResponse.json(

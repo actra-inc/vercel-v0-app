@@ -222,7 +222,12 @@ const Page = () => {
       headers: { "Content-Type": "application/json" },
       // model は意図的に送らない。レポート生成はサーバー既定の Gemma を使い、
       // 解析モデル（Gemini）と無料枠のバケットを分離する
-      body: JSON.stringify({ workLogs: sourceLogs, apiKey }),
+      body: JSON.stringify({
+        workLogs: sourceLogs,
+        apiKey,
+        // 利用者のタイムゾーンでレポート内の時刻を整形させる
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      }),
     })
     if (!response.ok) throw new Error(`API error: ${response.status}`)
     const reportData = await response.json()
@@ -254,15 +259,23 @@ const Page = () => {
   const handleGenerateDailyReport = useCallback(async () => {
     const apiKey = userSettings?.gemini_api_key
     if (!apiKey) throw new Error("API key not set")
-    if (todayRegularLogs.length === 0) throw new Error("No logs today")
+    // 「今日」はクリック時点で判定し直す（useMemo版は日付をまたぐと
+    // 前日のまま固定され、昨日のログが今日の日報になっていた）
+    const todayStr = new Date().toDateString()
+    const logsForToday = workLogs.filter(
+      (log: any) => !log.report_type && new Date(log.timestamp).toDateString() === todayStr,
+    )
+    if (logsForToday.length === 0) throw new Error("No logs today")
 
     const response = await fetch("/api/generate-daily-report", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        workLogs: todayRegularLogs,
+        workLogs: logsForToday,
         apiKey,
         date: new Date().toLocaleDateString("ja-JP"),
+        // 利用者のタイムゾーンで日報の時刻を整形させる
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         // model は意図的に送らない（レポート系はサーバー既定の Gemma で枠を分離）
       }),
     })
@@ -279,7 +292,7 @@ const Page = () => {
       report_type: "daily",
       report_data: reportData,
     })
-  }, [todayRegularLogs, userSettings, addWorkLog, t])
+  }, [workLogs, userSettings, addWorkLog, t])
 
   const reportsCount = useMemo(() => workLogs.filter((log: any) => !!log.report_type).length, [workLogs])
   const canGenerate = useMemo(() => workLogs.filter((log: any) => !log.report_type).length >= 3, [workLogs])

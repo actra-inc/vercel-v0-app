@@ -173,7 +173,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized: ログインが必要です" }, { status: 401 })
     }
 
-    const { workLogs, apiKey, model } = await request.json()
+    const { workLogs, apiKey, model, timeZone: tzParam } = await request.json()
+    // 利用者のタイムゾーンで時刻を整形（不正値・未指定はAsia/Tokyo）
+    let timeZone = "Asia/Tokyo"
+    if (typeof tzParam === "string" && tzParam) {
+      try {
+        new Intl.DateTimeFormat("ja-JP", { timeZone: tzParam })
+        timeZone = tzParam
+      } catch {
+        // フォールバック
+      }
+    }
     // 設定画面で選んだモデルを尊重する（未指定時はこれまで通り既定モデル）
     const reportModel = isValidModelId(model) ? model : DEFAULT_REPORT_MODEL
 
@@ -203,7 +213,7 @@ export async function POST(request: NextRequest) {
 以下は直近3件の作業ログです。これらを統合分析して、包括的なレポートを生成してください。
 
 【作業ログ1】
-- 時刻: ${new Date(recentLogs[0].timestamp).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" })}
+- 時刻: ${new Date(recentLogs[0].timestamp).toLocaleString("ja-JP", { timeZone })}
 - 活動: ${recentLogs[0].activity}
 - カテゴリ: ${recentLogs[0].category}
 - 詳細: ${recentLogs[0].details}
@@ -211,7 +221,7 @@ export async function POST(request: NextRequest) {
 ${recentLogs[0].distraction_check ? `- 脱線検知: ${recentLogs[0].distraction_check.is_distracted ? "あり" : "なし"}` : ""}
 
 【作業ログ2】
-- 時刻: ${new Date(recentLogs[1].timestamp).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" })}
+- 時刻: ${new Date(recentLogs[1].timestamp).toLocaleString("ja-JP", { timeZone })}
 - 活動: ${recentLogs[1].activity}
 - カテゴリ: ${recentLogs[1].category}
 - 詳細: ${recentLogs[1].details}
@@ -219,7 +229,7 @@ ${recentLogs[0].distraction_check ? `- 脱線検知: ${recentLogs[0].distraction
 ${recentLogs[1].distraction_check ? `- 脱線検知: ${recentLogs[1].distraction_check.is_distracted ? "あり" : "なし"}` : ""}
 
 【作業ログ3】
-- 時刻: ${new Date(recentLogs[2].timestamp).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" })}
+- 時刻: ${new Date(recentLogs[2].timestamp).toLocaleString("ja-JP", { timeZone })}
 - 活動: ${recentLogs[2].activity}
 - カテゴリ: ${recentLogs[2].category}
 - 詳細: ${recentLogs[2].details}
