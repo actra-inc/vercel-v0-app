@@ -400,7 +400,7 @@ const Page = () => {
               {[
                 { title: "Google Account (name, email, profile photo)", desc: "Used solely for authentication and to display your account information in the app header. Never shared with third parties." },
                 { title: "Google Calendar (read-only)", desc: "Used only to display today's schedule in the Time Tracker. FlowNudge never creates, modifies, or deletes calendar events. Calendar data is not stored externally." },
-                { title: "Screen Capture (local only)", desc: "Screenshots are analyzed locally in your browser and are never uploaded to external servers. All processing happens on your device." },
+                { title: "Screen Capture (analyzed with your own API key)", desc: "Screenshots are captured only while analysis is running, resized in your browser, and sent to Google's Gemini API using your own API key. FlowNudge's servers never store the images — only the resulting text logs are saved to your account." },
               ].map(({ title, desc }) => (
                 <div key={title} className="flex gap-4 p-5 rounded-xl bg-white border border-gray-200 shadow-sm">
                   <CheckCircle className="h-6 w-6 text-green-500 flex-shrink-0 mt-0.5" />
