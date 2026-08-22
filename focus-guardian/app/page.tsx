@@ -220,8 +220,9 @@ const Page = () => {
     const response = await fetch("/api/generate-summary-report", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      // 設定画面のモデル選択をレポート生成にも反映する（未指定ならサーバー既定）
-      body: JSON.stringify({ workLogs: sourceLogs, apiKey, model: userSettings?.gemini_model }),
+      // model は意図的に送らない。レポート生成はサーバー既定の Gemma を使い、
+      // 解析モデル（Gemini）と無料枠のバケットを分離する
+      body: JSON.stringify({ workLogs: sourceLogs, apiKey }),
     })
     if (!response.ok) throw new Error(`API error: ${response.status}`)
     const reportData = await response.json()
@@ -262,8 +263,7 @@ const Page = () => {
         workLogs: todayRegularLogs,
         apiKey,
         date: new Date().toLocaleDateString("ja-JP"),
-        // 設定画面のモデル選択を日報生成にも反映する（未指定ならサーバー既定）
-        model: userSettings?.gemini_model,
+        // model は意図的に送らない（レポート系はサーバー既定の Gemma で枠を分離）
       }),
     })
     if (!response.ok) throw new Error(`API error: ${response.status}`)

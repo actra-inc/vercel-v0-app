@@ -322,7 +322,8 @@ export function WorkLogPanel({
           body: JSON.stringify({
             workLogs: regularLogs.slice(0, 3), // workLogsは新しい順なので先頭3件が最新
             apiKey,
-            model: model || "gemini-3.5-flash-lite",
+            // model は意図的に送らない。レポート生成はサーバー既定の Gemma を使い、
+            // 解析モデル（Gemini）とは無料枠のバケットを分離して長時間運用を優先する
           }),
         })
 
