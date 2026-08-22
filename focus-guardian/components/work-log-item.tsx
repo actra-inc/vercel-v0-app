@@ -48,7 +48,8 @@ interface WorkLogItemProps {
 }
 
 export function WorkLogItem({ log, onPlayAlert }: WorkLogItemProps) {
-  const { t } = useTranslation()
+  const { t, language } = useTranslation()
+  const dateLocale = language === "ja" ? "ja-JP" : "en-US"
   // レポートタイプの場合は専用コンポーネントで表示
   if (log.report_type === "summary" && log.report_data) {
     return <WorkSummaryReport timestamp={log.timestamp} reportData={log.report_data} />
@@ -107,7 +108,7 @@ export function WorkLogItem({ log, onPlayAlert }: WorkLogItemProps) {
             </div>
             <p className="text-sm text-gray-600 flex items-center gap-1">
               <Clock className="h-3 w-3" />
-              {new Date(log.timestamp).toLocaleString("ja-JP")}
+              {new Date(log.timestamp).toLocaleString(dateLocale)}
             </p>
           </div>
           {log.confidence !== undefined && (

@@ -105,6 +105,13 @@ export function AppSettings({ captureInterval, onCaptureIntervalChange }: AppSet
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
+              {/* 旧既定値（180秒等）で保存されたユーザーの選択が空表示に
+                  ならないよう、一覧外の現在値は動的に選択肢へ加える */}
+              {![30, 60, 120, 300].includes(captureInterval) && (
+                <SelectItem value={captureInterval.toString()}>
+                  {captureInterval < 60 ? `${captureInterval}s` : `${captureInterval / 60}min`}
+                </SelectItem>
+              )}
               <SelectItem value="30">{t('as_every30s')}</SelectItem>
               <SelectItem value="60">{t('as_every1m')}</SelectItem>
               <SelectItem value="120">{t('as_every2m')}</SelectItem>

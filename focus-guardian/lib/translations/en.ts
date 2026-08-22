@@ -97,7 +97,7 @@ export const en: Record<TranslationKey, string> = {
   wlp_screenshot: 'Analyze an image file',
   wlp_screenshotHint: 'Use this to analyze a single image you already have, e.g. a screen from another device',
   wlp_featureTitle: '💡 Integrated analysis:',
-  wlp_featureDesc: 'Screenshots are captured at a fixed interval, read with OCR and classified by AI. You get an alert when you drift from your planned task, and a consolidated report every 3 logs.',
+  wlp_featureDesc: 'Screenshots are captured at a fixed interval and analyzed directly by AI (Gemini). You get an alert when you drift from your planned task, and a consolidated report every 3 logs.',
   wlp_feature1: '📸 Auto screenshot every 30 seconds',
   wlp_feature2: '🔍 OCR text extraction from screen',
   wlp_feature3: '🤖 Gemini AI analyzes and classifies your activity',
@@ -203,6 +203,9 @@ export const en: Record<TranslationKey, string> = {
   wsr_distractionPattern: 'Distraction Patterns',
   wsr_keyFindings: 'Key Findings',
   wsr_suggestions: 'Suggestions',
+  wsr_sourceScreenshots: 'Source screenshots',
+  wsr_screenshotAlt: 'Screenshot {num}',
+  wsr_screenshotSessionNote: '* Images are shown for this session only (they are not stored)',
 
   // AIAnalysisStatus
   ai_title: 'AI Analysis Summary',

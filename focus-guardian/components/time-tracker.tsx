@@ -60,6 +60,9 @@ export function TimeTracker({
   const [selectedEventStart, setSelectedEventStart] = useState<Date | null>(null)
   // 停止直後に経過時間のプレビューが復活しないようにするフラグ
   const [suppressStartPreview, setSuppressStartPreview] = useState(false)
+  // このセッションで保存した区間の終端。一時停止→再開時に計測起点が
+  // これより前へ戻らないようクランプする（同じ時間帯の二重記録を防ぐ）
+  const lastSavedEndRef = useRef<Date | null>(null)
   const [showCalendar, setShowCalendar] = useState(false)
   const [taskSource, setTaskSource] = useState<TaskSource>("calendar")
   const [togglCurrentEntry, setTogglCurrentEntry] = useState<{ description: string; project: string | null; is_running: boolean; start: string | null } | null>(null)
@@ -205,13 +208,20 @@ export function TimeTracker({
   //  - カレンダー: 選択した（すでに始まっている）予定の開始時刻
   //  - どちらでもない手入力: 「開始」を押した時刻
   const resolveStartTime = (): Date => {
+    let start: Date
     if (taskSource === "toggl" && togglCurrentEntry?.is_running && togglCurrentEntry.start) {
-      return new Date(togglCurrentEntry.start)
+      start = new Date(togglCurrentEntry.start)
+    } else if (taskSource === "calendar" && selectedEventStart) {
+      start = selectedEventStart
+    } else {
+      return new Date()
     }
-    if (taskSource === "calendar" && selectedEventStart) {
-      return selectedEventStart
-    }
-    return new Date()
+    // 一時停止→再開で予定/Togglの開始時刻に戻ると、保存済みの区間と
+    // 重なる時間帯がもう一度計上されてしまう。セッション内で保存した
+    // 区間の終端より前へは遡らない
+    const savedEnd = lastSavedEndRef.current
+    if (savedEnd && start < savedEnd) return savedEnd
+    return start
   }
 
   const startTimer = () => {
@@ -248,6 +258,8 @@ export function TimeTracker({
       const newEntries = [updatedEntry, ...localEntries]
       setLocalEntries(newEntries)
       saveToStorage(newEntries)
+      // 再開時に計測起点がこの区間より前へ戻らないようにする
+      lastSavedEndRef.current = now
     }
 
     setCurrentEntry(null)
@@ -255,6 +267,9 @@ export function TimeTracker({
     setCurrentTime(0)
     // 停止したのに経過時間プレビューが復活しないようにする
     setSuppressStartPreview(true)
+    // 一時停止後の再開で予定開始時刻へ再アンカーしないようクリアする
+    // （再び予定起点で計測したい場合はカレンダーから予定を選び直す）
+    setSelectedEventStart(null)
     onTimeEntryChange(null)
   }
 
@@ -419,6 +434,7 @@ export function TimeTracker({
                       size="sm"
                       onClick={fetchTodayEvents}
                       disabled={calendarLoading}
+                      aria-label={t('common_refresh')}
                       className="h-6 px-2 text-xs text-green-700 hover:bg-green-100"
                     >
                       {calendarLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
@@ -510,6 +526,7 @@ export function TimeTracker({
                     size="sm"
                     onClick={fetchTogglCurrentEntry}
                     disabled={togglLoading || isRunning}
+                    aria-label={t('common_refresh')}
                     className="h-6 px-2 text-xs text-orange-700 hover:bg-orange-100"
                   >
                     {togglLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
@@ -642,6 +659,7 @@ export function TimeTracker({
                       variant="ghost"
                       size="sm"
                       onClick={() => deleteEntry(entry.id)}
+                      aria-label={t('common_delete')}
                       className="h-6 w-6 p-0 text-red-500 hover:text-red-700"
                     >
                       <Trash2 className="h-3 w-3" />

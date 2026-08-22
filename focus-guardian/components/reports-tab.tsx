@@ -76,7 +76,8 @@ export function ReportsTab({
   onGenerateDailyReport,
   canGenerateDaily,
 }: ReportsTabProps) {
-  const { t } = useTranslation()
+  const { t, language } = useTranslation()
+  const dateLocale = language === "ja" ? "ja-JP" : "en-US"
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [deletingAll, setDeletingAll] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
@@ -339,7 +340,7 @@ export function ReportsTab({
                         <CardTitle className="text-xl text-gray-800">{t('rt_reportTitle', { num: String(reports.length - index) })}</CardTitle>
                         <p className="text-sm text-gray-600 mt-1">
                           <Clock className="h-3 w-3 inline mr-1" />
-                          {timestamp.toLocaleString("ja-JP", {
+                          {timestamp.toLocaleString(dateLocale, {
                             year: "numeric",
                             month: "long",
                             day: "numeric",
@@ -529,7 +530,8 @@ function DailyReportCard({
   onDelete: () => void
   deleting: boolean
 }) {
-  const { t } = useTranslation()
+  const { t, language } = useTranslation()
+  const dateLocale = language === "ja" ? "ja-JP" : "en-US"
   const [copied, setCopied] = useState(false)
   const data = (report.report_data ?? {}) as DailyReportData
 
@@ -563,7 +565,7 @@ function DailyReportCard({
               </CardTitle>
               <p className="text-sm text-gray-600 mt-1">
                 <Clock className="h-3 w-3 inline mr-1" />
-                {new Date(report.timestamp).toLocaleString("ja-JP")}
+                {new Date(report.timestamp).toLocaleString(dateLocale)}
               </p>
             </div>
           </div>

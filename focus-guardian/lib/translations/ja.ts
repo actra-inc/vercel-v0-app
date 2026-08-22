@@ -95,7 +95,7 @@ export const ja = {
   wlp_screenshot: '画像を選んで解析',
   wlp_screenshotHint: '別端末の画面など、手元の画像ファイルを1枚だけ解析したいときに使います',
   wlp_featureTitle: '💡 統合解析機能:',
-  wlp_featureDesc: '一定間隔で画面をキャプチャし、OCRで読み取った内容をAIが分類。予定作業から脱線するとアラートで知らせ、3件ごとに統合レポートを自動生成します。',
+  wlp_featureDesc: '一定間隔で画面をキャプチャし、画像をそのままAI（Gemini）が解析・分類。予定作業から脱線するとアラートで知らせ、3件ごとに統合レポートを自動生成します。',
   wlp_feature1: '📸 30秒ごとに自動でスクリーンショットを取得',
   wlp_feature2: '🔍 OCRでテキスト内容を読み取り',
   wlp_feature3: '🤖 Gemini AIが作業内容を分析・分類',
@@ -201,6 +201,9 @@ export const ja = {
   wsr_distractionPattern: '脱線パターン',
   wsr_keyFindings: '重要な発見',
   wsr_suggestions: '改善提案',
+  wsr_sourceScreenshots: '解析元スクリーンショット',
+  wsr_screenshotAlt: 'スクリーンショット {num}',
+  wsr_screenshotSessionNote: '※ 画像はセッション中のみ表示されます（保存はされません）',
 
   // AIAnalysisStatus
   ai_title: 'AI分析サマリー',

@@ -114,7 +114,7 @@ export function SettingsPanel({
               <Settings className="h-5 w-5 text-orange-600" />
               {t('sp_title')}
             </CardTitle>
-            <Button variant="ghost" size="sm" onClick={onClose}>
+            <Button variant="ghost" size="sm" onClick={onClose} aria-label={t('common_close')}>
               <X className="h-4 w-4" />
             </Button>
           </div>

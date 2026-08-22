@@ -27,7 +27,8 @@ interface WorkSummaryReportProps {
 }
 
 export function WorkSummaryReport({ timestamp, reportData }: WorkSummaryReportProps) {
-  const { t } = useTranslation()
+  const { t, language } = useTranslation()
+  const dateLocale = language === "ja" ? "ja-JP" : "en-US"
   // AI生成レポートはフィールドが欠けている場合があるため防御的に扱う
   const timeDistribution = reportData.time_distribution ?? {
     productive_time: 0,
@@ -48,13 +49,13 @@ export function WorkSummaryReport({ timestamp, reportData }: WorkSummaryReportPr
               <CardTitle className="text-xl text-gray-800">{t('wsr_title')}</CardTitle>
               <p className="text-sm text-gray-600 mt-1">
                 <Clock className="h-3 w-3 inline mr-1" />
-                {new Date(timestamp).toLocaleString("ja-JP")}
+                {new Date(timestamp).toLocaleString(dateLocale)}
               </p>
             </div>
           </div>
           <Badge variant="outline" className="border-orange-300 text-orange-700 bg-orange-50 text-lg px-4 py-1">
             <Target className="h-4 w-4 mr-1" />
-            {reportData.overall_score ?? 0}点
+            {reportData.overall_score ?? 0}{t('rt_scoreUnit')}
           </Badge>
         </div>
       </CardHeader>
@@ -64,16 +65,16 @@ export function WorkSummaryReport({ timestamp, reportData }: WorkSummaryReportPr
           <div className="p-4 bg-white rounded-lg border border-orange-100 shadow-sm">
             <h4 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
               <FileText className="h-4 w-4 text-orange-600" />
-              解析元スクリーンショット
+              {t('wsr_sourceScreenshots')}
             </h4>
+            {/* 過去に保存された blob: URL はリロード後に必ず死ぬため、
+                読み込みに失敗した画像はリンクごと非表示にする */}
             <div className="grid grid-cols-3 gap-2">
               {reportData.source_screenshots.map((url, index) => (
-                {/* 過去に保存された blob: URL はリロード後に必ず死ぬため、
-                    読み込みに失敗した画像はリンクごと非表示にする */}
                 <a key={index} href={url} target="_blank" rel="noopener noreferrer">
                   <img
                     src={url}
-                    alt={`スクリーンショット ${index + 1}`}
+                    alt={t('wsr_screenshotAlt', { num: index + 1 })}
                     className="w-full rounded border border-gray-200 object-cover aspect-video hover:opacity-80 transition-opacity"
                     onError={(e) => {
                       const anchor = e.currentTarget.closest("a")
@@ -83,7 +84,7 @@ export function WorkSummaryReport({ timestamp, reportData }: WorkSummaryReportPr
                 </a>
               ))}
             </div>
-            <p className="text-xs text-gray-400 mt-2">※ 画像はセッション中のみ表示されます</p>
+            <p className="text-xs text-gray-400 mt-2">{t('wsr_screenshotSessionNote')}</p>
           </div>
         )}
 
@@ -91,7 +92,7 @@ export function WorkSummaryReport({ timestamp, reportData }: WorkSummaryReportPr
         <div className="p-4 bg-white rounded-lg border border-orange-100 shadow-sm">
           <h4 className="font-semibold text-gray-800 mb-2 flex items-center gap-2">
             <FileText className="h-4 w-4 text-orange-600" />
-            概要
+            {t('wsr_overview')}
           </h4>
           <p className="text-gray-700">{reportData.summary}</p>
         </div>
@@ -100,7 +101,7 @@ export function WorkSummaryReport({ timestamp, reportData }: WorkSummaryReportPr
         <div className="p-4 bg-white rounded-lg border border-orange-100 shadow-sm">
           <h4 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
             <TrendingUp className="h-4 w-4 text-orange-600" />
-            時間配分
+            {t('wsr_timeDistribution')}
           </h4>
           <div className="space-y-3">
             <div className="flex items-center gap-3">
@@ -152,7 +153,7 @@ export function WorkSummaryReport({ timestamp, reportData }: WorkSummaryReportPr
         <div className="p-4 bg-white rounded-lg border border-orange-100 shadow-sm">
           <h4 className="font-semibold text-gray-800 mb-2 flex items-center gap-2">
             <TrendingUp className="h-4 w-4 text-orange-600" />
-            生産性分析
+            {t('wsr_productivityAnalysis')}
           </h4>
           <p className="text-gray-700">{reportData.productivity_analysis}</p>
         </div>
@@ -161,7 +162,7 @@ export function WorkSummaryReport({ timestamp, reportData }: WorkSummaryReportPr
         <div className="p-4 bg-white rounded-lg border border-orange-100 shadow-sm">
           <h4 className="font-semibold text-gray-800 mb-2 flex items-center gap-2">
             <Target className="h-4 w-4 text-orange-600" />
-            集中度の推移
+            {t('wsr_focusTrend')}
           </h4>
           <p className="text-gray-700">{reportData.focus_trend}</p>
         </div>
@@ -170,7 +171,7 @@ export function WorkSummaryReport({ timestamp, reportData }: WorkSummaryReportPr
         <div className="p-4 bg-white rounded-lg border border-orange-100 shadow-sm">
           <h4 className="font-semibold text-gray-800 mb-2 flex items-center gap-2">
             <AlertTriangle className="h-4 w-4 text-orange-600" />
-            脱線パターン
+            {t('wsr_distractionPattern')}
           </h4>
           <p className="text-gray-700">{reportData.distraction_summary}</p>
         </div>
@@ -179,7 +180,7 @@ export function WorkSummaryReport({ timestamp, reportData }: WorkSummaryReportPr
         <div className="p-4 bg-white rounded-lg border border-orange-100 shadow-sm">
           <h4 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
             <CheckCircle className="h-4 w-4 text-orange-600" />
-            重要な発見
+            {t('wsr_keyFindings')}
           </h4>
           <ul className="space-y-2">
             {keyFindings.map((finding, index) => (
@@ -195,7 +196,7 @@ export function WorkSummaryReport({ timestamp, reportData }: WorkSummaryReportPr
         <div className="p-4 bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg border border-green-200 shadow-sm">
           <h4 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
             <Target className="h-4 w-4 text-green-600" />
-            改善提案
+            {t('wsr_suggestions')}
           </h4>
           <ul className="space-y-2">
             {recommendations.map((recommendation, index) => (

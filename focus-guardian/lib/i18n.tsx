@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useState, useEffect, type ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect, useMemo, useCallback, type ReactNode } from 'react'
 import { ja, type TranslationKey } from './translations/ja'
 import { en } from './translations/en'
 
@@ -33,17 +33,27 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('flownudge_language', lang)
   }
 
-  const t = (key: TranslationKey, vars?: Record<string, string | number>): string => {
-    let str = translations[language][key] ?? translations.ja[key] ?? key
-    if (vars) {
-      Object.entries(vars).forEach(([k, v]) => {
-        str = str.replace(new RegExp(`\\{${k}\\}`, 'g'), String(v))
-      })
-    }
-    return str
-  }
+  // t を useCallback で安定化する（毎レンダー再生成されると、依存配列に
+  // 入れた useCallback/useEffect が全て言語切替以外でも作り直され、
+  // 逆に依存から外すと旧言語で固まる、という二択を強いていた）
+  const t = useCallback(
+    (key: TranslationKey, vars?: Record<string, string | number>): string => {
+      let str = translations[language][key] ?? translations.ja[key] ?? key
+      if (vars) {
+        Object.entries(vars).forEach(([k, v]) => {
+          // 置換値は関数で渡す（文字列だと "$&" などの特殊パターンが展開され、
+          // 作業名に $ を含むと通知文が壊れる）
+          str = str.replace(new RegExp(`\\{${k}\\}`, 'g'), () => String(v))
+        })
+      }
+      return str
+    },
+    [language],
+  )
 
-  return <I18nContext.Provider value={{ language, setLanguage, t }}>{children}</I18nContext.Provider>
+  const value = useMemo(() => ({ language, setLanguage, t }), [language, t])
+
+  return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>
 }
 
 export const useTranslation = () => useContext(I18nContext)

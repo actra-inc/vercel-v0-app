@@ -36,7 +36,8 @@ interface TogglEntry {
 }
 
 export function TogglSettings() {
-  const { t } = useTranslation()
+  const { t, language } = useTranslation()
+  const dateLocale = language === "ja" ? "ja-JP" : "en-US"
   const [apiToken, setApiToken] = useState("")
   const [workspaceId, setWorkspaceId] = useState("")
   const [showApiToken, setShowApiToken] = useState(false)
@@ -262,7 +263,7 @@ export function TogglSettings() {
                     <div>
                       <div className="text-xs font-medium text-gray-600 mb-1">{t('tg_startTime')}</div>
                       <div className="font-medium">
-                        {currentEntry.start ? new Date(currentEntry.start).toLocaleString("ja-JP") : t('tg_notSet')}
+                        {currentEntry.start ? new Date(currentEntry.start).toLocaleString(dateLocale) : t('tg_notSet')}
                       </div>
                     </div>
                     <div>
