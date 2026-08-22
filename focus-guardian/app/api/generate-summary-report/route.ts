@@ -16,7 +16,7 @@ async function fetchWithRetry(url: string, options: RequestInit): Promise<Respon
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     if (attempt > 0) {
       const delay = 1000 * Math.pow(2, attempt - 1)
-      console.warn(`[Gemma] 500 error on attempt ${attempt}, retrying in ${delay}ms...`)
+      console.warn(`[Report] 500 error on attempt ${attempt}, retrying in ${delay}ms...`)
       await new Promise((resolve) => setTimeout(resolve, delay))
     }
     const response = await fetch(url, options)
@@ -185,7 +185,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "At least 3 work logs are required" }, { status: 400 })
     }
 
-    const recentLogs: WorkLogEntry[] = workLogs.slice(0, 3)
+    // 細工されたボディで即500にならないよう配列を検証する
+    if (!Array.isArray(workLogs) || workLogs.length === 0) {
+      return NextResponse.json({ error: "workLogs must be a non-empty array" }, { status: 400 })
+    }
+
+    // クライアントは新しい順で送ってくるため、時系列（古い→新しい）に並べ直す。
+    // 逆順のままだと「集中度の推移」が逆向きに分析される
+    const recentLogs: WorkLogEntry[] = workLogs
+      .slice(0, 3)
+      .slice()
+      .sort((a: WorkLogEntry, b: WorkLogEntry) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
 
     // まずGemmaでリッチなレポートを試みる
     try {
@@ -193,7 +203,7 @@ export async function POST(request: NextRequest) {
 以下は直近3件の作業ログです。これらを統合分析して、包括的なレポートを生成してください。
 
 【作業ログ1】
-- 時刻: ${new Date(recentLogs[0].timestamp).toLocaleString("ja-JP")}
+- 時刻: ${new Date(recentLogs[0].timestamp).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" })}
 - 活動: ${recentLogs[0].activity}
 - カテゴリ: ${recentLogs[0].category}
 - 詳細: ${recentLogs[0].details}
@@ -201,7 +211,7 @@ export async function POST(request: NextRequest) {
 ${recentLogs[0].distraction_check ? `- 脱線検知: ${recentLogs[0].distraction_check.is_distracted ? "あり" : "なし"}` : ""}
 
 【作業ログ2】
-- 時刻: ${new Date(recentLogs[1].timestamp).toLocaleString("ja-JP")}
+- 時刻: ${new Date(recentLogs[1].timestamp).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" })}
 - 活動: ${recentLogs[1].activity}
 - カテゴリ: ${recentLogs[1].category}
 - 詳細: ${recentLogs[1].details}
@@ -209,7 +219,7 @@ ${recentLogs[0].distraction_check ? `- 脱線検知: ${recentLogs[0].distraction
 ${recentLogs[1].distraction_check ? `- 脱線検知: ${recentLogs[1].distraction_check.is_distracted ? "あり" : "なし"}` : ""}
 
 【作業ログ3】
-- 時刻: ${new Date(recentLogs[2].timestamp).toLocaleString("ja-JP")}
+- 時刻: ${new Date(recentLogs[2].timestamp).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" })}
 - 活動: ${recentLogs[2].activity}
 - カテゴリ: ${recentLogs[2].category}
 - 詳細: ${recentLogs[2].details}
@@ -243,11 +253,12 @@ ${recentLogs[2].distraction_check ? `- 脱線検知: ${recentLogs[2].distraction
 必ず有効なJSONのみを返してください。余計な説明文は不要です。
 `
 
-      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${reportModel}:generateContent?key=${apiKey}`
+      // APIキーはURLクエリではなくヘッダーで送る（ログへの漏えい面を減らす）
+      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${reportModel}:generateContent`
 
       const response = await fetchWithRetry(apiUrl, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: {
@@ -268,15 +279,18 @@ ${recentLogs[2].distraction_check ? `- 脱線検知: ${recentLogs[2].distraction
           } else if (jsonText.startsWith("```")) {
             jsonText = jsonText.replace(/```\n?/g, "")
           }
+          // モデルが前置き文をつけてもJSON本体を拾えるよう、最初の{から最後の}までを抽出
+          const braceMatch = jsonText.match(/\{[\s\S]*\}/)
+          if (braceMatch) jsonText = braceMatch[0]
           const reportData = JSON.parse(jsonText)
-          console.log("✅ Gemma report generated successfully")
+          console.log(`✅ Report generated successfully (${reportModel})`)
           return NextResponse.json(normalizeReportData(reportData, recentLogs))
         }
       } else {
-        console.warn(`Gemma API returned ${response.status}, falling back to local report`)
+        console.warn(`Report model ${reportModel} returned ${response.status}, falling back to local report`)
       }
     } catch (gemmaError) {
-      console.warn("Gemma failed, using fallback:", gemmaError)
+      console.warn(`Report model ${reportModel} failed, using fallback:`, gemmaError)
     }
 
     // Gemma失敗時はログデータからローカルでレポートを生成

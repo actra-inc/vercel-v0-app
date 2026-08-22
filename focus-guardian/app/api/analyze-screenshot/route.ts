@@ -131,7 +131,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "API key is required" }, { status: 400 })
     }
 
-    const analysisUrl = `https://generativelanguage.googleapis.com/v1beta/models/${analysisModel}:generateContent?key=${apiKey}`
+    // APIキーはURLクエリ(?key=)ではなくヘッダーで送る（ログ・プロキシへの漏えい面を減らす）
+    const analysisUrl = `https://generativelanguage.googleapis.com/v1beta/models/${analysisModel}:generateContent`
 
     const categoriesList = categories.join("、")
     const analysisPrompt = `あなたは作業効率モニタリングシステムです。このスクリーンショットを分析し、ユーザーが何をしているかを判定してください。
@@ -165,7 +166,7 @@ export async function POST(request: NextRequest) {
 
     const response = await fetchWithRetry(analysisUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
       body: JSON.stringify({
         contents: [{
           parts: [
@@ -239,7 +240,14 @@ export async function POST(request: NextRequest) {
       ? analysis.work_category
       : fallbackCategory
 
-    const taskAlignment = Number(analysis.distraction_check?.task_alignment) || 0.5
+    // 0 は falsy のため `Number(x) || 0.5` だと task_alignment=0.0（明白な脱線）が
+    // 0.5 に化けて強制脱線判定が効かず、focus_score も 50 に上振れしていた。
+    // 数値でない/欠落時のみ 0.5 にフォールバックし、0-1 にクランプする
+    const rawAlignment = analysis.distraction_check?.task_alignment
+    const taskAlignment =
+      typeof rawAlignment === "number" && Number.isFinite(rawAlignment)
+        ? Math.min(1, Math.max(0, rawAlignment))
+        : 0.5
     const forceDistracted = !!currentTask && taskAlignment < 0.35
     const distractionCheck = analysis.distraction_check
       ? {
@@ -258,7 +266,11 @@ export async function POST(request: NextRequest) {
       category: forceDistracted ? "distracted" : (analysis.category || "neutral"),
       work_category: validCategory,
       details: analysis.details || (currentTask ? `「${currentTask}」の作業中` : "作業内容を解析しました"),
-      confidence: Math.round((Number(analysis.confidence) || 0.5) * 100),
+      confidence: Math.round(
+        (typeof analysis.confidence === "number" && Number.isFinite(analysis.confidence)
+          ? Math.min(1, Math.max(0, analysis.confidence))
+          : 0.5) * 100,
+      ),
       applications: analysis.apps || [],
       focus_score: Math.round(taskAlignment * 100),
       distraction_check: distractionCheck,

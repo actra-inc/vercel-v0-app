@@ -17,7 +17,7 @@ async function fetchWithRetry(url: string, options: RequestInit): Promise<Respon
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     if (attempt > 0) {
       const delay = 1000 * Math.pow(2, attempt - 1)
-      console.warn(`[Gemma] 500 error on attempt ${attempt}, retrying in ${delay}ms...`)
+      console.warn(`[Report] 500 error on attempt ${attempt}, retrying in ${delay}ms...`)
       await new Promise((resolve) => setTimeout(resolve, delay))
     }
     const response = await fetch(url, options)
@@ -201,6 +201,9 @@ export async function POST(request: NextRequest) {
     }
 
     const { workLogs, apiKey, date, model } = await request.json()
+    if (!Array.isArray(workLogs)) {
+      return NextResponse.json({ error: "workLogs must be an array" }, { status: 400 })
+    }
     // 設定画面で選んだモデルを尊重する（未指定時はこれまで通り既定モデル）
     const reportModel = isValidModelId(model) ? model : DEFAULT_REPORT_MODEL
 
@@ -270,11 +273,12 @@ ${logLines}
 }
 `
 
-      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${reportModel}:generateContent?key=${apiKey}`
+      // APIキーはURLクエリではなくヘッダーで送る（ログへの漏えい面を減らす）
+      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${reportModel}:generateContent`
 
       const response = await fetchWithRetry(apiUrl, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: {
@@ -295,15 +299,18 @@ ${logLines}
           } else if (jsonText.startsWith("```")) {
             jsonText = jsonText.replace(/```\n?/g, "")
           }
+          // モデルが前置き文をつけてもJSON本体を拾えるよう、最初の{から最後の}までを抽出
+          const braceMatch = jsonText.match(/\{[\s\S]*\}/)
+          if (braceMatch) jsonText = braceMatch[0]
           const raw = JSON.parse(jsonText)
-          console.log("✅ Gemma daily report generated successfully")
+          console.log(`✅ Daily report generated successfully (${reportModel})`)
           return NextResponse.json(normalizeDailyReport(raw, logs, reportDate, totalCount))
         }
       } else {
-        console.warn(`Gemma API returned ${response.status}, falling back to local daily report`)
+        console.warn(`Report model ${reportModel} returned ${response.status}, falling back to local daily report`)
       }
     } catch (gemmaError) {
-      console.warn("Gemma failed, using fallback daily report:", gemmaError)
+      console.warn(`Report model ${reportModel} failed, using fallback daily report:`, gemmaError)
     }
 
     // Gemma失敗時はログから機械的に日報を生成

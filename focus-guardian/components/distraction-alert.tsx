@@ -36,6 +36,11 @@ export function DistractionAlert({ result, plannedTask, actualActivity, onDismis
   const playAlertSound = () => {
     // Web Audio APIで警告音を生成
     const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
+    // 再生完了後にAudioContextを解放する（作りっぱなしだとブラウザの
+    // コンテキスト数上限に達し、以後の警告音が無音になる）
+    setTimeout(() => {
+      audioContext.close().catch(() => {})
+    }, 1500)
 
     // 警告音のパラメータ
     const frequency1 = 800 // Hz
