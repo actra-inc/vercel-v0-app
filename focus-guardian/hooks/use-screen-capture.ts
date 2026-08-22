@@ -9,6 +9,21 @@ interface UseScreenCaptureOptions {
   onError?: (error: Error) => void
 }
 
+// フレーム取得系のPromiseが永遠に解決しないケース（バックグラウンドタブで
+// video の loadedmetadata が発火しない、muted track で grabFrame が pending のまま等）で
+// isCapturingRef が true に固着して解析が永久停止するのを防ぐためのタイムアウト
+const FRAME_TIMEOUT_MS = 15 * 1000
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)
+    promise.then(
+      (v) => { clearTimeout(timer); resolve(v) },
+      (e) => { clearTimeout(timer); reject(e) },
+    )
+  })
+}
+
 export function useScreenCapture(options: UseScreenCaptureOptions = {}) {
   const { interval = 30000, quality = 0.8, onCapture, onError } = options
 
@@ -82,7 +97,7 @@ export function useScreenCapture(options: UseScreenCaptureOptions = {}) {
         if (window.ImageCapture && typeof ImageCapture.prototype.grabFrame === "function") {
           try {
             const imageCapture = new ImageCapture(videoTrack)
-            const imageBitmap = await imageCapture.grabFrame()
+            const imageBitmap = await withTimeout(imageCapture.grabFrame(), FRAME_TIMEOUT_MS, "grabFrame")
             const canvas = document.createElement("canvas")
             canvas.width = imageBitmap.width
             canvas.height = imageBitmap.height
@@ -102,15 +117,22 @@ export function useScreenCapture(options: UseScreenCaptureOptions = {}) {
           video.srcObject = stream
           video.muted = true
 
-          await new Promise<void>((resolve, reject) => {
-            video.onloadedmetadata = () => {
-              video
-                .play()
-                .then(() => setTimeout(resolve, 100))
-                .catch(reject)
-            }
-            video.onerror = reject
-          })
+          // onloadedmetadata / onerror のどちらも発火しないとこの Promise は
+          // 永遠に未解決になり、finally が走らず isCapturingRef が固着する。
+          // タイムアウトで必ず決着させる
+          await withTimeout(
+            new Promise<void>((resolve, reject) => {
+              video.onloadedmetadata = () => {
+                video
+                  .play()
+                  .then(() => setTimeout(resolve, 100))
+                  .catch(reject)
+              }
+              video.onerror = () => reject(new Error("video element error"))
+            }),
+            FRAME_TIMEOUT_MS,
+            "video metadata",
+          )
 
           const canvas = document.createElement("canvas")
           canvas.width = video.videoWidth
@@ -173,6 +195,12 @@ export function useScreenCapture(options: UseScreenCaptureOptions = {}) {
   // ユーザーアクションから直接呼び出される関数
   // 開始できたかどうかを返す（キャンセル・失敗時に呼び出し側がセッションを記録しないように）
   const startAutoCapture = useCallback(async (): Promise<boolean> => {
+    // 共有ピッカーが非モーダルなブラウザで開始ボタンを連打すると、
+    // ストリームと interval が多重に張られてリークする
+    if (streamRef.current) {
+      console.warn("Screen capture already running; ignoring duplicate start request")
+      return true
+    }
     console.log("=== Screen Capture Start Requested ===")
     console.log("User agent:", navigator.userAgent)
     console.log("Location:", location.href)
