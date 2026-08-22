@@ -97,7 +97,11 @@ export function useScreenCapture(options: UseScreenCaptureOptions = {}) {
         if (window.ImageCapture && typeof ImageCapture.prototype.grabFrame === "function") {
           try {
             const imageCapture = new ImageCapture(videoTrack)
-            const imageBitmap = await withTimeout(imageCapture.grabFrame(), FRAME_TIMEOUT_MS, "grabFrame")
+            const imageBitmap = (await withTimeout(
+              imageCapture.grabFrame(),
+              FRAME_TIMEOUT_MS,
+              "grabFrame",
+            )) as ImageBitmap
             const canvas = document.createElement("canvas")
             canvas.width = imageBitmap.width
             canvas.height = imageBitmap.height
