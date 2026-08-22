@@ -52,9 +52,10 @@ CREATE TABLE public.work_logs (
   category TEXT NOT NULL CHECK (category IN ('productive', 'distracted', 'neutral')),
   details TEXT,
   screenshot_url TEXT,
-  confidence DECIMAL(3,2),
+  confidence INTEGER,
   applications TEXT[] DEFAULT '{}',
   focus_score INTEGER,
+  work_category TEXT,
   distraction_check JSONB,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -64,10 +65,10 @@ CREATE TABLE public.user_settings (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id UUID REFERENCES public.users(id) ON DELETE CASCADE UNIQUE,
   gemini_api_key TEXT,
-  gemini_model TEXT DEFAULT 'gemini-2.5-flash-lite',
+  gemini_model TEXT DEFAULT 'gemini-3.5-flash-lite',
   toggl_api_token TEXT,
   toggl_workspace_id TEXT,
-  capture_interval INTEGER DEFAULT 30,
+  capture_interval INTEGER DEFAULT 60,
   auto_sync_toggl BOOLEAN DEFAULT false,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()

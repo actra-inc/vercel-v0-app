@@ -1,3 +1,8 @@
+-- ⚠️ 非推奨（2026-08-22）: このスクリプトは現行コードと非互換の旧スキーマです。
+-- 実行すると work_logs が別構造（ai_analysis/confidence_score等）で作成され、
+-- アプリの保存処理が全て失敗します。新規構築には supabase-schema-final.sql を、
+-- 既存環境の是正には align-schema-with-code.sql を使ってください。
+
 -- 作業ログを保存するテーブルを作成
 CREATE TABLE IF NOT EXISTS work_logs (
   id SERIAL PRIMARY KEY,

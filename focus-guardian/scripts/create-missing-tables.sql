@@ -1,3 +1,8 @@
+-- ⚠️ 非推奨（2026-08-22）: このスクリプトは現行コードと非互換の旧スキーマです。
+-- 実行すると work_logs が別構造（ai_analysis/confidence_score等）で作成され、
+-- アプリの保存処理が全て失敗します。新規構築には supabase-schema-final.sql を、
+-- 既存環境の是正には align-schema-with-code.sql を使ってください。
+
 -- Create users table if not exists
 CREATE TABLE IF NOT EXISTS users (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -50,7 +55,7 @@ CREATE TABLE IF NOT EXISTS work_logs (
 CREATE TABLE IF NOT EXISTS user_settings (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES users(id) ON DELETE CASCADE UNIQUE,
-  capture_interval INTEGER DEFAULT 30, -- seconds
+  capture_interval INTEGER DEFAULT 60, -- seconds
   ai_analysis_enabled BOOLEAN DEFAULT true,
   notification_enabled BOOLEAN DEFAULT true,
   privacy_mode BOOLEAN DEFAULT false,
