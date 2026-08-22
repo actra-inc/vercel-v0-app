@@ -205,6 +205,8 @@ export function WorkLogPanel({
         formData.append("apiKey", apiKey)
         formData.append("currentTask", currentTask || t('wlp_working'))
         formData.append("categories", JSON.stringify(categories))
+        // 設定画面で選んだ解析モデルをサーバーに渡す（未設定ならサーバー既定）
+        if (model) formData.append("model", model)
 
         console.log("[v0] Sending image to /api/analyze-screenshot")
 

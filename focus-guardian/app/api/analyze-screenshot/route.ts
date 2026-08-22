@@ -2,7 +2,12 @@ import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import { type NextRequest, NextResponse } from "next/server"
 
-const GEMINI_MODEL = "gemini-3.5-flash-lite"
+// クライアントが model を指定しなかった場合のフォールバック既定モデル
+const DEFAULT_ANALYSIS_MODEL = "gemini-3.5-flash-lite"
+
+// URLのパス断片に埋め込むため、モデルIDとして妥当な文字列だけを通す
+const isValidModelId = (m: unknown): m is string =>
+  typeof m === "string" && /^[a-zA-Z0-9._-]+$/.test(m)
 // 合計試行回数（初回 + リトライ1回）。旧名 MAX_RETRIES は「リトライ回数」と紛らわしかった
 const MAX_ATTEMPTS = 2
 // 429リトライで待つ最大秒数。これを超える待ちはサーバー側で抱え込まず即座に返す
@@ -97,6 +102,9 @@ export async function POST(request: NextRequest) {
     const apiKey = formData.get("apiKey") as string
     const currentTask = formData.get("currentTask") as string
     const categoriesJson = formData.get("categories") as string
+    // 設定画面で選んだ解析モデル（未指定・不正値は既定にフォールバック）
+    const modelParam = formData.get("model")
+    const analysisModel = isValidModelId(modelParam) ? modelParam : DEFAULT_ANALYSIS_MODEL
     const DEFAULT_CATEGORY_NAMES = ["メールチェック", "娯楽", "チャット", "リサーチ", "ミーティング", "業務以外のSNS", "未分類"]
     let categories: string[] = DEFAULT_CATEGORY_NAMES
     if (categoriesJson) {
@@ -123,7 +131,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "API key is required" }, { status: 400 })
     }
 
-    const analysisUrl = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`
+    const analysisUrl = `https://generativelanguage.googleapis.com/v1beta/models/${analysisModel}:generateContent?key=${apiKey}`
 
     const categoriesList = categories.join("、")
     const analysisPrompt = `あなたは作業効率モニタリングシステムです。このスクリーンショットを分析し、ユーザーが何をしているかを判定してください。
