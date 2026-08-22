@@ -150,6 +150,7 @@ export function SettingsPanel({
                 model={model}
                 onApiKeyChange={onApiKeyChange}
                 onModelChange={onModelChange}
+                captureInterval={captureInterval}
               />
             </TabsContent>
 
