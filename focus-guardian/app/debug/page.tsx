@@ -13,7 +13,21 @@ import {
   generateCorrectUrls,
 } from "@/lib/debug-utils"
 
+// デバッグページは本番では公開しない（環境変数の一覧表示や
+// localStorage全消去ボタンを含むため）。フックを持つ本体より前で
+// 分岐するとRules of Hooksに反するため、ラッパーで出し分ける
 export default function DebugPage() {
+  if (process.env.NODE_ENV === "production") {
+    return (
+      <div className="flex min-h-screen items-center justify-center text-gray-500">
+        Not available in production
+      </div>
+    )
+  }
+  return <DebugPageInner />
+}
+
+function DebugPageInner() {
   const [envInfo, setEnvInfo] = useState(null)
   const [supabaseTest, setSupabaseTest] = useState(null)
   const [urlValidation, setUrlValidation] = useState(null)

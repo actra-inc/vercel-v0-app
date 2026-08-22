@@ -164,7 +164,9 @@ export const getUserSettings = async (userId: string) => {
 }
 
 export const updateUserSettings = async (userId: string, settings: Partial<UserSettings>) => {
-  console.log("💾 updateUserSettings called with:", { userId, settings })
+  // 注意: settings には gemini_api_key / toggl_api_token が含まれるため
+  // 値そのものはログに出さない（ブラウザコンソールへの平文露出を防ぐ）
+  console.log("💾 updateUserSettings called with keys:", { userId, keys: Object.keys(settings) })
 
   try {
     // まず既存の設定を取得
@@ -174,7 +176,7 @@ export const updateUserSettings = async (userId: string, settings: Partial<UserS
       .eq("user_id", userId)
       .maybeSingle()
 
-    console.log("📊 Existing settings:", { existingSettings, fetchError })
+    console.log("📊 Existing settings row:", { exists: !!existingSettings, fetchError })
 
     if (fetchError) {
       console.error("❌ Error fetching existing settings:", fetchError)
@@ -188,7 +190,7 @@ export const updateUserSettings = async (userId: string, settings: Partial<UserS
       updated_at: new Date().toISOString(),
     }
 
-    console.log("📤 Update data:", updateData)
+    console.log("📤 Update keys:", Object.keys(updateData))
 
     // 既存レコードが存在する場合は更新、存在しない場合は挿入
     if (existingSettings) {
@@ -206,7 +208,7 @@ export const updateUserSettings = async (userId: string, settings: Partial<UserS
         return { data: null, error: error.message }
       }
 
-      console.log("✅ Settings updated successfully:", data)
+      console.log("✅ Settings updated successfully")
       return { data, error: null }
     } else {
       // 新規レコードを挿入

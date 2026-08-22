@@ -2,6 +2,11 @@ import { NextResponse } from "next/server"
 import { supabase } from "@/lib/supabase"
 
 export async function GET() {
+  // デバッグ用エンドポイントは本番では公開しない
+  if (process.env.NODE_ENV === "production") {
+    return NextResponse.json({ error: "Not found" }, { status: 404 })
+  }
+
   try {
     // Test basic connection
     const { data: authData, error: authError } = await supabase.auth.getSession()
