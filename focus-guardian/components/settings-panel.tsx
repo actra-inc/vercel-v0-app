@@ -155,7 +155,11 @@ export function SettingsPanel({
             </TabsContent>
 
             <TabsContent value="toggl" className="mt-6">
-              <TogglSettings />
+              <TogglSettings
+                savedApiToken={togglApiToken}
+                savedWorkspaceId={togglWorkspaceId}
+                onCredentialsChange={onTogglCredentialsChange}
+              />
             </TabsContent>
 
             <TabsContent value="projects" className="mt-6">

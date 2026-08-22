@@ -35,11 +35,23 @@ interface TogglEntry {
   debug?: any
 }
 
-export function TogglSettings() {
+interface TogglSettingsProps {
+  /** DB(user_settings)に保存済みの値 */
+  savedApiToken?: string
+  savedWorkspaceId?: string
+  /** 検証済みの資格情報をDBへ保存する（空文字でクリア） */
+  onCredentialsChange?: (token: string, workspaceId: string) => void | Promise<void>
+}
+
+export function TogglSettings({
+  savedApiToken = "",
+  savedWorkspaceId = "",
+  onCredentialsChange,
+}: TogglSettingsProps) {
   const { t, language } = useTranslation()
   const dateLocale = language === "ja" ? "ja-JP" : "en-US"
-  const [apiToken, setApiToken] = useState("")
-  const [workspaceId, setWorkspaceId] = useState("")
+  const [apiToken, setApiToken] = useState(savedApiToken)
+  const [workspaceId, setWorkspaceId] = useState(savedWorkspaceId)
   const [showApiToken, setShowApiToken] = useState(false)
   const [isConfigured, setIsConfigured] = useState(false)
   const [isTestingConnection, setIsTestingConnection] = useState(false)
@@ -49,39 +61,28 @@ export function TogglSettings() {
   const [saveMessage, setSaveMessage] = useState<{ text: string; success: boolean } | null>(null)
   const [showDebugInfo, setShowDebugInfo] = useState(false)
 
-  // Load saved credentials from localStorage (client-side only)
+  // 保存済みの値（DB: user_settings）をフォームへ反映する。
+  // 以前は localStorage 保存でDB経路が死んでおり、端末間で設定が同期されず
+  // トークンがサーバー側で参照できなかった
   useEffect(() => {
-    if (typeof window === "undefined") return
+    setApiToken(savedApiToken)
+    setWorkspaceId(savedWorkspaceId)
+    setIsConfigured(Boolean(savedApiToken && savedWorkspaceId))
+  }, [savedApiToken, savedWorkspaceId])
 
-    try {
-      const savedApiToken = localStorage.getItem("toggl_api_token")
-      const savedWorkspaceId = localStorage.getItem("toggl_workspace_id")
-
-      if (savedApiToken) {
-        setApiToken(savedApiToken)
-        setIsConfigured(true)
-      }
-      if (savedWorkspaceId) {
-        setWorkspaceId(savedWorkspaceId)
-      }
-
-      // Check server configuration as well
-      fetch("/api/toggl/status")
-        .then((res) => {
-          if (!res.ok) throw new Error("Failed to fetch")
-          return res.json()
-        })
-        .then((data) => {
-          if (data.configured && !savedApiToken) {
-            setIsConfigured(true)
-          }
-        })
-        .catch((error) => {
-          console.warn("Failed to check Toggl status:", error)
-        })
-    } catch (error) {
-      console.error("Error loading Toggl credentials:", error)
-    }
+  useEffect(() => {
+    // 環境変数によるサーバー側設定（個人運用モード）の確認
+    fetch("/api/toggl/status")
+      .then((res) => {
+        if (!res.ok) throw new Error("Failed to fetch")
+        return res.json()
+      })
+      .then((data) => {
+        if (data.configured) setIsConfigured(true)
+      })
+      .catch((error) => {
+        console.warn("Failed to check Toggl status:", error)
+      })
   }, [])
 
   const testTogglConnection = async () => {
@@ -90,12 +91,13 @@ export function TogglSettings() {
     setCurrentEntry(null)
 
     try {
-      let url = "/api/toggl-current"
-      if (apiToken && workspaceId) {
-        url += `?apiToken=${encodeURIComponent(apiToken)}&workspaceId=${encodeURIComponent(workspaceId)}`
-      }
-
-      const response = await fetch(url)
+      // 未保存の入力値を検証する場合はPOSTボディで送る
+      // （URLクエリはアクセスログに残るため使わない）
+      const response = await fetch("/api/toggl-current", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(apiToken && workspaceId ? { apiToken, workspaceId } : {}),
+      })
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`)
       }
@@ -139,9 +141,12 @@ export function TogglSettings() {
     setSaveMessage(null)
 
     try {
-      // First, validate the credentials
-      const testUrl = `/api/toggl-current?apiToken=${encodeURIComponent(apiToken)}&workspaceId=${encodeURIComponent(workspaceId)}`
-      const testResponse = await fetch(testUrl)
+      // First, validate the credentials（POSTボディで送りログに残さない）
+      const testResponse = await fetch("/api/toggl-current", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ apiToken, workspaceId }),
+      })
 
       if (!testResponse.ok) {
         throw new Error("Invalid credentials. Please check your API Token and Workspace ID.")
@@ -152,10 +157,13 @@ export function TogglSettings() {
         throw new Error(testData.error)
       }
 
-      // Save to localStorage
+      // DB(user_settings)へ保存し、端末間で同期されるようにする
+      await onCredentialsChange?.(apiToken, workspaceId)
+
+      // 旧仕様のlocalStorage保存が残っていれば掃除する
       if (typeof window !== "undefined") {
-        localStorage.setItem("toggl_api_token", apiToken)
-        localStorage.setItem("toggl_workspace_id", workspaceId)
+        localStorage.removeItem("toggl_api_token")
+        localStorage.removeItem("toggl_workspace_id")
       }
 
       setIsConfigured(true)
@@ -174,7 +182,7 @@ export function TogglSettings() {
     }
   }
 
-  const handleClearCredentials = () => {
+  const handleClearCredentials = async () => {
     try {
       setApiToken("")
       setWorkspaceId("")
@@ -182,6 +190,8 @@ export function TogglSettings() {
       setCurrentEntry(null)
       setConnectionError(null)
       setSaveMessage(null)
+
+      await onCredentialsChange?.("", "")
 
       if (typeof window !== "undefined") {
         localStorage.removeItem("toggl_api_token")

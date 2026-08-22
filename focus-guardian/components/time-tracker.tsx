@@ -156,7 +156,8 @@ export function TimeTracker({
     setTogglLoading(true)
     setTogglError(null)
     try {
-      const res = await fetch(`/api/toggl-current?apiToken=${encodeURIComponent(togglApiToken)}&workspaceId=${encodeURIComponent(togglWorkspaceId)}`)
+      // 資格情報はサーバー側でuser_settingsから解決される（URLに載せない）
+      const res = await fetch("/api/toggl-current")
       const data = await res.json()
       if (!res.ok || data.error) {
         setTogglError(data.error || t('tt_togglError'))

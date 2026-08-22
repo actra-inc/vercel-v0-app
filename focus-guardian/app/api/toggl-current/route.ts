@@ -60,42 +60,76 @@ async function getProjects(apiToken: string, workspaceId: string): Promise<Recor
   }
 }
 
-export async function GET(request: Request) {
-  try {
-    // ログイン済みユーザーのみ許可（他のAPIルートと同じガード。
-    // 環境変数フォールバックがあるため、未認証だと第三者がオーナーの
-    // Toggl作業記録・プロジェクト一覧を取得できてしまう）
-    const cookieStore = await cookies()
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          getAll() {
-            return cookieStore.getAll()
-          },
-          setAll(cookiesToSet) {
-            try {
-              cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options))
-            } catch {
-              // Server Componentからの書き込みエラーは無視
-            }
-          },
+async function getAuthenticatedUser() {
+  const cookieStore = await cookies()
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll()
+        },
+        setAll(cookiesToSet) {
+          try {
+            cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options))
+          } catch {
+            // Server Componentからの書き込みエラーは無視
+          }
         },
       },
-    )
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized: ログインが必要です" }, { status: 401 })
-    }
+    },
+  )
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  return { user, supabase }
+}
 
-    // Get API token and workspace ID from query parameters or environment variables
-    const { searchParams } = new URL(request.url)
-    const apiToken = searchParams.get("apiToken") || process.env.TOGGL_API_TOKEN
-    const workspaceId = searchParams.get("workspaceId") || process.env.TOGGL_WORKSPACE_ID
+// トークンをクライアントから受け取らず、ログイン中ユーザーの user_settings から
+// サーバー側で解決する。以前はGETクエリでトークンを送っており、Vercelの
+// アクセスログに全権トークンが平文で残り続けていた
+async function resolveCredentials(supabase: ReturnType<typeof createServerClient>, userId: string) {
+  const { data } = await supabase
+    .from("user_settings")
+    .select("toggl_api_token, toggl_workspace_id")
+    .eq("user_id", userId)
+    .maybeSingle()
+  const apiToken = data?.toggl_api_token || process.env.TOGGL_API_TOKEN
+  const workspaceId = data?.toggl_workspace_id || process.env.TOGGL_WORKSPACE_ID
+  return { apiToken, workspaceId }
+}
 
+// 現在のTogglエントリを取得（GET: 保存済み資格情報を使用）
+export async function GET() {
+  const { user, supabase } = await getAuthenticatedUser()
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized: ログインが必要です" }, { status: 401 })
+  }
+  const { apiToken, workspaceId } = await resolveCredentials(supabase, user.id)
+  return fetchTogglEntry(apiToken, workspaceId)
+}
+
+// 接続テスト用（POST: 保存前の資格情報をボディで受け取って検証する。
+// ボディはURLと違いアクセスログに残らない）
+export async function POST(request: Request) {
+  const { user, supabase } = await getAuthenticatedUser()
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized: ログインが必要です" }, { status: 401 })
+  }
+  const body = await request.json().catch(() => ({}))
+  let apiToken: string | undefined = typeof body.apiToken === "string" ? body.apiToken : undefined
+  let workspaceId: string | undefined = typeof body.workspaceId === "string" ? body.workspaceId : undefined
+  if (!apiToken || !workspaceId) {
+    const resolved = await resolveCredentials(supabase, user.id)
+    apiToken = apiToken || resolved.apiToken
+    workspaceId = workspaceId || resolved.workspaceId
+  }
+  return fetchTogglEntry(apiToken, workspaceId)
+}
+
+async function fetchTogglEntry(apiToken: string | undefined, workspaceId: string | undefined) {
+  try {
     if (!apiToken || !workspaceId) {
       return NextResponse.json(
         {

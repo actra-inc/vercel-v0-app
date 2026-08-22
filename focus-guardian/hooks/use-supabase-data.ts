@@ -68,18 +68,45 @@ export function useSupabaseData() {
           console.warn("Error loading settings:", settingsError)
         }
 
+        // 旧仕様でlocalStorageに保存されたToggl資格情報を一度だけDBへ移行する
+        // （DB保存に一本化: サーバー側でトークンを解決できるようにし、
+        //   端末間でも設定が同期されるようにする）
+        const legacyTogglToken =
+          typeof window !== "undefined" ? localStorage.getItem("toggl_api_token") || "" : ""
+        const legacyTogglWorkspace =
+          typeof window !== "undefined" ? localStorage.getItem("toggl_workspace_id") || "" : ""
+
         if (settings) {
-          setUserSettings(settings)
+          if (legacyTogglToken && legacyTogglWorkspace && !settings.toggl_api_token) {
+            const { data: migrated } = await updateUserSettings(currentUser.id, {
+              toggl_api_token: legacyTogglToken,
+              toggl_workspace_id: legacyTogglWorkspace,
+            })
+            setUserSettings(migrated || settings)
+            localStorage.removeItem("toggl_api_token")
+            localStorage.removeItem("toggl_workspace_id")
+            console.log("🔁 Migrated Toggl credentials from localStorage to user_settings")
+          } else {
+            setUserSettings(settings)
+          }
         } else {
           // Create default settings if none exist
           const defaultSettings = {
             gemini_model: "gemini-3.5-flash-lite",
             capture_interval: DEFAULT_CAPTURE_INTERVAL_SECONDS,
             auto_sync_toggl: false,
+            // 旧localStorage保存があれば初期作成時に取り込む
+            ...(legacyTogglToken && legacyTogglWorkspace
+              ? { toggl_api_token: legacyTogglToken, toggl_workspace_id: legacyTogglWorkspace }
+              : {}),
           }
           const { data: newSettings } = await updateUserSettings(currentUser.id, defaultSettings)
           if (newSettings) {
             setUserSettings(newSettings)
+            if (legacyTogglToken && legacyTogglWorkspace) {
+              localStorage.removeItem("toggl_api_token")
+              localStorage.removeItem("toggl_workspace_id")
+            }
           }
         }
       } catch (err) {
@@ -150,7 +177,7 @@ export function useSupabaseData() {
       throw new Error("User not authenticated")
     }
 
-    console.log("🔄 updateSettings called with:", settings)
+    console.log("🔄 updateSettings called with keys:", Object.keys(settings))
 
     try {
       const { data, error } = await updateUserSettings(user.id, settings)

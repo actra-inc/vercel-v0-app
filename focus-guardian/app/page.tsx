@@ -36,8 +36,8 @@ const Page = () => {
     setCurrentTab("settings")
   }, [])
   const screenSessionStartRef = useRef<{ time: Date; task: string } | null>(null)
-  const togglApiToken = typeof window !== "undefined" ? localStorage.getItem("toggl_api_token") || "" : ""
-  const togglWorkspaceId = typeof window !== "undefined" ? localStorage.getItem("toggl_workspace_id") || "" : ""
+  // Toggl資格情報はuser_settings（DB）が正。旧localStorage保存は
+  // use-supabase-data側で一度だけDBへ移行される
   const [categories, setCategories] = useState<ActivityCategory[]>(() => {
     if (typeof window === "undefined") return DEFAULT_CATEGORIES
     try {
@@ -550,8 +550,8 @@ const Page = () => {
                   onCurrentTaskChange={setCurrentTask}
                   timeEntries={timeEntries}
                   screenSessions={screenSessions}
-                  togglApiToken={togglApiToken}
-                  togglWorkspaceId={togglWorkspaceId}
+                  togglApiToken={userSettings?.toggl_api_token || ""}
+                  togglWorkspaceId={userSettings?.toggl_workspace_id || ""}
                   onOpenTogglSettings={() => openSettings("toggl")}
                 />
               </div>
