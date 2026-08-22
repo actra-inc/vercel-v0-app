@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server"
+import { createServerClient } from "@supabase/ssr"
+import { cookies } from "next/headers"
 
-export const runtime = "edge"
+// 認証チェックに @supabase/ssr + cookies() を使うため Node.js ランタイムで実行する
+// （以前は edge だったが、無認証で誰でも叩けるうえ環境変数のTogglトークンに
+//   フォールバックするため、オーナーの作業記録が第三者へ漏れる穴になっていた）
 
 // ワークスペースごとにキャッシュする（単一の共有キャッシュだと
 // 複数ユーザー利用時に他ユーザーのプロジェクト名が返ってしまう）
@@ -58,6 +62,35 @@ async function getProjects(apiToken: string, workspaceId: string): Promise<Recor
 
 export async function GET(request: Request) {
   try {
+    // ログイン済みユーザーのみ許可（他のAPIルートと同じガード。
+    // 環境変数フォールバックがあるため、未認証だと第三者がオーナーの
+    // Toggl作業記録・プロジェクト一覧を取得できてしまう）
+    const cookieStore = await cookies()
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() {
+            return cookieStore.getAll()
+          },
+          setAll(cookiesToSet) {
+            try {
+              cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options))
+            } catch {
+              // Server Componentからの書き込みエラーは無視
+            }
+          },
+        },
+      },
+    )
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized: ログインが必要です" }, { status: 401 })
+    }
+
     // Get API token and workspace ID from query parameters or environment variables
     const { searchParams } = new URL(request.url)
     const apiToken = searchParams.get("apiToken") || process.env.TOGGL_API_TOKEN
@@ -67,14 +100,9 @@ export async function GET(request: Request) {
       return NextResponse.json(
         {
           error: "Toggl integration not configured.",
-          debug: {
-            hasApiToken: !!apiToken,
-            hasWorkspaceId: !!workspaceId,
-            envToken: !!process.env.TOGGL_API_TOKEN,
-            envWorkspace: !!process.env.TOGGL_WORKSPACE_ID,
-          },
+          debug: { hasApiToken: !!apiToken, hasWorkspaceId: !!workspaceId },
         },
-        { status: 500 },
+        { status: 400 },
       )
     }
 
@@ -92,23 +120,17 @@ export async function GET(request: Request) {
     if (!currentRes.ok) {
       const errorText = await currentRes.text()
       console.error(`Toggl current entry API responded with status ${currentRes.status}:`, errorText)
+      // トークン断片や生レスポンスはクライアントへ返さない（ログにのみ残す）
       return NextResponse.json(
         {
           error: `Toggl API responded with status ${currentRes.status}`,
-          debug: {
-            status: currentRes.status,
-            statusText: currentRes.statusText,
-            response: errorText,
-            apiToken: apiToken ? `${apiToken.substring(0, 8)}...` : null,
-            workspaceId,
-          },
+          debug: { status: currentRes.status, statusText: currentRes.statusText },
         },
-        { status: 500 },
+        { status: 502 },
       )
     }
 
     const currentData = await currentRes.json()
-    console.log("Toggl current entry response:", JSON.stringify(currentData, null, 2))
 
     // If no current entry, try to get the most recent entry
     let entryData = null
@@ -127,7 +149,6 @@ export async function GET(request: Request) {
 
       if (recentRes.ok) {
         const recentEntries = await recentRes.json()
-        console.log("Recent entries:", JSON.stringify(recentEntries, null, 2))
 
         if (Array.isArray(recentEntries) && recentEntries.length > 0) {
           // Get the most recent entry
@@ -145,11 +166,7 @@ export async function GET(request: Request) {
         project: null,
         description: null,
         start: null,
-        debug: {
-          message: "No current or recent time entries found",
-          currentResponse: currentData,
-          hasCurrentEntry: !!currentData?.id,
-        },
+        debug: { message: "No current or recent time entries found" },
       })
     }
 
@@ -171,37 +188,22 @@ export async function GET(request: Request) {
         entryData.duration < 0
           ? Math.floor((Date.now() - new Date(entryData.start).getTime()) / 1000)
           : Math.abs(entryData.duration),
-      debug: {
-        rawEntry: entryData,
-        availableProjects: projects,
-        projectLookup: {
-          project_id: entryData.project_id,
-          found_project: projectName,
-        },
-        entryFields: {
-          id: entryData.id,
-          description: entryData.description,
-          start: entryData.start,
-          duration: entryData.duration,
-          project_id: entryData.project_id,
-          workspace_id: entryData.workspace_id,
-          tags: entryData.tags,
-        },
-      },
+      // 生エントリ・全プロジェクト名などの詳細は開発時のみ返す
+      debug:
+        process.env.NODE_ENV === "development"
+          ? {
+              rawEntry: entryData,
+              availableProjects: projects,
+              projectLookup: { project_id: entryData.project_id, found_project: projectName },
+            }
+          : undefined,
     }
 
-    console.log("Final response:", JSON.stringify(responseData, null, 2))
     return NextResponse.json(responseData)
   } catch (e: any) {
     console.error("Toggl API error:", e)
     return NextResponse.json(
-      {
-        error: "Toggl API error",
-        debug: {
-          errorMessage: e.message,
-          errorStack: e.stack,
-        },
-      },
+      { error: "Toggl API error", debug: { errorMessage: e.message } },
       { status: 500 },
     )
   }
