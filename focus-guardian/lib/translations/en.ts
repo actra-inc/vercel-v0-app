@@ -231,6 +231,8 @@ export const en: Record<TranslationKey, string> = {
   tg_showDebug: 'Show Debug',
   tg_hideDebug: 'Hide Debug',
   tg_connectionError: 'Connection error:',
+  tg_description: 'Connect your Toggl account to automatically track your current task. The API token and workspace ID are stored in your account settings (database) and synced across devices.',
+  tg_clearFailed: 'Failed to clear the settings. Check your connection and try again.',
   tg_saveMissingColumn: 'Could not save. The database may be missing columns. Run scripts/align-schema-with-code.sql in Supabase, then save again.',
   tg_currentEntry: '📊 Current Toggl Entry:',
   tg_project: 'Project:',

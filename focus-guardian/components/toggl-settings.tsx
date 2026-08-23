@@ -188,6 +188,10 @@ export function TogglSettings({
 
   const handleClearCredentials = async () => {
     try {
+      // 先にDBをクリアする。UIを先に空にすると、DB更新失敗時に
+      // 「クリアできたように見えてトークンが生き続ける」無言の不整合になる
+      await onCredentialsChange?.("", "")
+
       setApiToken("")
       setWorkspaceId("")
       setIsConfigured(false)
@@ -195,14 +199,13 @@ export function TogglSettings({
       setConnectionError(null)
       setSaveMessage(null)
 
-      await onCredentialsChange?.("", "")
-
       if (typeof window !== "undefined") {
         localStorage.removeItem("toggl_api_token")
         localStorage.removeItem("toggl_workspace_id")
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error clearing credentials:", error)
+      setSaveMessage({ text: t('tg_clearFailed'), success: false })
     }
   }
 
@@ -317,10 +320,7 @@ export function TogglSettings({
           <Settings className="h-5 w-5" />
           Integrations → Toggl
         </CardTitle>
-        <CardDescription>
-          Connect your Toggl account to automatically track your current task. The API Token and Workspace ID will be
-          stored locally in your browser.
-        </CardDescription>
+        <CardDescription>{t('tg_description')}</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSaveCredentials} className="space-y-4">

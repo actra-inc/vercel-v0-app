@@ -83,9 +83,17 @@ export function useSupabaseData() {
               toggl_workspace_id: legacyTogglWorkspace,
             })
             setUserSettings(migrated || settings)
-            localStorage.removeItem("toggl_api_token")
-            localStorage.removeItem("toggl_workspace_id")
-            console.log("🔁 Migrated Toggl credentials from localStorage to user_settings")
+            // 重要: DB書き込みが成功した場合のみlocalStorageを消す。
+            // 失敗時（DBに列が無い等）に消すと、資格情報の最後のコピーを
+            // 破壊してしまい「保存したのに消えた」が確定してしまう。
+            // 失敗時は残しておけば次回ロードで移行を再試行できる
+            if (migrated) {
+              localStorage.removeItem("toggl_api_token")
+              localStorage.removeItem("toggl_workspace_id")
+              console.log("🔁 Migrated Toggl credentials from localStorage to user_settings")
+            } else {
+              console.warn("⚠️ Toggl credential migration to DB failed; keeping localStorage copy for retry")
+            }
           } else {
             setUserSettings(settings)
           }

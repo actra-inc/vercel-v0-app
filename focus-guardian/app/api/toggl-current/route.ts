@@ -89,12 +89,22 @@ async function getAuthenticatedUser() {
 // トークンをクライアントから受け取らず、ログイン中ユーザーの user_settings から
 // サーバー側で解決する。以前はGETクエリでトークンを送っており、Vercelの
 // アクセスログに全権トークンが平文で残り続けていた
-async function resolveCredentials(supabase: ReturnType<typeof createServerClient>, userId: string) {
-  const { data } = await supabase
+async function resolveCredentials(
+  supabase: ReturnType<typeof createServerClient>,
+  userId: string,
+): Promise<{ apiToken?: string; workspaceId?: string; queryFailed?: boolean }> {
+  const { data, error } = await supabase
     .from("user_settings")
     .select("toggl_api_token, toggl_workspace_id")
     .eq("user_id", userId)
     .maybeSingle()
+  // SELECT失敗（列欠落・一時障害）を「未設定」と混同しない。
+  // ここでenvへフォールバックすると、本人の保存値があるのに
+  // オーナーのトークンで取得する誤動作や「未設定」誤診につながる
+  if (error) {
+    console.error("Failed to read Toggl credentials from user_settings:", error.message)
+    return { queryFailed: true }
+  }
   const apiToken = data?.toggl_api_token || process.env.TOGGL_API_TOKEN
   const workspaceId = data?.toggl_workspace_id || process.env.TOGGL_WORKSPACE_ID
   return { apiToken, workspaceId }
@@ -106,8 +116,11 @@ export async function GET() {
   if (!user) {
     return NextResponse.json({ error: "Unauthorized: ログインが必要です" }, { status: 401 })
   }
-  const { apiToken, workspaceId } = await resolveCredentials(supabase, user.id)
-  return fetchTogglEntry(apiToken, workspaceId)
+  const creds = await resolveCredentials(supabase, user.id)
+  if (creds.queryFailed) {
+    return NextResponse.json({ error: "Failed to load Toggl settings. Please retry." }, { status: 503 })
+  }
+  return fetchTogglEntry(creds.apiToken, creds.workspaceId)
 }
 
 // 接続テスト用（POST: 保存前の資格情報をボディで受け取って検証する。
@@ -122,6 +135,9 @@ export async function POST(request: Request) {
   let workspaceId: string | undefined = typeof body.workspaceId === "string" ? body.workspaceId : undefined
   if (!apiToken || !workspaceId) {
     const resolved = await resolveCredentials(supabase, user.id)
+    if (resolved.queryFailed) {
+      return NextResponse.json({ error: "Failed to load Toggl settings. Please retry." }, { status: 503 })
+    }
     apiToken = apiToken || resolved.apiToken
     workspaceId = workspaceId || resolved.workspaceId
   }

@@ -229,6 +229,8 @@ export const ja = {
   tg_showDebug: 'Debug表示',
   tg_hideDebug: 'Debug非表示',
   tg_connectionError: '接続エラー:',
+  tg_description: 'Togglアカウントを連携すると、実行中の作業を自動で取り込めます。APIトークンとワークスペースIDはアカウント設定（データベース）に保存され、端末間で同期されます。',
+  tg_clearFailed: '設定のクリアに失敗しました。通信状態を確認して再試行してください。',
   tg_saveMissingColumn: '保存できませんでした。データベースに列が不足している可能性があります。Supabaseで scripts/align-schema-with-code.sql を実行してから、もう一度保存してください。',
   tg_currentEntry: '📊 現在のTogglエントリ:',
   tg_project: 'プロジェクト:',
