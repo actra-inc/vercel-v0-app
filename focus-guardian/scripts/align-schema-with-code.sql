@@ -25,9 +25,15 @@ ALTER TABLE work_logs
               WHEN focus_score <= 1 THEN ROUND(focus_score * 100)
               ELSE ROUND(focus_score) END)::INTEGER;
 
--- 3. user_settings の既定値をコード側と一致させる（既存行は変更しない）
+-- 3. user_settings の既定値をコード側と一致させる
 ALTER TABLE user_settings ALTER COLUMN gemini_model SET DEFAULT 'gemini-3.5-flash-lite';
-ALTER TABLE user_settings ALTER COLUMN capture_interval SET DEFAULT 60;
+ALTER TABLE user_settings ALTER COLUMN capture_interval SET DEFAULT 30;
+
+-- 3b. 旧バグ由来のキャプチャ間隔180秒を既定の30秒へ是正する。
+--     180はUIの選択肢（30/60/120/300）に存在しない値であり、
+--     旧既定値バグで作成された行にしか現れないため一括更新してよい。
+--     60/120/300はユーザーが選択した可能性があるため変更しない
+UPDATE user_settings SET capture_interval = 30 WHERE capture_interval = 180;
 
 -- 確認用
 SELECT column_name, data_type, column_default

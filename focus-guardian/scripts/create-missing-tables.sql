@@ -55,7 +55,7 @@ CREATE TABLE IF NOT EXISTS work_logs (
 CREATE TABLE IF NOT EXISTS user_settings (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES users(id) ON DELETE CASCADE UNIQUE,
-  capture_interval INTEGER DEFAULT 60, -- seconds
+  capture_interval INTEGER DEFAULT 30, -- seconds
   ai_analysis_enabled BOOLEAN DEFAULT true,
   notification_enabled BOOLEAN DEFAULT true,
   privacy_mode BOOLEAN DEFAULT false,

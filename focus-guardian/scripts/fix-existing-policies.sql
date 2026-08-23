@@ -87,7 +87,7 @@ CREATE TABLE IF NOT EXISTS user_settings (
     gemini_model TEXT DEFAULT 'gemini-3.5-flash-lite',
     toggl_api_token TEXT,
     toggl_workspace_id TEXT,
-    capture_interval INTEGER DEFAULT 60,
+    capture_interval INTEGER DEFAULT 30,
     auto_sync_toggl BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()

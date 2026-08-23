@@ -2,8 +2,9 @@
 
 // 画面キャプチャ間隔の既定値（秒）。
 // 新規ユーザー作成時（use-supabase-data）と設定未取得時のフォールバック（page.tsx）の
-// 両方から参照する。以前は 180 と 60 で食い違っていた
-export const DEFAULT_CAPTURE_INTERVAL_SECONDS = 60
+// 両方から参照する。2026-08-23 のユーザー判断で 30 秒に統一
+// （経緯: 旧バグで 180、その後 60、検証の結果 30 が採用）
+export const DEFAULT_CAPTURE_INTERVAL_SECONDS = 30
 
 export const config = {
   supabase: {
