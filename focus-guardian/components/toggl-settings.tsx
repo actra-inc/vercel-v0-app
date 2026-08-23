@@ -173,8 +173,12 @@ export function TogglSettings({
       })
     } catch (error: any) {
       console.error("Error saving credentials:", error)
+      // DBに列が無い環境（旧スクリプトで構築）ではSupabaseがPGRST204等を返す。
+      // 英語の生エラーだけでは対処不能なので、マイグレーションSQLの実行を案内する
+      const msg = String(error?.message ?? "")
+      const isMissingColumn = /column|PGRST204|schema/i.test(msg)
       setSaveMessage({
-        text: error.message || "Failed to validate credentials.",
+        text: isMissingColumn ? t('tg_saveMissingColumn') : msg || "Failed to validate credentials.",
         success: false,
       })
     } finally {

@@ -229,6 +229,7 @@ export const ja = {
   tg_showDebug: 'Debug表示',
   tg_hideDebug: 'Debug非表示',
   tg_connectionError: '接続エラー:',
+  tg_saveMissingColumn: '保存できませんでした。データベースに列が不足している可能性があります。Supabaseで scripts/align-schema-with-code.sql を実行してから、もう一度保存してください。',
   tg_currentEntry: '📊 現在のTogglエントリ:',
   tg_project: 'プロジェクト:',
   tg_notSet: '未設定',

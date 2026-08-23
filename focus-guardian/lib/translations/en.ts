@@ -231,6 +231,7 @@ export const en: Record<TranslationKey, string> = {
   tg_showDebug: 'Show Debug',
   tg_hideDebug: 'Hide Debug',
   tg_connectionError: 'Connection error:',
+  tg_saveMissingColumn: 'Could not save. The database may be missing columns. Run scripts/align-schema-with-code.sql in Supabase, then save again.',
   tg_currentEntry: '📊 Current Toggl Entry:',
   tg_project: 'Project:',
   tg_notSet: 'Not set',

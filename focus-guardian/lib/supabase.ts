@@ -220,7 +220,7 @@ export const updateUserSettings = async (userId: string, settings: Partial<UserS
         return { data: null, error: error.message }
       }
 
-      console.log("✅ Settings inserted successfully:", data)
+      console.log("✅ Settings inserted successfully")
       return { data, error: null }
     }
   } catch (error) {

@@ -187,7 +187,7 @@ export function useSupabaseData() {
         throw new Error(error)
       }
 
-      console.log("✅ Settings updated successfully:", data)
+      console.log("✅ Settings updated successfully")
 
       if (data) {
         setUserSettings(data)

@@ -25,6 +25,17 @@ ALTER TABLE work_logs
               WHEN focus_score <= 1 THEN ROUND(focus_score * 100)
               ELSE ROUND(focus_score) END)::INTEGER;
 
+-- 2b. user_settings にコードが読み書きする列を冪等に補完する。
+--     本番DBが旧スクリプトで構築されている場合、toggl_api_token 等の列が
+--     存在せず、Toggl設定の保存が PGRST204（column not found）で失敗して
+--     「保存したのに毎回消える」症状になる（Geminiキーは列があるため保存できる）
+ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS toggl_api_token TEXT;
+ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS toggl_workspace_id TEXT;
+ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS gemini_api_key TEXT;
+ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS gemini_model TEXT DEFAULT 'gemini-3.5-flash-lite';
+ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS capture_interval INTEGER DEFAULT 30;
+ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS auto_sync_toggl BOOLEAN DEFAULT false;
+
 -- 3. user_settings の既定値をコード側と一致させる
 ALTER TABLE user_settings ALTER COLUMN gemini_model SET DEFAULT 'gemini-3.5-flash-lite';
 ALTER TABLE user_settings ALTER COLUMN capture_interval SET DEFAULT 30;
@@ -39,5 +50,6 @@ UPDATE user_settings SET capture_interval = 30 WHERE capture_interval = 180;
 SELECT column_name, data_type, column_default
 FROM information_schema.columns
 WHERE table_name IN ('work_logs', 'user_settings')
-  AND column_name IN ('work_category', 'confidence', 'focus_score', 'gemini_model', 'capture_interval')
+  AND column_name IN ('work_category', 'confidence', 'focus_score', 'gemini_model', 'capture_interval',
+                      'toggl_api_token', 'toggl_workspace_id', 'gemini_api_key', 'auto_sync_toggl')
 ORDER BY table_name, column_name;
