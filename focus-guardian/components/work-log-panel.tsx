@@ -78,7 +78,7 @@ export function WorkLogPanel({
   clearWorkLogs,
   onTrackingChange,
 }: WorkLogPanelProps) {
-  const { t } = useTranslation()
+  const { t, language } = useTranslation()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [isApiKeyValid, setIsApiKeyValid] = useState(false)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
@@ -88,6 +88,9 @@ export function WorkLogPanel({
   // 次ティックから並行実行されて重複ログ・基準画像のレースが起きるのを防ぐ。
   // isAnalyzing state はUI表示用で、非同期更新のためガードには使えない）
   const analyzingRef = useRef(false)
+  // 429（quota超過）後のクールダウン期限。期限内は解析APIを呼ばない
+  // （枯渇したAPIを30秒ごとに叩き続ける無駄打ちを防ぐ）
+  const cooldownUntilRef = useRef(0)
   // 差分スキップの可視化と強制解析（静的画面で解析が無音停止して見える問題への対応）
   const consecutiveSkipsRef = useRef(0)
   const [skipStreak, setSkipStreak] = useState(0)
@@ -198,6 +201,12 @@ export function WorkLogPanel({
         return
       }
 
+      // 429クールダウン中は解析を呼ばない（手動アップロードは意図的な操作なのでバイパス）
+      if (!opts?.force && Date.now() < cooldownUntilRef.current) {
+        console.log("[v0] In quota cooldown, skipping analysis until", new Date(cooldownUntilRef.current).toISOString())
+        return
+      }
+
       // 再入ガード: 前回の解析が終わるまで次のキャプチャは捨てる
       if (analyzingRef.current) {
         console.log("[v0] Analysis already in progress, skipping this capture")
@@ -257,15 +266,20 @@ export function WorkLogPanel({
           console.error("[v0] API error response:", errorData)
 
           if (errorData.error === "quota_exceeded") {
-            // alert()はメインスレッドをブロックし、閉じるまで定期キャプチャごと
-            // 止まってしまうため使わない（「数回の解析で止まる」の主因だった）。
-            // サーバーが返す retryAfter（例: "27s"）があれば再開の目安を出す。
+            // alert()はメインスレッドをブロックするため使わない。
+            // クールダウンを設定して期限まで解析APIを呼ばない:
+            //  - retryAfter（例: "27s"）あり = 分単位の一時制限 → その秒数（下限60秒）
+            //  - なし = 日次上限（RPD）の可能性が高い → 15分待って再確認
             const delayMatch = /^(\d+)/.exec(String(errorData.retryAfter ?? ""))
-            setLastAnalysisError(
-              delayMatch
-                ? t('wlp_errQuotaWithDelay', { seconds: delayMatch[1] })
-                : t('wlp_errQuotaNoDelay'),
+            const cooldownMs = delayMatch
+              ? Math.max(Number(delayMatch[1]), 60) * 1000
+              : 15 * 60 * 1000
+            cooldownUntilRef.current = Date.now() + cooldownMs
+            const resumeAt = new Date(cooldownUntilRef.current).toLocaleTimeString(
+              language === "ja" ? "ja-JP" : "en-US",
+              { hour: "2-digit", minute: "2-digit" },
             )
+            setLastAnalysisError(t('wlp_errQuotaCooldown', { time: resumeAt }))
             return
           }
 
@@ -287,6 +301,7 @@ export function WorkLogPanel({
         }
 
         setLastAnalysisError(null)
+        cooldownUntilRef.current = 0
         const imageUrl = URL.createObjectURL(blob)
 
         const logEntry = {
@@ -304,10 +319,17 @@ export function WorkLogPanel({
 
         console.log("[v0] Adding work log entry:", logEntry)
 
-        await addWorkLog(logEntry)
-        // ログ保存まで成功してから比較ベースを更新する
-        // （保存失敗時は次回同じ画面でもスキップされず、記録の欠落を防げる）
-        prevImageDataRef.current = currentImageData
+        const saved = await addWorkLog(logEntry)
+        if (saved) {
+          // ログ保存まで成功してから比較ベースを更新する
+          // （保存失敗時は次回同じ画面でもスキップされず、記録の欠落を防げる。
+          //   addWorkLog はネットワーク系エラーで throw せず null を返すため、
+          //   戻り値で判定しないとこのガードが機能しない）
+          prevImageDataRef.current = currentImageData
+        } else {
+          console.warn("⚠️ Work log save returned null; keeping previous diff baseline for retry")
+          setLastAnalysisError(t('wlp_errSaveFailed'))
+        }
 
         // 脱線検知時に自動アラート音 + ブラウザ通知
         if (result.distraction_check?.is_distracted) {
@@ -340,7 +362,7 @@ export function WorkLogPanel({
         setIsAnalyzing(false)
       }
     },
-    [apiKey, currentTask, model, addWorkLog, resizeAndEncodeImage, categories],
+    [apiKey, currentTask, model, addWorkLog, resizeAndEncodeImage, categories, t, language],
   ) // 必要最小限の依存関係のみ
 
   const handleAutoGenerateReport = useCallback(
