@@ -108,7 +108,10 @@ export function ReportsTab({
       await onGenerateDailyReport()
     } catch (e) {
       console.error("Daily report generation error:", e)
-      alert(t('dr_generateError'))
+      // 日付跨ぎでボタンが活性のまま残った場合、「今日のログがない」のに
+      // 汎用の失敗メッセージが出て誤解を招くため、原因別に文言を出し分ける
+      const msg = e instanceof Error ? e.message : ""
+      alert(msg === "No logs today" ? t('dr_noLogsToday') : t('dr_generateError'))
     } finally {
       setIsGeneratingDaily(false)
     }
