@@ -16,12 +16,23 @@ import type { TranslationKey } from "@/lib/translations/ja"
 // いずれも Gemini API の stable かつ画像入力対応モデルのみ
 // （存在しないIDを選ばせると解析が404で全滅するため、一覧は実在確認済みのものに限る）。
 // レポート・日報は別モデル（Gemma・サーバー既定）を使うため、この選択の影響を受けない
-const MODEL_OPTIONS: Array<{ id: string; descKey: TranslationKey; recommended?: boolean }> = [
-  { id: "gemini-3.5-flash-lite", descKey: "ga_modelDesc35FlashLite", recommended: true },
-  { id: "gemini-3.1-flash-lite", descKey: "ga_modelDesc31FlashLite" },
-  { id: "gemini-2.5-flash-lite", descKey: "ga_modelDesc25FlashLite" },
-  { id: "gemini-3.5-flash", descKey: "ga_modelDesc35Flash" },
-  { id: "gemini-3.7-flash", descKey: "ga_modelDesc37Flash" },
+//
+// estFreeRpd: 無料枠の1日あたりリクエスト数の【目安値】。
+// 公知情報ベース（flash-lite系は歴代 ~1000 RPD、flash系は ~250 RPD）で、
+// Google側のAPI仕様変更により予告なく変わる。正確な値は AI Studio の
+// レート制限ページ（https://aistudio.google.com/rate-limit）で確認し、
+// 変わっていたらこの数値を更新すること。UIには「目安」であることを明記している
+const MODEL_OPTIONS: Array<{
+  id: string
+  descKey: TranslationKey
+  recommended?: boolean
+  estFreeRpd: number
+}> = [
+  { id: "gemini-3.5-flash-lite", descKey: "ga_modelDesc35FlashLite", recommended: true, estFreeRpd: 1000 },
+  { id: "gemini-3.1-flash-lite", descKey: "ga_modelDesc31FlashLite", estFreeRpd: 1000 },
+  { id: "gemini-2.5-flash-lite", descKey: "ga_modelDesc25FlashLite", estFreeRpd: 1000 },
+  { id: "gemini-3.5-flash", descKey: "ga_modelDesc35Flash", estFreeRpd: 250 },
+  { id: "gemini-3.7-flash", descKey: "ga_modelDesc37Flash", estFreeRpd: 250 },
 ]
 
 interface GeminiApiSettingsProps {
@@ -71,6 +82,12 @@ export function GeminiApiSettings({
 
   // 見込みAPI消費（画面解析のみ。スキップ0の最大値）
   const perHour = Math.round(3600 / captureInterval)
+  // 無料枠の目安RPDから「現在の間隔で1日何時間解析できるか」を概算する。
+  // hours = RPD ÷ (1時間あたりの解析回数)。24時間でクランプ
+  const estHoursPerDay = (estFreeRpd: number): string => {
+    if (!captureInterval || captureInterval <= 0) return "-"
+    return Math.min(24, estFreeRpd / (3600 / captureInterval)).toFixed(1)
+  }
   const intervalLabel =
     captureInterval < 60
       ? t('wlp_intervalSeconds', { count: captureInterval })
@@ -150,6 +167,9 @@ export function GeminiApiSettings({
                     )}
                   </div>
                   <div className="text-xs text-gray-500 mt-0.5">{t(opt.descKey)}</div>
+                  <div className="text-xs text-orange-700 mt-0.5">
+                    {t('ga_modelHoursPerDay', { hours: estHoursPerDay(opt.estFreeRpd) })}
+                  </div>
                 </div>
               </label>
             ))}
@@ -191,6 +211,7 @@ export function GeminiApiSettings({
             })}
           </div>
           <p className="text-xs text-orange-800/80 leading-snug">{t('ga_usageNote')}</p>
+          <p className="text-xs text-orange-800/80 leading-snug">{t('ga_usageQuotaChangeNote')}</p>
           <p className="text-xs text-orange-800/80">
             {t('ga_usageLimitPrefix')}
             <a
