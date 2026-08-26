@@ -236,7 +236,7 @@ const Page = () => {
       .map((log: any) => log.screenshot_url)
       .filter((url: any): url is string => typeof url === "string" && url.length > 0)
 
-    await addWorkLog({
+    const savedReport = await addWorkLog({
       user_id: user?.id || "",
       timestamp: new Date().toISOString(),
       activity: t('wlp_autoReport'),
@@ -246,6 +246,11 @@ const Page = () => {
       report_type: "summary",
       report_data: { ...reportData, source_screenshots: sourceScreenshots },
     })
+    if (!savedReport) {
+      // addWorkLogはネットワーク系エラーでthrowせずnullを返す。
+      // ここでthrowしないとレポートが無言で消える（呼び出し元のcatchが表示を出す）
+      throw new Error("Report save failed (network error)")
+    }
   }, [workLogs, userSettings, addWorkLog, t])
 
   // 今日（ローカル日付）の通常ログ。日報生成の素材になる
@@ -282,7 +287,7 @@ const Page = () => {
     if (!response.ok) throw new Error(`API error: ${response.status}`)
     const reportData = await response.json()
 
-    await addWorkLog({
+    const savedReport = await addWorkLog({
       user_id: user?.id || "",
       timestamp: new Date().toISOString(),
       activity: t('dr_cardTitle'),
@@ -292,6 +297,11 @@ const Page = () => {
       report_type: "daily",
       report_data: reportData,
     })
+    if (!savedReport) {
+      // addWorkLogはネットワーク系エラーでthrowせずnullを返す。
+      // ここでthrowしないとレポートが無言で消える（呼び出し元のcatchが表示を出す）
+      throw new Error("Report save failed (network error)")
+    }
   }, [workLogs, userSettings, addWorkLog, t])
 
   const reportsCount = useMemo(() => workLogs.filter((log: any) => !!log.report_type).length, [workLogs])

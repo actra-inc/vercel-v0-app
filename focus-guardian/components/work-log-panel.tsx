@@ -401,7 +401,9 @@ export function WorkLogPanel({
           .map(log => log.screenshot_url)
           .filter((url): url is string => typeof url === "string" && url.length > 0)
 
-        await addWorkLog({
+        // addWorkLog はネットワーク系エラーで throw せず null を返すため、
+        // 戻り値を確認しないとレポートが無言で消えたまま節目キーも解放されない
+        const savedReport = await addWorkLog({
           timestamp: new Date().toISOString(),
           activity: t('wlp_autoReport'),
           category: "neutral",
@@ -409,6 +411,9 @@ export function WorkLogPanel({
           report_type: "summary",
           report_data: { ...reportData, source_screenshots: sourceScreenshots },
         })
+        if (!savedReport) {
+          throw new Error("Report save returned null (network error)")
+        }
 
         console.log("✅ Auto-generated report added to logs")
       } catch (error) {
