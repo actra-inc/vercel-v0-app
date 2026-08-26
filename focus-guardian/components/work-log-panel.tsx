@@ -91,6 +91,8 @@ export function WorkLogPanel({
   // 429（quota超過）後のクールダウン期限。期限内は解析APIを呼ばない
   // （枯渇したAPIを30秒ごとに叩き続ける無駄打ちを防ぐ）
   const cooldownUntilRef = useRef(0)
+  // 現在のバナーがクォータ由来かどうか（キー/モデル変更時に消してよいか判定用）
+  const quotaBannerRef = useRef(false)
   // 差分スキップの可視化と強制解析（静的画面で解析が無音停止して見える問題への対応）
   const consecutiveSkipsRef = useRef(0)
   const [skipStreak, setSkipStreak] = useState(0)
@@ -167,6 +169,22 @@ export function WorkLogPanel({
     const isValid = Boolean(apiKey && apiKey.trim().length > 0)
     setIsApiKeyValid(isValid)
   }, [apiKey])
+
+  // APIキーまたはモデルを変更したら429クールダウンを解除する。
+  // 別キー・別モデル（RPDバケットが別）に切り替えても旧クールダウンが残ると、
+  // 最長15分「黙って解析されない」状態が続き、UIの「再読み込み不要で反映」
+  // という案内と矛盾してしまう。依存はキー/モデルの文字列値のみにすること
+  // （t や language を入れると言語切替で正当なクールダウンまで解除される）
+  useEffect(() => {
+    if (cooldownUntilRef.current === 0) return
+    cooldownUntilRef.current = 0
+    // バナーはクォータ由来のものだけ消す（キャプチャエラー等の表示は残す）
+    if (quotaBannerRef.current) {
+      quotaBannerRef.current = false
+      setLastAnalysisError(null)
+    }
+    console.log("[v0] Quota cooldown reset due to API key/model change")
+  }, [apiKey, model])
 
   useEffect(() => {
     const regularLogs = workLogs.filter((log) => !log.report_type)
@@ -279,6 +297,7 @@ export function WorkLogPanel({
               language === "ja" ? "ja-JP" : "en-US",
               { hour: "2-digit", minute: "2-digit" },
             )
+            quotaBannerRef.current = true
             setLastAnalysisError(t('wlp_errQuotaCooldown', { time: resumeAt }))
             return
           }
@@ -302,6 +321,7 @@ export function WorkLogPanel({
 
         setLastAnalysisError(null)
         cooldownUntilRef.current = 0
+        quotaBannerRef.current = false
         const imageUrl = URL.createObjectURL(blob)
 
         const logEntry = {
@@ -496,7 +516,18 @@ export function WorkLogPanel({
     }
   }
 
+  // 警告音の連鳴防止（通知側 lib/notification.ts の60秒クールダウンと同型）。
+  // 30秒間隔化により、脱線継続中や保存リトライ中はキャプチャごとに
+  // このパスへ到達するため、スロットルが無いと30秒ごとに鳴り続ける
+  const lastAlertSoundAtRef = useRef(0)
+
   const playAlertSound = () => {
+    const now = Date.now()
+    if (now - lastAlertSoundAtRef.current < 60 * 1000) {
+      console.log("[v0] Alert sound skipped (cooldown)")
+      return
+    }
+    lastAlertSoundAtRef.current = now
     try {
       const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
 
