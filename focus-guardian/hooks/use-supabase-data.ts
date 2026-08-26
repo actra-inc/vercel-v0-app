@@ -22,6 +22,7 @@ import {
   type WorkLog,
   type UserSettings,
 } from "@/lib/supabase"
+import { createOrUpdateUser } from "@/lib/supabase"
 import { DEFAULT_CAPTURE_INTERVAL_SECONDS } from "@/lib/config"
 
 export function useSupabaseData() {
@@ -49,6 +50,16 @@ export function useSupabaseData() {
         console.log("User not authenticated")
         setLoading(false)
         return
+      }
+
+      // public.users 行を担保する（upsertなので冪等）。
+      // 全テーブルが REFERENCES public.users(id) を持つため、この行が無いと
+      // 新規ユーザーの最初の保存（設定・ログ・プロジェクト）がFK違反で失敗する。
+      // 従来この処理は AuthProvider にあったが、AuthProvider はどこからも
+      // マウントされておらず、行を作る経路が存在しなかった
+      const { error: ensureUserError } = await createOrUpdateUser(currentUser)
+      if (ensureUserError) {
+        console.warn("Failed to ensure public.users row (will retry next load):", ensureUserError.message)
       }
 
       setUser({

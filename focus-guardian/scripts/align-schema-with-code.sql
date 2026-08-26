@@ -58,6 +58,44 @@ ALTER TABLE user_settings ALTER COLUMN capture_interval SET DEFAULT 30;
 --     60/120/300はユーザーが選択した可能性があるため変更しない
 UPDATE user_settings SET capture_interval = 30 WHERE capture_interval = 180;
 
+-- 4. public.users 行の担保。
+--    全テーブルが REFERENCES public.users(id) を持つ一方、auth.users から
+--    public.users へ行を作る経路がアプリ・DBのどちらにも無く、新規ユーザーの
+--    最初の保存がFK違反(23503)で失敗し得た。
+--    (a) 既存の auth ユーザーをバックフィルし、(b) 以後の新規サインアップで
+--    自動作成するトリガを張る（いずれも冪等）
+INSERT INTO public.users (id, email, name, avatar_url)
+SELECT
+  au.id,
+  au.email,
+  COALESCE(au.raw_user_meta_data->>'full_name', au.email),
+  au.raw_user_meta_data->>'avatar_url'
+FROM auth.users au
+ON CONFLICT (id) DO NOTHING;
+
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER SET search_path = public
+AS $$
+BEGIN
+  INSERT INTO public.users (id, email, name, avatar_url)
+  VALUES (
+    NEW.id,
+    NEW.email,
+    COALESCE(NEW.raw_user_meta_data->>'full_name', NEW.email),
+    NEW.raw_user_meta_data->>'avatar_url'
+  )
+  ON CONFLICT (id) DO NOTHING;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
 -- 確認用
 SELECT column_name, data_type, column_default
 FROM information_schema.columns
