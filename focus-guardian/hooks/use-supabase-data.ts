@@ -211,7 +211,13 @@ export function useSupabaseData() {
   // Project operations
   // ※ state更新は関数型で行う（古いクロージャ経由の連続操作で直前の変更が消えないように）
   const addProject = async (project: Omit<Project, "id" | "created_at" | "updated_at">) => {
-    const { data, error } = await createProject(project)
+    if (!user) {
+      throw new Error("User not authenticated")
+    }
+    // 呼び出し側は user_id を渡してこないため、ここで補完する。
+    // RLSのINSERTポリシーは auth.uid() = user_id を要求するので、
+    // 未設定のままだと必ず違反してプロジェクト作成が失敗する
+    const { data, error } = await createProject({ ...project, user_id: user.id })
     if (error) throw new Error(error.message || "Failed to create project")
     if (data) {
       setProjects((prev) => [...prev, data])

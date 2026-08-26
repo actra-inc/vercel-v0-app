@@ -55,26 +55,35 @@ export function ProjectManager({
     client: "",
   })
 
+  const [submitError, setSubmitError] = useState<string | null>(null)
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setSubmitError(null)
 
-    if (editingProject) {
-      await editProject(editingProject.id, {
-        name: formData.name,
-        color: formData.color,
-        client: formData.client,
-      })
-    } else {
-      await addProject({
-        name: formData.name,
-        color: formData.color,
-        client: formData.client,
-      })
+    try {
+      if (editingProject) {
+        await editProject(editingProject.id, {
+          name: formData.name,
+          color: formData.color,
+          client: formData.client,
+        })
+      } else {
+        await addProject({
+          name: formData.name,
+          color: formData.color,
+          client: formData.client,
+        })
+      }
+
+      setFormData({ name: "", color: PROJECT_COLORS[0], client: "" })
+      setEditingProject(null)
+      setIsOpen(false)
+    } catch (error) {
+      // 以前は未処理のPromise拒否でダイアログが無反応のまま残っていた
+      console.error("Project save error:", error)
+      setSubmitError(t('pm_saveError'))
     }
-
-    setFormData({ name: "", color: PROJECT_COLORS[0], client: "" })
-    setEditingProject(null)
-    setIsOpen(false)
   }
 
   const handleEdit = (project: Project) => {
@@ -163,6 +172,9 @@ export function ProjectManager({
                 </div>
 
                 <div className="flex gap-2">
+                  {submitError && (
+                    <p className="text-sm text-red-600">{submitError}</p>
+                  )}
                   <Button type="submit" className="flex-1">
                     {editingProject ? t('common_update') : t('common_create')}
                   </Button>

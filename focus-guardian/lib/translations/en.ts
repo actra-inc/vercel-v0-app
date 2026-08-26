@@ -244,6 +244,7 @@ export const en: Record<TranslationKey, string> = {
   tg_debugInfo: '🔧 Debug Info:',
 
   // ProjectManager
+  pm_saveError: 'Failed to save the project. Check your connection and try again.',
   pm_minRequired: 'At least one project is required',
   pm_confirmDelete: 'Delete this project?',
   pm_title: 'Project Management',

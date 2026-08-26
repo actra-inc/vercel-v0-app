@@ -242,6 +242,7 @@ export const ja = {
   tg_debugInfo: '🔧 Debug情報:',
 
   // ProjectManager
+  pm_saveError: 'プロジェクトの保存に失敗しました。通信状態を確認して再試行してください。',
   pm_minRequired: '最低1つのプロジェクトが必要です',
   pm_confirmDelete: 'このプロジェクトを削除しますか？',
   pm_title: 'プロジェクト管理',
