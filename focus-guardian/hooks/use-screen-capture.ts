@@ -167,6 +167,26 @@ export function useScreenCapture(options: UseScreenCaptureOptions = {}) {
     [quality, stopCapture],
   )
 
+  // トラッキング中にキャプチャ間隔の設定が変わったら、実際の周期にも反映する。
+  // setInterval は開始時の interval を閉じ込めるため、この張り替えが無いと
+  // バッジや「次回キャプチャ」表示（新しい値を即時反映）と実周期が食い違ったまま
+  // 停止/再開まで続いてしまう
+  useEffect(() => {
+    const stream = streamRef.current
+    if (!stream || !intervalRef.current) return
+
+    clearInterval(intervalRef.current)
+    console.log(`Capture interval changed; rescheduling every ${interval}ms`)
+    intervalRef.current = setInterval(() => {
+      if (stream.active) {
+        captureFrame(stream)
+      } else {
+        console.log("Stream is no longer active, stopping capture")
+        stopCapture()
+      }
+    }, interval)
+  }, [interval, captureFrame, stopCapture])
+
   const checkBrowserSupport = useCallback(() => {
     // HTTPS必須チェック
     if (location.protocol !== "https:" && location.hostname !== "localhost") {
