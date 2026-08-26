@@ -261,9 +261,23 @@ export async function POST(request: NextRequest) {
           task_alignment: taskAlignment,
         }
 
+    // category はDB側に CHECK (IN ('productive','distracted','neutral')) があるため、
+    // モデルが大文字や日本語ラベルを返すと insert が23514で失敗し、その解析回の
+    // 記録が丸ごと失われる。許可3値へ正規化する
+    const rawCategory = typeof analysis.category === "string" ? analysis.category.toLowerCase().trim() : ""
+    const normalizedCategory = ["productive", "distracted", "neutral"].includes(rawCategory)
+      ? rawCategory
+      : "neutral"
+
+    // applications は TEXT[] 列のため、文字列以外の要素が混ざると配列リテラル
+    // エラーで insert が失敗する。文字列のみ・上限20件に整形する
+    const normalizedApps = Array.isArray(analysis.apps)
+      ? analysis.apps.filter((a: unknown): a is string => typeof a === "string" && a.length > 0).slice(0, 20)
+      : []
+
     return NextResponse.json({
       activity: analysis.activity || "不明な活動",
-      category: forceDistracted ? "distracted" : (analysis.category || "neutral"),
+      category: forceDistracted ? "distracted" : normalizedCategory,
       work_category: validCategory,
       details: analysis.details || (currentTask ? `「${currentTask}」の作業中` : "作業内容を解析しました"),
       confidence: Math.round(
@@ -271,7 +285,7 @@ export async function POST(request: NextRequest) {
           ? Math.min(1, Math.max(0, analysis.confidence))
           : 0.5) * 100,
       ),
-      applications: analysis.apps || [],
+      applications: normalizedApps,
       focus_score: Math.round(taskAlignment * 100),
       distraction_check: distractionCheck,
     })

@@ -392,7 +392,7 @@ const Page = () => {
             <p className="text-center text-gray-500 mb-14 text-lg">Four powerful features to maximize your productivity</p>
             <div className="grid md:grid-cols-2 gap-8">
               {[
-                { Icon: Camera, title: "Automatic Screen Analysis", desc: "Captures your screen every 30 seconds and uses OCR to extract text, identifying what you're working on in real time." },
+                { Icon: Camera, title: "Automatic Screen Analysis", desc: "Captures your screen every 30 seconds and analyzes it with Gemini Vision using your own API key, identifying what you're working on in real time." },
                 { Icon: Brain, title: "AI Distraction Detection", desc: "Gemini AI compares your screen activity with your planned task and alerts you instantly when you go off-track." },
                 { Icon: TrendingUp, title: "Productivity Reports", desc: "Automatically generates consolidated reports every 3 sessions with focus scores, time distribution, and personalized improvement suggestions." },
                 { Icon: Calendar, title: "Google Calendar Integration", desc: "Reads your Google Calendar (read-only) to display today's schedule and help you align your work sessions with your planned tasks." },
