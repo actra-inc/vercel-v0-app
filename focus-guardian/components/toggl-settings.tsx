@@ -149,7 +149,21 @@ export function TogglSettings({
       })
 
       if (!testResponse.ok) {
-        throw new Error("Invalid credentials. Please check your API Token and Workspace ID.")
+        // 失敗理由を出し分ける（従来は一律「Invalid credentials」で、
+        // セッション切れやToggl側の一時障害でも正しいトークンを疑わせていた）
+        const body = await testResponse.json().catch(() => null)
+        if (testResponse.status === 401) {
+          throw new Error(t('tg_sessionExpired'))
+        }
+        if (testResponse.status === 502 || testResponse.status === 503 || testResponse.status >= 500) {
+          // 502のうちToggl側が401/403を返した場合のみ資格情報エラー
+          const togglStatus = body?.debug?.status
+          if (togglStatus === 401 || togglStatus === 403) {
+            throw new Error(t('tg_invalidCredentials'))
+          }
+          throw new Error(t('tg_togglTempError'))
+        }
+        throw new Error(t('tg_invalidCredentials'))
       }
 
       const testData = await testResponse.json()
@@ -205,7 +219,11 @@ export function TogglSettings({
       }
     } catch (error: any) {
       console.error("Error clearing credentials:", error)
-      setSaveMessage({ text: t('tg_clearFailed'), success: false })
+      const msg = String(error?.message ?? "")
+      setSaveMessage({
+        text: /column|PGRST204|schema/i.test(msg) ? t('tg_saveMissingColumn') : t('tg_clearFailed'),
+        success: false,
+      })
     }
   }
 
@@ -260,6 +278,16 @@ export function TogglSettings({
                 <div className="font-medium">{t('tg_connectionError')}</div>
                 <div className="text-sm mt-1">{connectionError}</div>
               </AlertDescription>
+            </Alert>
+          )}
+
+          {/* クリア失敗などの通知。従来は未設定フォーム側でしか描画されず、
+              設定済みカードから実行する「設定をクリア」の失敗が誰にも見えなかった */}
+          {saveMessage && (
+            <Alert
+              className={`${saveMessage.success ? "border-green-200 bg-green-50 text-green-800" : "border-red-200 bg-red-50 text-red-800"}`}
+            >
+              <AlertDescription>{saveMessage.text}</AlertDescription>
             </Alert>
           )}
 
