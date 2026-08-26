@@ -64,10 +64,6 @@ export function useSupabaseData() {
       try {
         const { data: settings, error: settingsError } = await getUserSettings(currentUser.id)
 
-        if (settingsError && !settingsError.message?.includes("No rows")) {
-          console.warn("Error loading settings:", settingsError)
-        }
-
         // 旧仕様でlocalStorageに保存されたToggl資格情報を一度だけDBへ移行する
         // （DB保存に一本化: サーバー側でトークンを解決できるようにし、
         //   端末間でも設定が同期されるようにする）
@@ -76,8 +72,17 @@ export function useSupabaseData() {
         const legacyTogglWorkspace =
           typeof window !== "undefined" ? localStorage.getItem("toggl_workspace_id") || "" : ""
 
-        if (settings) {
-          if (legacyTogglToken && legacyTogglWorkspace && !settings.toggl_api_token) {
+        if (settingsError) {
+          // 取得失敗（ネットワーク断・5xx・JWT失効など）は「未作成」と区別する。
+          // ここで既定値を書き込むと、行が実在する場合にUPDATEされて
+          // ユーザーのモデル・間隔設定が既定値へ巻き戻ってしまう。
+          // 何もせず次回ロードに任せる（表示は page.tsx 側のフォールバック既定値で動く）
+          console.warn("Error loading settings (skipping init, will retry next load):", settingsError)
+        } else if (settings) {
+          // 移行対象は「一度も設定されていない（null/undefined）」場合のみ。
+          // 空文字は「明示的にクリアした」印なので、他端末に残る旧localStorage値で
+          // 復活させてはいけない
+          if (legacyTogglToken && legacyTogglWorkspace && settings.toggl_api_token == null) {
             const { data: migrated } = await updateUserSettings(currentUser.id, {
               toggl_api_token: legacyTogglToken,
               toggl_workspace_id: legacyTogglWorkspace,
@@ -96,9 +101,15 @@ export function useSupabaseData() {
             }
           } else {
             setUserSettings(settings)
+            // DB側が設定済み（または明示クリア済み）なら旧localStorageの平文トークンは
+            // もう不要なので掃除する（残すと平文がブラウザに永久残存する）
+            if ((legacyTogglToken || legacyTogglWorkspace) && settings.toggl_api_token != null) {
+              localStorage.removeItem("toggl_api_token")
+              localStorage.removeItem("toggl_workspace_id")
+            }
           }
         } else {
-          // Create default settings if none exist
+          // 行が確実に存在しない（error=null かつ data=null）場合のみ既定値を作成する
           const defaultSettings = {
             gemini_model: "gemini-3.5-flash-lite",
             capture_interval: DEFAULT_CAPTURE_INTERVAL_SECONDS,

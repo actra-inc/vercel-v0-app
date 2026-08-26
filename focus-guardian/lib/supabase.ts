@@ -158,7 +158,9 @@ export const createOrUpdateUser = async (user: any) => {
 }
 
 export const getUserSettings = async (userId: string) => {
-  const { data, error } = await supabase.from("user_settings").select("*").eq("user_id", userId).single()
+  // .single() は0行を PGRST116 エラーにするため「未作成」と「取得失敗」を
+  // 区別できない。maybeSingle() なら 0行 = { data: null, error: null }
+  const { data, error } = await supabase.from("user_settings").select("*").eq("user_id", userId).maybeSingle()
 
   return { data, error }
 }
