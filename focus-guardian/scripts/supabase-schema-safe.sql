@@ -56,6 +56,8 @@ CREATE TABLE public.work_logs (
   applications TEXT[] DEFAULT '{}',
   focus_score INTEGER,
   work_category TEXT,
+  report_type TEXT,
+  report_data JSONB,
   distraction_check JSONB,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
