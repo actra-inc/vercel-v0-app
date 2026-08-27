@@ -33,6 +33,7 @@ interface ReportData {
   key_findings: string[]
   recommendations: string[]
   overall_score: number
+  source_screenshots?: string[]
 }
 
 // 日報（report_type='daily'）の report_data 構造
@@ -387,6 +388,32 @@ export function ReportsTab({
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-6 pt-6">
+                  {/* 解析元スクリーンショット */}
+                  {Array.isArray(data.source_screenshots) && data.source_screenshots.length > 0 && (
+                    <div className="p-4 bg-white rounded-lg border border-orange-100 shadow-sm">
+                      <h4 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-orange-600" />
+                        {t('wsr_sourceScreenshots')}
+                      </h4>
+                      <div className="grid grid-cols-3 gap-2">
+                        {data.source_screenshots.map((url, imgIndex) => (
+                          <a key={imgIndex} href={url} target="_blank" rel="noopener noreferrer">
+                            <img
+                              src={url}
+                              alt={t('wsr_screenshotAlt', { num: imgIndex + 1 })}
+                              className="w-full rounded border border-gray-200 object-cover aspect-video hover:opacity-80 transition-opacity"
+                              onError={(e) => {
+                                const anchor = e.currentTarget.closest("a")
+                                if (anchor) anchor.style.display = "none"
+                              }}
+                            />
+                          </a>
+                        ))}
+                      </div>
+                      <p className="text-xs text-gray-400 mt-2">{t('wsr_screenshotSessionNote')}</p>
+                    </div>
+                  )}
+
                   {/* サマリー */}
                   <div className="p-4 bg-white rounded-lg border border-orange-100 shadow-sm">
                     <h4 className="font-semibold text-gray-800 mb-2 flex items-center gap-2">
