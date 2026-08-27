@@ -1,8 +1,9 @@
 "use client"
 
 // 脱線検知のブラウザ通知（Notification API）ユーティリティ。
-// 脱線している時こそ FlowNudge のタブは見られていないため、
-// 音のアラートに加えて OS レベルの通知で気づけるようにする。
+// new Notification() はChromeがバックグラウンドのときmacOSで画面ポップアップが
+// 出ずNotification Centerにのみ入る。Service Worker の showNotification() を
+// 優先使用することでバックグラウンド時も確実にポップアップを表示する。
 
 const ENABLED_STORAGE_KEY = "distraction_notification_enabled"
 
@@ -45,6 +46,16 @@ export const setDistractionNotificationEnabled = (enabled: boolean) => {
   localStorage.setItem(ENABLED_STORAGE_KEY, enabled ? "on" : "off")
 }
 
+// Service Workerを登録する。通知コンポーネントのmount時に呼び出す。
+export const registerServiceWorker = async (): Promise<void> => {
+  if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return
+  try {
+    await navigator.serviceWorker.register("/sw.js")
+  } catch (e) {
+    console.warn("[notification] SW registration failed:", e)
+  }
+}
+
 export interface DistractionNotificationOptions {
   title: string
   body: string
@@ -63,39 +74,45 @@ export interface ShowNotificationResult {
   reason?: NotificationSkipReason
 }
 
-// 実際に通知を出す共通処理
-const createNotification = (
+// 実際に通知を出す共通処理。
+// Service Worker が使えるときは showNotification()、使えない場合は new Notification() にフォールバック。
+// Chrome on macOS では new Notification() はバックグラウンド時に画面に出ないため SW を優先する。
+const createNotification = async (
   title: string,
   body: string,
   tag = "flownudge-distraction",
-): ShowNotificationResult => {
-  try {
-    const notification = new Notification(title, {
-      body,
-      icon: "/flownudge-logo.png",
-      tag, // 同種の通知は積み上げず置き換える
-      // 脱線通知は「席を外している／別アプリを見ている」ときに気づかせるためのもの。
-      // 自動で消すと通知センターからも消えて気づけないため、ユーザーが閉じるまで残す。
-      requireInteraction: true,
-      // 同じ tag でも再度アラートする（2回目以降が無音で差し替わるのを防ぐ）
-      renotify: true,
-    } as NotificationOptions)
+): Promise<ShowNotificationResult> => {
+  const options: NotificationOptions = {
+    body,
+    icon: "/flownudge-logo.png",
+    tag,
+    requireInteraction: true,
+    renotify: true,
+  } as NotificationOptions
 
-    // 通知クリックでアプリのタブへ戻す
+  // Service Worker 経由（バックグラウンドでも確実にポップアップ）
+  if (typeof navigator !== "undefined" && "serviceWorker" in navigator) {
+    try {
+      const registration = await navigator.serviceWorker.ready
+      await registration.showNotification(title, options)
+      console.log("[notification] Shown via SW:", title)
+      return { shown: true }
+    } catch (swError) {
+      console.warn("[notification] SW showNotification failed, falling back to new Notification():", swError)
+    }
+  }
+
+  // フォールバック: new Notification()（フォアグラウンド時は動く）
+  try {
+    const notification = new Notification(title, options)
     notification.onclick = () => {
-      try {
-        window.focus()
-      } catch {
-        // no-op
-      }
+      try { window.focus() } catch { /* no-op */ }
       notification.close()
     }
-
     notification.onerror = (event) => {
       console.warn("[notification] Notification error event:", event)
     }
-
-    console.log("[notification] Shown:", title)
+    console.log("[notification] Shown via new Notification():", title)
     return { shown: true }
   } catch (error) {
     console.warn("[notification] Failed to show notification:", error)
@@ -104,10 +121,10 @@ const createNotification = (
 }
 
 // 脱線通知を表示する。出せなかった場合は理由を返す
-export const showDistractionNotification = ({
+export const showDistractionNotification = async ({
   title,
   body,
-}: DistractionNotificationOptions): ShowNotificationResult => {
+}: DistractionNotificationOptions): Promise<ShowNotificationResult> => {
   if (!isNotificationSupported()) {
     console.warn("[notification] Skipped: このブラウザは通知に未対応です")
     return { shown: false, reason: "unsupported" }
@@ -133,7 +150,7 @@ export const showDistractionNotification = ({
 
 // 設定画面から「通知が届くか」を確かめるためのテスト通知。
 // クールダウンとアプリ内オン/オフの影響を受けない（許可状態だけを検証する）
-export const sendTestNotification = (title: string, body: string): ShowNotificationResult => {
+export const sendTestNotification = async (title: string, body: string): Promise<ShowNotificationResult> => {
   if (!isNotificationSupported()) return { shown: false, reason: "unsupported" }
   if (Notification.permission !== "granted") return { shown: false, reason: "not-granted" }
   // 実際の脱線通知を上書きしないよう別タグにする

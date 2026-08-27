@@ -47,8 +47,8 @@ export function AppSettings({ captureInterval, onCaptureIntervalChange }: AppSet
   }
 
   // 通知が実際に届くかをその場で確認する（届かない場合の切り分け用）
-  const handleTestNotification = () => {
-    const result = sendTestNotification(t('as_notifTestTitle'), t('as_notifTestBody'))
+  const handleTestNotification = async () => {
+    const result = await sendTestNotification(t('as_notifTestTitle'), t('as_notifTestBody'))
     setNotifPermission(getNotificationPermission())
     setTestResult(result.shown ? t('as_notifTestSent') : t('as_notifTestFailed'))
   }

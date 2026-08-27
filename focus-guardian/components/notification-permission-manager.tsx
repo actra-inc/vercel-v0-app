@@ -9,6 +9,7 @@ import { useTranslation } from "@/lib/i18n"
 import {
   getNotificationPermission,
   requestNotificationPermission,
+  registerServiceWorker,
   type NotificationPermissionState,
 } from "@/lib/notification"
 
@@ -22,6 +23,7 @@ export function NotificationPermissionManager() {
   // 許可状態は設定画面やブラウザ側からも変わるため、マウント時の1回だけでなく
   // フォーカス復帰時と Permissions API の変化イベントでも取り直す
   useEffect(() => {
+    registerServiceWorker()
     const sync = () => setPermission(getNotificationPermission())
     sync()
     window.addEventListener("focus", sync)
