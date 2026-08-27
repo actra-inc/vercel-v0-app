@@ -186,7 +186,7 @@ export const ja = {
   as_notifTestButton: 'テスト通知を送る',
   as_notifTestTitle: 'FlowNudge のテスト通知',
   as_notifTestBody: 'この通知が見えていれば、脱線通知も届きます。',
-  as_notifTestSent: 'テスト通知を送信しました。表示されない場合はOS側の通知設定（集中モード/おやすみモード）を確認してください。',
+  as_notifTestSent: 'テスト通知を送信しました。表示されない場合は①macOSの集中モード/おやすみモードがOFFか、②システム設定 > 通知 で「Google Chrome Helper (Alerts)」（Chromeの場合）の通知が許可されているか確認してください。',
   as_notifTestFailed: 'テスト通知を表示できませんでした。ブラウザの通知許可を確認してください。',
 
   // WorkSummaryReport

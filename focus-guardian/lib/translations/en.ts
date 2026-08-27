@@ -188,7 +188,7 @@ export const en: Record<TranslationKey, string> = {
   as_notifTestButton: 'Send a test notification',
   as_notifTestTitle: 'FlowNudge test notification',
   as_notifTestBody: 'If you can see this, distraction alerts will reach you too.',
-  as_notifTestSent: 'Test notification sent. If nothing appeared, check your OS notification settings (Focus / Do Not Disturb).',
+  as_notifTestSent: 'Test notification sent. If nothing appeared, check: ① Focus / Do Not Disturb is OFF, and ② on macOS with Chrome, "Google Chrome Helper (Alerts)" is allowed in System Settings > Notifications.',
   as_notifTestFailed: 'Could not show the test notification. Please check the browser notification permission.',
 
   // WorkSummaryReport
