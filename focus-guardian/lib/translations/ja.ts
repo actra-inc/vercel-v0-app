@@ -346,7 +346,6 @@ export const ja = {
   ga_modelSaveError: 'モデルの保存に失敗しました。通信状態を確認して選び直してください。',
   ga_modelDesc35FlashLite: '軽量・高速の最新Flash-Lite。無料枠の1日あたり回数が最も大きい系列',
   ga_modelDesc31FlashLite: '1世代前のFlash-Lite。3.5系で不具合が出たときの代替',
-  ga_modelDesc25FlashLite: '旧世代のFlash-Lite。互換用の保険',
   ga_modelDesc35Flash: '標準Flash。判定精度は上がりますが、無料枠の1日あたり回数は小さめです',
   ga_modelDesc37Flash: '最新の標準Flash。精度最優先',
   ga_modelHoursPerDay: '現在の間隔なら1日あたり約{hours}時間の解析が可能（無料枠の目安）',

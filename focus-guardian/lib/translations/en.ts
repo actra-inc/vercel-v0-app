@@ -349,7 +349,6 @@ export const en: Record<TranslationKey, string> = {
   ga_modelSaveError: 'Failed to save the model. Check your connection and select again.',
   ga_modelDesc35FlashLite: 'Latest lightweight Flash-Lite. The largest free-tier daily quota of the lineup',
   ga_modelDesc31FlashLite: 'Previous-generation Flash-Lite. A fallback if 3.5 misbehaves',
-  ga_modelDesc25FlashLite: 'Older-generation Flash-Lite. Compatibility fallback',
   ga_modelDesc35Flash: 'Standard Flash. Better accuracy, but a smaller free-tier daily quota',
   ga_modelDesc37Flash: 'Newest standard Flash. Best accuracy',
   ga_modelHoursPerDay: 'At the current interval, roughly {hours} hours of analysis per day (free-tier estimate)',
