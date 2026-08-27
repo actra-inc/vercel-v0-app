@@ -1,6 +1,15 @@
 // Service Worker for FlowNudge notifications
-// new Notification() はChromeがバックグラウンドのときmacOSで画面に出ない。
-// SW経由のshowNotification()はバックグラウンドでも確実にポップアップする。
+// new Notification() はChromeがバックグラウンドのときmacOSで画面ポップアップが
+// 出ずNotification Centerのみに入る。SW の showNotification() で解消する。
+
+// 既存ページを待たず即座に有効化する（新規登録時は常にアクティブになる）
+self.addEventListener('install', (event) => {
+  event.waitUntil(self.skipWaiting())
+})
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(clients.claim())
+})
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()

@@ -1,15 +1,19 @@
 "use client"
 
 // 脱線検知のブラウザ通知（Notification API）ユーティリティ。
-// new Notification() はChromeがバックグラウンドのときmacOSで画面ポップアップが
-// 出ずNotification Centerにのみ入る。Service Worker の showNotification() を
-// 優先使用することでバックグラウンド時も確実にポップアップを表示する。
+// new Notification() はChromeがバックグラウンド（他アプリ使用中）のとき
+// macOSで画面ポップアップが出ずNotification Centerのみに入る制限がある。
+// Service Worker の showNotification() を優先使用することで解消する。
 
 const ENABLED_STORAGE_KEY = "distraction_notification_enabled"
 
 // 通知の連発を防ぐクールダウン（キャプチャ間隔30秒でも鳴りすぎないように）
 const COOLDOWN_MS = 60 * 1000
 let lastNotifiedAt = 0
+
+// 登録済みSWを保持。navigator.serviceWorker.ready は未登録時に永久待機するため
+// 登録時に直接取得して保持する方式を採る
+let swRegistration: ServiceWorkerRegistration | null = null
 
 export const isNotificationSupported = (): boolean =>
   typeof window !== "undefined" && "Notification" in window
@@ -47,12 +51,16 @@ export const setDistractionNotificationEnabled = (enabled: boolean) => {
 }
 
 // Service Workerを登録する。通知コンポーネントのmount時に呼び出す。
+// 登録済みSWをモジュール変数に保持し、navigator.serviceWorker.ready の
+// 永久待機問題を回避する。
 export const registerServiceWorker = async (): Promise<void> => {
   if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return
   try {
-    await navigator.serviceWorker.register("/sw.js")
+    swRegistration = await navigator.serviceWorker.register("/sw.js")
+    console.log("[notification] SW registered:", swRegistration.scope)
   } catch (e) {
     console.warn("[notification] SW registration failed:", e)
+    swRegistration = null
   }
 }
 
@@ -75,8 +83,7 @@ export interface ShowNotificationResult {
 }
 
 // 実際に通知を出す共通処理。
-// Service Worker が使えるときは showNotification()、使えない場合は new Notification() にフォールバック。
-// Chrome on macOS では new Notification() はバックグラウンド時に画面に出ないため SW を優先する。
+// 登録済みSWがあれば showNotification()、なければ new Notification() にフォールバック。
 const createNotification = async (
   title: string,
   body: string,
@@ -91,18 +98,18 @@ const createNotification = async (
   } as NotificationOptions
 
   // Service Worker 経由（バックグラウンドでも確実にポップアップ）
-  if (typeof navigator !== "undefined" && "serviceWorker" in navigator) {
+  // swRegistration が null の場合は未登録 or 登録失敗 → フォールバックへ
+  if (swRegistration) {
     try {
-      const registration = await navigator.serviceWorker.ready
-      await registration.showNotification(title, options)
+      await swRegistration.showNotification(title, options)
       console.log("[notification] Shown via SW:", title)
       return { shown: true }
     } catch (swError) {
-      console.warn("[notification] SW showNotification failed, falling back to new Notification():", swError)
+      console.warn("[notification] SW showNotification failed, falling back:", swError)
     }
   }
 
-  // フォールバック: new Notification()（フォアグラウンド時は動く）
+  // フォールバック: new Notification()（フォアグラウンド時・SW未使用環境で動く）
   try {
     const notification = new Notification(title, options)
     notification.onclick = () => {
