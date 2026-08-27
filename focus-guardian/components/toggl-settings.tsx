@@ -35,17 +35,25 @@ interface TogglEntry {
   debug?: any
 }
 
+/** 資格情報の保存先。DBに保存できなかった場合はこの端末のみ(local)になる */
+export type TogglSaveResult =
+  | { stored: "db" }
+  | { stored: "local"; cause?: string; detail?: string }
+
 interface TogglSettingsProps {
   /** DB(user_settings)に保存済みの値 */
   savedApiToken?: string
   savedWorkspaceId?: string
+  /** DBに保存できず、この端末のlocalStorageにだけ資格情報がある状態か */
+  credentialsLocalOnly?: boolean
   /** 検証済みの資格情報をDBへ保存する（空文字でクリア） */
-  onCredentialsChange?: (token: string, workspaceId: string) => void | Promise<void>
+  onCredentialsChange?: (token: string, workspaceId: string) => void | Promise<TogglSaveResult | void>
 }
 
 export function TogglSettings({
   savedApiToken = "",
   savedWorkspaceId = "",
+  credentialsLocalOnly = false,
   onCredentialsChange,
 }: TogglSettingsProps) {
   const { t, language } = useTranslation()
@@ -58,7 +66,12 @@ export function TogglSettings({
   const [isSaving, setIsSaving] = useState(false)
   const [currentEntry, setCurrentEntry] = useState<TogglEntry | null>(null)
   const [connectionError, setConnectionError] = useState<string | null>(null)
-  const [saveMessage, setSaveMessage] = useState<{ text: string; success: boolean } | null>(null)
+  const [saveMessage, setSaveMessage] = useState<{
+    text: string
+    variant: "success" | "warning" | "error"
+    /** 生のエラー内容（原因を断定するための手掛かり。誤診時にこれが決め手になる） */
+    detail?: string
+  } | null>(null)
   const [showDebugInfo, setShowDebugInfo] = useState(false)
 
   // 保存済みの値（DB: user_settings）をフォームへ反映する。
@@ -129,11 +142,50 @@ export function TogglSettings({
     }
   }
 
+  // 原因が特定できているときだけ対処法を断定して案内する。
+  // 特定できないものまで「列が不足している」と表示すると誤った対処へ誘導してしまうので、
+  // その場合は生のエラーメッセージをそのまま見せる
+  const describeFailure = (error: any, fallback: string): string => {
+    switch (error?.failureCause) {
+      case "missing_table":
+        return t('tg_diagMissingTable')
+      case "missing_column":
+        return t('tg_saveMissingColumn')
+      case "stale_schema_cache":
+        return t('tg_diagStaleCache')
+      case "rls_blocked":
+        return t('tg_diagRls')
+      case "no_user_row":
+        return t('tg_diagNoUserRow')
+      case "network":
+        return t('tg_diagNetwork')
+      default:
+        return String(error?.message || fallback)
+    }
+  }
+
+  // 表示した案内が外れていた場合に自力で切り分けられるよう、生の情報も併記する
+  // （shown と同じ文言は重複表示になるので落とす）
+  const formatDetail = (error: any, shown: string): string | undefined => {
+    const parts = [error?.code, error?.message, error?.diagnosisDetail]
+      .filter((v): v is string => typeof v === "string" && v.length > 0 && v !== shown)
+      .filter((v, i, arr) => arr.indexOf(v) === i)
+    if (error?.projectRef) parts.push(`project: ${error.projectRef}`)
+    return parts.length > 0 ? parts.join(" / ") : undefined
+  }
+
+  const messageClass = (variant: "success" | "warning" | "error") =>
+    variant === "success"
+      ? "border-green-200 bg-green-50 text-green-800"
+      : variant === "warning"
+        ? "border-amber-200 bg-amber-50 text-amber-900"
+        : "border-red-200 bg-red-50 text-red-800"
+
   const handleSaveCredentials = async (e: React.FormEvent) => {
     e.preventDefault()
 
     if (!apiToken || !workspaceId) {
-      setSaveMessage({ text: "API Token and Workspace ID are required.", success: false })
+      setSaveMessage({ text: t('tg_requiredFields'), variant: "error" })
       return
     }
 
@@ -171,30 +223,21 @@ export function TogglSettings({
         throw new Error(testData.error)
       }
 
-      // DB(user_settings)へ保存し、端末間で同期されるようにする
-      await onCredentialsChange?.(apiToken, workspaceId)
-
-      // 旧仕様のlocalStorage保存が残っていれば掃除する
-      if (typeof window !== "undefined") {
-        localStorage.removeItem("toggl_api_token")
-        localStorage.removeItem("toggl_workspace_id")
-      }
+      // DB(user_settings)へ保存し、端末間で同期されるようにする。
+      // DB側のスキーマが原因で保存できない場合、呼び出し元がこの端末へ退避したうえで
+      // stored: "local" を返す（Toggl連携そのものは動く状態にする）
+      const result = (await onCredentialsChange?.(apiToken, workspaceId)) as TogglSaveResult | undefined
 
       setIsConfigured(true)
-      setSaveMessage({
-        text: "Toggl credentials validated and saved successfully!",
-        success: true,
-      })
+      if (result?.stored === "local") {
+        setSaveMessage({ text: t('tg_savedLocalOnly'), variant: "warning", detail: result.detail })
+      } else {
+        setSaveMessage({ text: t('tg_saveSuccess'), variant: "success" })
+      }
     } catch (error: any) {
       console.error("Error saving credentials:", error)
-      // DBに列が無い環境（旧スクリプトで構築）ではSupabaseがPGRST204等を返す。
-      // 英語の生エラーだけでは対処不能なので、マイグレーションSQLの実行を案内する
-      const msg = String(error?.message ?? "")
-      const isMissingColumn = /column|PGRST204|schema/i.test(msg)
-      setSaveMessage({
-        text: isMissingColumn ? t('tg_saveMissingColumn') : msg || "Failed to validate credentials.",
-        success: false,
-      })
+      const text = describeFailure(error, t('tg_saveFailed'))
+      setSaveMessage({ text, variant: "error", detail: formatDetail(error, text) })
     } finally {
       setIsSaving(false)
     }
@@ -202,7 +245,7 @@ export function TogglSettings({
 
   const handleClearCredentials = async () => {
     try {
-      // 先にDBをクリアする。UIを先に空にすると、DB更新失敗時に
+      // 先に保存先をクリアする。UIを先に空にすると、更新失敗時に
       // 「クリアできたように見えてトークンが生き続ける」無言の不整合になる
       await onCredentialsChange?.("", "")
 
@@ -212,18 +255,10 @@ export function TogglSettings({
       setCurrentEntry(null)
       setConnectionError(null)
       setSaveMessage(null)
-
-      if (typeof window !== "undefined") {
-        localStorage.removeItem("toggl_api_token")
-        localStorage.removeItem("toggl_workspace_id")
-      }
     } catch (error: any) {
       console.error("Error clearing credentials:", error)
-      const msg = String(error?.message ?? "")
-      setSaveMessage({
-        text: /column|PGRST204|schema/i.test(msg) ? t('tg_saveMissingColumn') : t('tg_clearFailed'),
-        success: false,
-      })
+      const text = describeFailure(error, t('tg_clearFailed'))
+      setSaveMessage({ text, variant: "error", detail: formatDetail(error, text) })
     }
   }
 
@@ -253,6 +288,15 @@ export function TogglSettings({
             </AlertDescription>
           </Alert>
 
+          {/* DBに保存できずこの端末だけに退避している場合は、同期されないことを明示する
+              （黙って動くと「保存できたのに他端末で消える」と見える） */}
+          {credentialsLocalOnly && saveMessage?.variant !== "warning" && (
+            <Alert className="border-amber-200 bg-amber-50">
+              <AlertTriangle className="h-4 w-4 text-amber-600" />
+              <AlertDescription className="text-amber-900">{t('tg_savedLocalOnly')}</AlertDescription>
+            </Alert>
+          )}
+
           <div className="flex gap-2">
             <Button
               variant="outline"
@@ -261,10 +305,10 @@ export function TogglSettings({
               className="flex items-center gap-2 bg-transparent"
             >
               {isTestingConnection ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-              接続テスト
+              {t('tg_testConnection')}
             </Button>
             <Button variant="outline" onClick={handleClearCredentials}>
-              設定をクリア
+              {t('tg_clearSettings')}
             </Button>
             <Button variant="outline" size="sm" onClick={() => setShowDebugInfo(!showDebugInfo)} className="ml-auto">
               {showDebugInfo ? t('tg_hideDebug') : t('tg_showDebug')}
@@ -284,10 +328,13 @@ export function TogglSettings({
           {/* クリア失敗などの通知。従来は未設定フォーム側でしか描画されず、
               設定済みカードから実行する「設定をクリア」の失敗が誰にも見えなかった */}
           {saveMessage && (
-            <Alert
-              className={`${saveMessage.success ? "border-green-200 bg-green-50 text-green-800" : "border-red-200 bg-red-50 text-red-800"}`}
-            >
-              <AlertDescription>{saveMessage.text}</AlertDescription>
+            <Alert className={messageClass(saveMessage.variant)}>
+              <AlertDescription>
+                <div>{saveMessage.text}</div>
+                {saveMessage.detail && (
+                  <div className="mt-1 break-all font-mono text-xs opacity-80">{saveMessage.detail}</div>
+                )}
+              </AlertDescription>
             </Alert>
           )}
 
@@ -413,10 +460,13 @@ export function TogglSettings({
           </div>
         </form>
         {saveMessage && (
-          <Alert
-            className={`mt-4 ${saveMessage.success ? "border-green-200 bg-green-50 text-green-800" : "border-red-200 bg-red-50 text-red-800"}`}
-          >
-            <AlertDescription>{saveMessage.text}</AlertDescription>
+          <Alert className={`mt-4 ${messageClass(saveMessage.variant)}`}>
+            <AlertDescription>
+              <div>{saveMessage.text}</div>
+              {saveMessage.detail && (
+                <div className="mt-1 break-all font-mono text-xs opacity-80">{saveMessage.detail}</div>
+              )}
+            </AlertDescription>
           </Alert>
         )}
       </CardContent>

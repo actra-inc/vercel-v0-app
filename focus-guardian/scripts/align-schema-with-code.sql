@@ -96,11 +96,27 @@ CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
--- 確認用
-SELECT column_name, data_type, column_default
+-- 5. PostgREST（Supabase API）のスキーマキャッシュを再読み込みする。
+--    ALTER TABLE 後もキャッシュが古いままだと、列が実在していてもAPIは
+--    PGRST204「Could not find the 'toggl_api_token' column ... in the schema cache」を
+--    返し続け、「SQLを流したのに保存できない」状態になる
+NOTIFY pgrst, 'reload schema';
+
+-- 確認用(1): 必要な列が揃っているか。
+-- toggl_api_token / toggl_workspace_id が並んでいなければ、このSQLが実行された
+-- プロジェクトとアプリの接続先プロジェクトが違う（NEXT_PUBLIC_SUPABASE_URL を確認）
+SELECT table_name, column_name, data_type, column_default
 FROM information_schema.columns
-WHERE table_name IN ('work_logs', 'user_settings')
+WHERE table_schema = 'public'
+  AND table_name IN ('work_logs', 'user_settings')
   AND column_name IN ('work_category', 'report_type', 'report_data', 'confidence', 'focus_score',
                       'gemini_model', 'capture_interval',
                       'toggl_api_token', 'toggl_workspace_id', 'gemini_api_key', 'auto_sync_toggl')
 ORDER BY table_name, column_name;
+
+-- 確認用(2): user_settings に書き込みできるRLSポリシーがあるか
+-- （SELECTだけ許可されていると保存が0行更新で静かに失敗する）
+SELECT policyname, cmd, qual IS NOT NULL AS has_using, with_check IS NOT NULL AS has_with_check
+FROM pg_policies
+WHERE schemaname = 'public' AND tablename = 'user_settings'
+ORDER BY policyname;

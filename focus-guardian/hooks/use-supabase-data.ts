@@ -21,6 +21,7 @@ import {
   type TimeEntry,
   type WorkLog,
   type UserSettings,
+  type SettingsWriteCause,
 } from "@/lib/supabase"
 import { createOrUpdateUser } from "@/lib/supabase"
 import { DEFAULT_CAPTURE_INTERVAL_SECONDS } from "@/lib/config"
@@ -94,7 +95,7 @@ export function useSupabaseData() {
           // 空文字は「明示的にクリアした」印なので、他端末に残る旧localStorage値で
           // 復活させてはいけない
           if (legacyTogglToken && legacyTogglWorkspace && settings.toggl_api_token == null) {
-            const { data: migrated } = await updateUserSettings(currentUser.id, {
+            const { data: migrated, error: migrateError } = await updateUserSettings(currentUser.id, {
               toggl_api_token: legacyTogglToken,
               toggl_workspace_id: legacyTogglWorkspace,
             })
@@ -108,7 +109,10 @@ export function useSupabaseData() {
               localStorage.removeItem("toggl_workspace_id")
               console.log("🔁 Migrated Toggl credentials from localStorage to user_settings")
             } else {
-              console.warn("⚠️ Toggl credential migration to DB failed; keeping localStorage copy for retry")
+              console.warn(
+                "⚠️ Toggl credential migration to DB failed; keeping localStorage copy for retry",
+                migrateError?.cause,
+              )
             }
           } else {
             setUserSettings(settings)
@@ -214,7 +218,17 @@ export function useSupabaseData() {
 
       if (error) {
         console.error("❌ Error updating settings:", error)
-        throw new Error(error)
+        // 呼び出し側が原因別に分岐（フォールバック保存・案内文の出し分け）できるよう、
+        // 分類結果をErrorに載せて渡す。message文字列の中身に依存した判定は誤診を招く
+        const failure = new Error(error.message) as Error & {
+          code?: string
+          failureCause?: SettingsWriteCause
+          missingColumns?: string[]
+        }
+        failure.code = error.code
+        failure.failureCause = error.cause
+        failure.missingColumns = error.missingColumns
+        throw failure
       }
 
       console.log("✅ Settings updated successfully")

@@ -7,7 +7,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Loader2, AlertCircle, X, Settings, Key, Link, FolderOpen, Info } from "lucide-react"
 import { GeminiApiSettings } from "@/components/gemini-api-settings"
-import { TogglSettings } from "@/components/toggl-settings"
+import { TogglSettings, type TogglSaveResult } from "@/components/toggl-settings"
 import { ProjectManager } from "@/components/project-manager"
 import { AppSettings } from "@/components/app-settings"
 import { VersionInfo } from "@/components/version-info"
@@ -18,10 +18,12 @@ interface SettingsPanelProps {
   model: string
   togglApiToken: string
   togglWorkspaceId: string
+  /** Toggl資格情報がDBではなくこの端末にだけ保存されている状態か */
+  togglCredentialsLocalOnly?: boolean
   captureInterval: number
   onApiKeyChange: (apiKey: string) => Promise<void>
   onModelChange: (model: string) => void
-  onTogglCredentialsChange: (token: string, workspaceId: string) => void
+  onTogglCredentialsChange: (token: string, workspaceId: string) => void | Promise<TogglSaveResult | void>
   onCaptureIntervalChange: (interval: number) => void
   onClose: () => void
   /** 開いたときに選択しておくタブ（他画面から「Toggl設定へ」などで飛べるように） */
@@ -38,6 +40,7 @@ export function SettingsPanel({
   model,
   togglApiToken,
   togglWorkspaceId,
+  togglCredentialsLocalOnly = false,
   captureInterval,
   onApiKeyChange,
   onModelChange,
@@ -158,6 +161,7 @@ export function SettingsPanel({
               <TogglSettings
                 savedApiToken={togglApiToken}
                 savedWorkspaceId={togglWorkspaceId}
+                credentialsLocalOnly={togglCredentialsLocalOnly}
                 onCredentialsChange={onTogglCredentialsChange}
               />
             </TabsContent>

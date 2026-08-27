@@ -1,8 +1,14 @@
 "use client"
 
 import { useEffect, useState, useCallback, useMemo, useRef } from "react"
-import { supabase, signInWithGoogle } from "@/lib/supabase"
+import {
+  supabase,
+  signInWithGoogle,
+  diagnoseUserSettings,
+  type UserSettingsDiagnosis,
+} from "@/lib/supabase"
 import { useSupabaseData } from "@/hooks/use-supabase-data"
+import type { TogglSaveResult } from "@/components/toggl-settings"
 import { TimeTracker } from "@/components/time-tracker"
 import { WorkLogPanel } from "@/components/work-log-panel"
 import { SettingsPanel } from "@/components/settings-panel"
@@ -203,6 +209,90 @@ const Page = () => {
       }
     },
     [updateSettings, refreshData],
+  )
+
+  // Toggl資格情報の保存先はDB(user_settings)が正。ただしDB側に列が無い等で
+  // 保存できない環境では、この端末のlocalStorageへ退避して連携自体は動くようにする
+  // （次回ロード時に use-supabase-data 側がDBへの移行を自動で再試行する）
+  const [togglLocalCreds, setTogglLocalCreds] = useState<{ token: string; workspaceId: string } | null>(null)
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const token = localStorage.getItem("toggl_api_token") || ""
+    const workspaceId = localStorage.getItem("toggl_workspace_id") || ""
+    if (token && workspaceId) setTogglLocalCreds({ token, workspaceId })
+  }, [])
+
+  const togglApiToken = userSettings?.toggl_api_token || togglLocalCreds?.token || ""
+  const togglWorkspaceId = userSettings?.toggl_workspace_id || togglLocalCreds?.workspaceId || ""
+  // DBに無く端末ローカルだけにある場合、サーバーはトークンを解決できないため
+  // API呼び出し時にクライアントから渡す必要がある
+  const togglCredentialsLocalOnly = !userSettings?.toggl_api_token && Boolean(togglLocalCreds?.token)
+
+  const handleTogglCredentialsChange = useCallback(
+    async (token: string, workspaceId: string): Promise<TogglSaveResult> => {
+      try {
+        await updateSettings({ toggl_api_token: token, toggl_workspace_id: workspaceId })
+        // DBに入ったので端末ローカルの退避コピーは不要
+        try {
+          localStorage.removeItem("toggl_api_token")
+          localStorage.removeItem("toggl_workspace_id")
+        } catch {}
+        setTogglLocalCreds(null)
+        return { stored: "db" }
+      } catch (error: any) {
+        // 「列が無い」と決め打ちせず、実際に問い合わせて原因を確定させる
+        // （列が無いのか / 列はあるがPostgRESTのキャッシュが古いのか / RLSで弾かれているのか）
+        let diagnosis: UserSettingsDiagnosis | null = null
+        try {
+          if (user) {
+            diagnosis = await diagnoseUserSettings(user.id, {
+              message: String(error?.message ?? ""),
+              code: error?.code,
+              cause: error?.failureCause ?? "unknown",
+              missingColumns: error?.missingColumns,
+            })
+          }
+        } catch (diagError) {
+          console.warn("Failed to diagnose user_settings:", diagError)
+        }
+
+        const cause = diagnosis && diagnosis.cause !== "ok" ? diagnosis.cause : error?.failureCause
+        if (error && typeof error === "object") {
+          error.failureCause = cause
+          error.diagnosisDetail = diagnosis?.detail
+          error.projectRef = diagnosis?.projectRef
+        }
+
+        // DB側のスキーマが原因なら、この端末へ退避して機能自体は使えるようにする
+        const schemaIssue =
+          cause === "missing_column" || cause === "missing_table" || cause === "stale_schema_cache"
+        if (schemaIssue) {
+          try {
+            if (token && workspaceId) {
+              localStorage.setItem("toggl_api_token", token)
+              localStorage.setItem("toggl_workspace_id", workspaceId)
+              setTogglLocalCreds({ token, workspaceId })
+            } else {
+              localStorage.removeItem("toggl_api_token")
+              localStorage.removeItem("toggl_workspace_id")
+              setTogglLocalCreds(null)
+            }
+            return {
+              stored: "local",
+              cause,
+              detail: [diagnosis?.detail, diagnosis?.projectRef && `project: ${diagnosis.projectRef}`]
+                .filter(Boolean)
+                .join(" / "),
+            }
+          } catch (storageError) {
+            console.warn("Local fallback storage failed:", storageError)
+          }
+        }
+        throw error
+      }
+    },
+    [updateSettings, user],
   )
 
   const handleSignOut = useCallback(async () => {
@@ -573,8 +663,9 @@ const Page = () => {
                   onCurrentTaskChange={setCurrentTask}
                   timeEntries={timeEntries}
                   screenSessions={screenSessions}
-                  togglApiToken={userSettings?.toggl_api_token || ""}
-                  togglWorkspaceId={userSettings?.toggl_workspace_id || ""}
+                  togglApiToken={togglApiToken}
+                  togglWorkspaceId={togglWorkspaceId}
+                  togglCredentialsLocalOnly={togglCredentialsLocalOnly}
                   onOpenTogglSettings={() => openSettings("toggl")}
                 />
               </div>
@@ -624,8 +715,9 @@ const Page = () => {
               apiKey={userSettings?.gemini_api_key || ""}
               model={userSettings?.gemini_model || "gemini-3.5-flash-lite"}
               captureInterval={userSettings?.capture_interval || DEFAULT_CAPTURE_INTERVAL_SECONDS}
-              togglApiToken={userSettings?.toggl_api_token || ""}
-              togglWorkspaceId={userSettings?.toggl_workspace_id || ""}
+              togglApiToken={togglApiToken}
+              togglWorkspaceId={togglWorkspaceId}
+              togglCredentialsLocalOnly={togglCredentialsLocalOnly}
               onApiKeyChange={handleApiKeyChange}
               onModelChange={async (model) => {
                 await updateSettings({ gemini_model: model })
@@ -633,9 +725,7 @@ const Page = () => {
               onCaptureIntervalChange={async (interval) => {
                 await updateSettings({ capture_interval: interval })
               }}
-              onTogglCredentialsChange={async (token, workspaceId) => {
-                await updateSettings({ toggl_api_token: token, toggl_workspace_id: workspaceId })
-              }}
+              onTogglCredentialsChange={handleTogglCredentialsChange}
               projects={projects}
               addProject={addProject}
               editProject={editProject}

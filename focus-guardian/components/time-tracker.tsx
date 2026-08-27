@@ -34,6 +34,8 @@ interface TimeTrackerProps {
   screenSessions?: ScreenSession[]
   togglApiToken?: string
   togglWorkspaceId?: string
+  /** 資格情報がDBに無くこの端末だけにある状態（サーバーが解決できないため送る必要がある） */
+  togglCredentialsLocalOnly?: boolean
   /** Toggl設定画面を開く（未設定のときの導線） */
   onOpenTogglSettings?: () => void
 }
@@ -47,6 +49,7 @@ export function TimeTracker({
   screenSessions = [],
   togglApiToken = "",
   togglWorkspaceId = "",
+  togglCredentialsLocalOnly = false,
   onOpenTogglSettings,
 }: TimeTrackerProps) {
   const isTogglConfigured = Boolean(togglApiToken && togglWorkspaceId)
@@ -156,8 +159,16 @@ export function TimeTracker({
     setTogglLoading(true)
     setTogglError(null)
     try {
-      // 資格情報はサーバー側でuser_settingsから解決される（URLに載せない）
-      const res = await fetch("/api/toggl-current")
+      // 資格情報は原則サーバー側でuser_settingsから解決させる（URLに載せない）。
+      // DBに保存できずこの端末にだけある場合のみ、POSTボディで渡す
+      // （ボディはURLと違いアクセスログに残らない）
+      const res = togglCredentialsLocalOnly
+        ? await fetch("/api/toggl-current", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ apiToken: togglApiToken, workspaceId: togglWorkspaceId }),
+          })
+        : await fetch("/api/toggl-current")
       const data = await res.json()
       if (!res.ok || data.error) {
         setTogglError(data.error || t('tt_togglError'))
@@ -179,7 +190,7 @@ export function TimeTracker({
     } finally {
       setTogglLoading(false)
     }
-  }, [togglApiToken, togglWorkspaceId])
+  }, [togglApiToken, togglWorkspaceId, togglCredentialsLocalOnly])
 
   // Togglモード時に3分ごと自動ポーリング（未設定のときは叩かない）
   useEffect(() => {

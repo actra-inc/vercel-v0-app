@@ -236,7 +236,19 @@ export const en: Record<TranslationKey, string> = {
   tg_invalidCredentials: 'The API token or workspace ID is incorrect. Please check your Toggl settings.',
   tg_togglTempError: 'Toggl is experiencing a temporary error. Try again later (no need to re-enter your token).',
   tg_clearFailed: 'Failed to clear the settings. Check your connection and try again.',
-  tg_saveMissingColumn: 'Could not save. The database may be missing columns. Run scripts/align-schema-with-code.sql in Supabase, then save again.',
+  tg_saveMissingColumn:
+    'Could not save. The user_settings table is missing the toggl_api_token / toggl_workspace_id columns. Run scripts/align-schema-with-code.sql in Supabase, then save again.',
+  tg_saveSuccess: 'Toggl credentials validated and saved to your account settings (database).',
+  tg_saveFailed: 'Failed to save the credentials.',
+  tg_requiredFields: 'Enter both the API token and the workspace ID.',
+  tg_savedLocalOnly:
+    'The database write failed, so the credentials were stored on this device only. Toggl works here but will not sync to your other devices. Run scripts/align-schema-with-code.sql in Supabase and they will be migrated automatically on the next load.',
+  tg_diagMissingTable: 'The user_settings table does not exist. Run scripts/supabase-schema.sql in Supabase to create it.',
+  tg_diagStaleCache:
+    "The columns exist, but the Supabase API (PostgREST) schema cache is stale. Run NOTIFY pgrst, 'reload schema'; in the Supabase SQL editor, or wait a few minutes and try again.",
+  tg_diagRls: 'The database rejected the write because of row-level security. Run scripts/fix-existing-policies.sql in Supabase to recreate the policies.',
+  tg_diagNoUserRow: 'Your account row has not been created yet. Reload the page and save again (it will be created automatically).',
+  tg_diagNetwork: 'A network error prevented saving. Check your connection and try again.',
   tg_currentEntry: '📊 Current Toggl Entry:',
   tg_project: 'Project:',
   tg_notSet: 'Not set',
