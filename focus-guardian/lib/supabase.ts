@@ -528,8 +528,12 @@ export const createWorkLog = async (log: Omit<WorkLog, "id" | "created_at">) => 
 // 注意: RLSのDELETEポリシーが無い環境では、Supabaseはエラーを返さず
 // 「0行削除」で成功扱いになる。.select("id") で削除された行を返させ、
 // 削除件数を呼び出し側で検証できるようにする。
-export const deleteWorkLog = async (id: string) => {
-  const { data, error } = await supabase.from("work_logs").delete().eq("id", id).select("id")
+// userId を渡すと所有者条件も付ける（RLSが正しく効いていない環境でも
+// 他人の行のidを指定して消せないようにする多重防御）
+export const deleteWorkLog = async (id: string, userId?: string) => {
+  let query = supabase.from("work_logs").delete().eq("id", id)
+  if (userId) query = query.eq("user_id", userId)
+  const { data, error } = await query.select("id")
 
   return { error, deletedCount: data?.length ?? 0 }
 }
@@ -575,18 +579,8 @@ export const getReports = async (userId: string, limit = 20) => {
   return { data, error }
 }
 
-// Storage helpers for screenshots
-export const uploadScreenshot = async (file: File, userId: string) => {
-  const fileExt = file.name.split(".").pop()
-  const fileName = `${userId}/${Date.now()}.${fileExt}`
-
-  const { data, error } = await supabase.storage.from("screenshots").upload(fileName, file)
-
-  if (error) return { data: null, error }
-
-  const {
-    data: { publicUrl },
-  } = supabase.storage.from("screenshots").getPublicUrl(fileName)
-
-  return { data: { path: fileName, publicUrl }, error: null }
-}
+// スクリーンショットのStorageアップロードは実装していない。
+// 以前ここにあった uploadScreenshot() は getPublicUrl() で公開URLを返す実装で、
+// 呼び出し元が無いまま残っていた（有効化した瞬間に画面キャプチャが
+// URLを知る全員に見える状態になる）。必要になったら非公開バケット＋
+// 署名付きURL（createSignedUrl）で作り直すこと。

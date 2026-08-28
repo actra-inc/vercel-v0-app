@@ -130,8 +130,8 @@ export function useScreenCapture(options: UseScreenCaptureOptions = {}) {
 
       // 供給が止まっている間に撮ると真っ黒な画像になり、無料枠と作業ログを
       // 無駄に消費する。復帰(unmute)後の回で撮り直す
-      const track = stream.getVideoTracks()[0]
-      if (track?.muted) {
+      const videoTrack = stream.getVideoTracks()[0]
+      if (videoTrack?.muted) {
         console.log("Video track is muted (display asleep or window hidden), skipping capture.")
         return null
       }
@@ -140,7 +140,6 @@ export function useScreenCapture(options: UseScreenCaptureOptions = {}) {
       setIsCapturing(true)
 
       try {
-        const videoTrack = stream.getVideoTracks()[0]
         let blob: Blob | null = null
 
         if (window.ImageCapture && typeof ImageCapture.prototype.grabFrame === "function") {

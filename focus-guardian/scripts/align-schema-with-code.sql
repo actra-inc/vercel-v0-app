@@ -120,3 +120,12 @@ SELECT policyname, cmd, qual IS NOT NULL AS has_using, with_check IS NOT NULL AS
 FROM pg_policies
 WHERE schemaname = 'public' AND tablename = 'user_settings'
 ORDER BY policyname;
+
+-- 確認用(3): 各テーブルでRLSが有効か。
+-- rowsecurity が false のテーブルがあると、anonキーを持つ誰でも他人の行を
+-- 読み書きできる状態になる（このアプリはRLSだけで他人のデータを守っている）
+SELECT tablename, rowsecurity
+FROM pg_tables
+WHERE schemaname = 'public'
+  AND tablename IN ('users', 'projects', 'time_entries', 'work_logs', 'user_settings')
+ORDER BY tablename;

@@ -25,6 +25,13 @@ import {
 } from "@/lib/supabase"
 import { createOrUpdateUser } from "@/lib/supabase"
 import { DEFAULT_CAPTURE_INTERVAL_SECONDS } from "@/lib/config"
+import {
+  readScopedTogglCredentials,
+  readLegacyTogglCredentials,
+  writeScopedTogglCredentials,
+  clearLegacyTogglCredentials,
+  clearTogglCredentials,
+} from "@/lib/toggl-credentials"
 
 export function useSupabaseData() {
   const [user, setUser] = useState<User | null>(null)
@@ -76,13 +83,11 @@ export function useSupabaseData() {
       try {
         const { data: settings, error: settingsError } = await getUserSettings(currentUser.id)
 
-        // 旧仕様でlocalStorageに保存されたToggl資格情報を一度だけDBへ移行する
+        // 端末に退避されているToggl資格情報をDBへ移行する
         // （DB保存に一本化: サーバー側でトークンを解決できるようにし、
-        //   端末間でも設定が同期されるようにする）
-        const legacyTogglToken =
-          typeof window !== "undefined" ? localStorage.getItem("toggl_api_token") || "" : ""
-        const legacyTogglWorkspace =
-          typeof window !== "undefined" ? localStorage.getItem("toggl_workspace_id") || "" : ""
+        //   端末間でも設定が同期されるようにする）。
+        // 本人のキー → 旧仕様の共有キー の順に見る
+        const localCreds = readScopedTogglCredentials(currentUser.id) ?? readLegacyTogglCredentials()
 
         if (settingsError) {
           // 取得失敗（ネットワーク断・5xx・JWT失効など）は「未作成」と区別する。
@@ -94,33 +99,35 @@ export function useSupabaseData() {
           // 移行対象は「一度も設定されていない（null/undefined）」場合のみ。
           // 空文字は「明示的にクリアした」印なので、他端末に残る旧localStorage値で
           // 復活させてはいけない
-          if (legacyTogglToken && legacyTogglWorkspace && settings.toggl_api_token == null) {
+          if (localCreds && settings.toggl_api_token == null) {
             const { data: migrated, error: migrateError } = await updateUserSettings(currentUser.id, {
-              toggl_api_token: legacyTogglToken,
-              toggl_workspace_id: legacyTogglWorkspace,
+              toggl_api_token: localCreds.token,
+              toggl_workspace_id: localCreds.workspaceId,
             })
             setUserSettings(migrated || settings)
-            // 重要: DB書き込みが成功した場合のみlocalStorageを消す。
+            // 重要: DB書き込みが成功した場合のみ端末側のコピーを消す。
             // 失敗時（DBに列が無い等）に消すと、資格情報の最後のコピーを
             // 破壊してしまい「保存したのに消えた」が確定してしまう。
             // 失敗時は残しておけば次回ロードで移行を再試行できる
             if (migrated) {
-              localStorage.removeItem("toggl_api_token")
-              localStorage.removeItem("toggl_workspace_id")
-              console.log("🔁 Migrated Toggl credentials from localStorage to user_settings")
+              clearTogglCredentials(currentUser.id)
+              console.log("🔁 Migrated Toggl credentials from local storage to user_settings")
             } else {
+              // 移行できないので端末に残すが、旧共有キーのままだと同じ端末で
+              // 別アカウントにログインした人が拾ってしまうため本人のキーへ移す
+              writeScopedTogglCredentials(currentUser.id, localCreds)
+              clearLegacyTogglCredentials()
               console.warn(
-                "⚠️ Toggl credential migration to DB failed; keeping localStorage copy for retry",
+                "⚠️ Toggl credential migration to DB failed; keeping a device-local copy for retry",
                 migrateError?.cause,
               )
             }
           } else {
             setUserSettings(settings)
-            // DB側が設定済み（または明示クリア済み）なら旧localStorageの平文トークンは
+            // DB側が設定済み（または明示クリア済み）なら端末上の平文トークンは
             // もう不要なので掃除する（残すと平文がブラウザに永久残存する）
-            if ((legacyTogglToken || legacyTogglWorkspace) && settings.toggl_api_token != null) {
-              localStorage.removeItem("toggl_api_token")
-              localStorage.removeItem("toggl_workspace_id")
+            if (localCreds && settings.toggl_api_token != null) {
+              clearTogglCredentials(currentUser.id)
             }
           }
         } else {
@@ -129,18 +136,18 @@ export function useSupabaseData() {
             gemini_model: "gemini-3.5-flash-lite",
             capture_interval: DEFAULT_CAPTURE_INTERVAL_SECONDS,
             auto_sync_toggl: false,
-            // 旧localStorage保存があれば初期作成時に取り込む
-            ...(legacyTogglToken && legacyTogglWorkspace
-              ? { toggl_api_token: legacyTogglToken, toggl_workspace_id: legacyTogglWorkspace }
+            // 端末に退避された値があれば初期作成時に取り込む
+            ...(localCreds
+              ? { toggl_api_token: localCreds.token, toggl_workspace_id: localCreds.workspaceId }
               : {}),
           }
           const { data: newSettings } = await updateUserSettings(currentUser.id, defaultSettings)
           if (newSettings) {
             setUserSettings(newSettings)
-            if (legacyTogglToken && legacyTogglWorkspace) {
-              localStorage.removeItem("toggl_api_token")
-              localStorage.removeItem("toggl_workspace_id")
-            }
+            if (localCreds) clearTogglCredentials(currentUser.id)
+          } else if (localCreds) {
+            writeScopedTogglCredentials(currentUser.id, localCreds)
+            clearLegacyTogglCredentials()
           }
         }
       } catch (err) {

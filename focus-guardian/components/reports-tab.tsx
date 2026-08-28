@@ -68,6 +68,16 @@ interface ReportsTabProps {
   canGenerateDaily?: boolean
 }
 
+// レポートに保存されたスクリーンショットURLのうち、そのまま描画してよいものだけを返す。
+// href/src にそのまま流すと javascript: などのスキームが混ざったときに
+// クリックでスクリプトが動くため、http(s)/data:image に限定する
+function safeScreenshotUrls(source: unknown): string[] {
+  if (!Array.isArray(source)) return []
+  return source.filter(
+    (url): url is string => typeof url === "string" && /^(https?:\/\/|data:image\/)/i.test(url.trim()),
+  )
+}
+
 export function ReportsTab({
   workLogs,
   userId,
@@ -137,7 +147,7 @@ export function ReportsTab({
   const handleDeleteReport = async (reportId: string) => {
     try {
       setDeletingId(reportId)
-      const { error, deletedCount } = await deleteWorkLog(reportId)
+      const { error, deletedCount } = await deleteWorkLog(reportId, userId)
 
       if (error) {
         throw new Error(error.message || "Failed to delete report")
@@ -389,14 +399,14 @@ export function ReportsTab({
                 </CardHeader>
                 <CardContent className="space-y-6 pt-6">
                   {/* 解析元スクリーンショット */}
-                  {Array.isArray(data.source_screenshots) && data.source_screenshots.length > 0 && (
+                  {safeScreenshotUrls(data.source_screenshots).length > 0 && (
                     <div className="p-4 bg-white rounded-lg border border-orange-100 shadow-sm">
                       <h4 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
                         <FileText className="h-4 w-4 text-orange-600" />
                         {t('wsr_sourceScreenshots')}
                       </h4>
                       <div className="grid grid-cols-3 gap-2">
-                        {data.source_screenshots.map((url: string, imgIndex: number) => (
+                        {safeScreenshotUrls(data.source_screenshots).map((url: string, imgIndex: number) => (
                           <a key={imgIndex} href={url} target="_blank" rel="noopener noreferrer">
                             <img
                               src={url}

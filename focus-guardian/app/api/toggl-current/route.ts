@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server"
-import { createServerClient } from "@supabase/ssr"
-import { cookies } from "next/headers"
+import type { createServerClient } from "@supabase/ssr"
+import {
+  getAuthenticatedUser,
+  isTogglEnvOwner,
+  isValidApiToken,
+  isValidWorkspaceId,
+} from "@/lib/toggl-server"
 
 // 認証チェックに @supabase/ssr + cookies() を使うため Node.js ランタイムで実行する
 // （以前は edge だったが、無認証で誰でも叩けるうえ環境変数のTogglトークンに
@@ -60,43 +65,17 @@ async function getProjects(apiToken: string, workspaceId: string): Promise<Recor
   }
 }
 
-async function getAuthenticatedUser() {
-  const cookieStore = await cookies()
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll()
-        },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options))
-          } catch {
-            // Server Componentからの書き込みエラーは無視
-          }
-        },
-      },
-    },
-  )
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  return { user, supabase }
-}
-
 // トークンをクライアントから受け取らず、ログイン中ユーザーの user_settings から
 // サーバー側で解決する。以前はGETクエリでトークンを送っており、Vercelの
 // アクセスログに全権トークンが平文で残り続けていた
 async function resolveCredentials(
   supabase: ReturnType<typeof createServerClient>,
-  userId: string,
+  user: { id: string; email?: string | null },
 ): Promise<{ apiToken?: string; workspaceId?: string; queryFailed?: boolean }> {
   const { data, error } = await supabase
     .from("user_settings")
     .select("toggl_api_token, toggl_workspace_id")
-    .eq("user_id", userId)
+    .eq("user_id", user.id)
     .maybeSingle()
   // SELECT失敗（列欠落・一時障害）を「未設定」と混同しない。
   // ここでenvへフォールバックすると、本人の保存値があるのに
@@ -105,8 +84,20 @@ async function resolveCredentials(
     console.error("Failed to read Toggl credentials from user_settings:", error.message)
     return { queryFailed: true }
   }
-  const apiToken = data?.toggl_api_token || process.env.TOGGL_API_TOKEN
-  const workspaceId = data?.toggl_workspace_id || process.env.TOGGL_WORKSPACE_ID
+
+  // 環境変数の資格情報はオーナー本人にだけ許可する。
+  // 誰でも使えると、自分のトークンを保存していない別ユーザーに
+  // オーナーのToggl作業記録がそのまま見えてしまう
+  const envAllowed = isTogglEnvOwner(user)
+  if (!data?.toggl_api_token && !envAllowed && process.env.TOGGL_API_TOKEN) {
+    console.warn(
+      "[toggl] env credentials exist but this user is not the designated owner " +
+        "(set TOGGL_OWNER_USER_ID or TOGGL_OWNER_EMAIL to enable personal mode); skipping fallback",
+    )
+  }
+
+  const apiToken = data?.toggl_api_token || (envAllowed ? process.env.TOGGL_API_TOKEN : undefined)
+  const workspaceId = data?.toggl_workspace_id || (envAllowed ? process.env.TOGGL_WORKSPACE_ID : undefined)
   return { apiToken, workspaceId }
 }
 
@@ -116,7 +107,7 @@ export async function GET() {
   if (!user) {
     return NextResponse.json({ error: "Unauthorized: ログインが必要です" }, { status: 401 })
   }
-  const creds = await resolveCredentials(supabase, user.id)
+  const creds = await resolveCredentials(supabase, user)
   if (creds.queryFailed) {
     return NextResponse.json({ error: "Failed to load Toggl settings. Please retry." }, { status: 503 })
   }
@@ -131,10 +122,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized: ログインが必要です" }, { status: 401 })
   }
   const body = await request.json().catch(() => ({}))
-  let apiToken: string | undefined = typeof body.apiToken === "string" ? body.apiToken : undefined
-  let workspaceId: string | undefined = typeof body.workspaceId === "string" ? body.workspaceId : undefined
+  // 受け取った値は必ず形式検証する。未検証のworkspaceIdはURLパスに埋まるため
+  // `../` でTogglの別エンドポイントへ向けられる
+  if (body.apiToken !== undefined || body.workspaceId !== undefined) {
+    if (!isValidApiToken(body.apiToken) || !isValidWorkspaceId(body.workspaceId)) {
+      return NextResponse.json({ error: "Invalid credentials format" }, { status: 400 })
+    }
+  }
+  let apiToken: string | undefined = isValidApiToken(body.apiToken) ? body.apiToken : undefined
+  let workspaceId: string | undefined = isValidWorkspaceId(body.workspaceId) ? body.workspaceId : undefined
   if (!apiToken || !workspaceId) {
-    const resolved = await resolveCredentials(supabase, user.id)
+    const resolved = await resolveCredentials(supabase, user)
     if (resolved.queryFailed) {
       return NextResponse.json({ error: "Failed to load Toggl settings. Please retry." }, { status: 503 })
     }
@@ -154,6 +152,13 @@ async function fetchTogglEntry(apiToken: string | undefined, workspaceId: string
         },
         { status: 400 },
       )
+    }
+
+    // 保存済み・環境変数由来の値も検証する（古いデータや設定ミスで
+    // 想定外の文字が入っていると、URL組み立てやBasic認証ヘッダー生成が壊れる）
+    if (!isValidApiToken(apiToken) || !isValidWorkspaceId(workspaceId)) {
+      console.error("Toggl credentials have an unexpected format; refusing to call the API")
+      return NextResponse.json({ error: "Stored Toggl credentials have an invalid format." }, { status: 400 })
     }
 
     const auth = base64Encode(`${apiToken}:api_token`)

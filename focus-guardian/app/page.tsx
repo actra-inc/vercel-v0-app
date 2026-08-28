@@ -9,6 +9,11 @@ import {
 } from "@/lib/supabase"
 import { useSupabaseData } from "@/hooks/use-supabase-data"
 import type { TogglSaveResult } from "@/components/toggl-settings"
+import {
+  readScopedTogglCredentials,
+  writeScopedTogglCredentials,
+  clearTogglCredentials,
+} from "@/lib/toggl-credentials"
 import { TimeTracker } from "@/components/time-tracker"
 import { WorkLogPanel } from "@/components/work-log-panel"
 import { SettingsPanel } from "@/components/settings-panel"
@@ -214,14 +219,17 @@ const Page = () => {
   // Toggl資格情報の保存先はDB(user_settings)が正。ただしDB側に列が無い等で
   // 保存できない環境では、この端末のlocalStorageへ退避して連携自体は動くようにする
   // （次回ロード時に use-supabase-data 側がDBへの移行を自動で再試行する）
+  // 退避先はユーザーIDで分ける（共有端末で別アカウントにログインしたときに
+  // 他人のトークンを拾わないようにするため）
   const [togglLocalCreds, setTogglLocalCreds] = useState<{ token: string; workspaceId: string } | null>(null)
 
   useEffect(() => {
-    if (typeof window === "undefined") return
-    const token = localStorage.getItem("toggl_api_token") || ""
-    const workspaceId = localStorage.getItem("toggl_workspace_id") || ""
-    if (token && workspaceId) setTogglLocalCreds({ token, workspaceId })
-  }, [])
+    if (!user?.id) {
+      setTogglLocalCreds(null)
+      return
+    }
+    setTogglLocalCreds(readScopedTogglCredentials(user.id))
+  }, [user?.id])
 
   const togglApiToken = userSettings?.toggl_api_token || togglLocalCreds?.token || ""
   const togglWorkspaceId = userSettings?.toggl_workspace_id || togglLocalCreds?.workspaceId || ""
@@ -234,10 +242,7 @@ const Page = () => {
       try {
         await updateSettings({ toggl_api_token: token, toggl_workspace_id: workspaceId })
         // DBに入ったので端末ローカルの退避コピーは不要
-        try {
-          localStorage.removeItem("toggl_api_token")
-          localStorage.removeItem("toggl_workspace_id")
-        } catch {}
+        if (user?.id) clearTogglCredentials(user.id)
         setTogglLocalCreds(null)
         return { stored: "db" }
       } catch (error: any) {
@@ -267,15 +272,19 @@ const Page = () => {
         // DB側のスキーマが原因なら、この端末へ退避して機能自体は使えるようにする
         const schemaIssue =
           cause === "missing_column" || cause === "missing_table" || cause === "stale_schema_cache"
-        if (schemaIssue) {
+        if (schemaIssue && user?.id) {
           try {
             if (token && workspaceId) {
-              localStorage.setItem("toggl_api_token", token)
-              localStorage.setItem("toggl_workspace_id", workspaceId)
+              writeScopedTogglCredentials(user.id, { token, workspaceId })
+              // 書き込めたか確認する（プライベートモード等では保存されない）。
+              // 保存できていないのに「この端末に保存しました」と出すと、
+              // 実際には資格情報がどこにも残らない
+              if (!readScopedTogglCredentials(user.id)) {
+                throw new Error("local fallback storage is unavailable")
+              }
               setTogglLocalCreds({ token, workspaceId })
             } else {
-              localStorage.removeItem("toggl_api_token")
-              localStorage.removeItem("toggl_workspace_id")
+              clearTogglCredentials(user.id)
               setTogglLocalCreds(null)
             }
             return {
