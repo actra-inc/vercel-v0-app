@@ -7,12 +7,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Upload, Play, Pause, Camera, Zap, Trash2, AlertCircle } from "lucide-react"
+import { Upload, Play, Pause, Camera, Zap, Trash2, AlertCircle, MonitorX, RefreshCw, X } from "lucide-react"
 import { WorkLogItem } from "@/components/work-log-item"
 import { AIAnalysisStatus } from "@/components/ai-analysis-status"
 import { AudioPermissionManager } from "@/components/audio-permission-manager"
 import { NotificationPermissionManager } from "@/components/notification-permission-manager"
-import { showDistractionNotification } from "@/lib/notification"
+import { showDistractionNotification, showCaptureInterruptedNotification } from "@/lib/notification"
 import { useScreenCapture } from "@/hooks/use-screen-capture"
 import { cn } from "@/lib/utils"
 import { useTranslation } from "@/lib/i18n"
@@ -65,6 +65,40 @@ interface WorkLogPanelProps {
   addWorkLog: (log: any) => Promise<any>
   clearWorkLogs: () => Promise<{ dbDeleteFailed: boolean } | void>
   onTrackingChange?: (isTracking: boolean, startTime: Date | null) => void
+}
+
+// アラート音。コンポーネントの状態に依存しないのでモジュールスコープに置き、
+// 脱線アラートと画面共有の中断通知の両方から呼べるようにする
+function playAlertTone() {
+  try {
+    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
+
+    for (let i = 0; i < 2; i++) {
+      setTimeout(() => {
+        const oscillator = audioContext.createOscillator()
+        const gainNode = audioContext.createGain()
+
+        oscillator.connect(gainNode)
+        gainNode.connect(audioContext.destination)
+
+        oscillator.frequency.setValueAtTime(800, audioContext.currentTime)
+        oscillator.frequency.setValueAtTime(600, audioContext.currentTime + 0.15)
+
+        gainNode.gain.setValueAtTime(0.1, audioContext.currentTime)
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3)
+
+        oscillator.start(audioContext.currentTime)
+        oscillator.stop(audioContext.currentTime + 0.3)
+      }, i * 400)
+    }
+
+    // 再生完了後にAudioContextを解放（作りっぱなしだとブラウザの上限に達して音が鳴らなくなる）
+    setTimeout(() => {
+      audioContext.close().catch(() => {})
+    }, 1200)
+  } catch (error) {
+    console.error("❌ Failed to play alert sound:", error)
+  }
 }
 
 export function WorkLogPanel({
@@ -487,11 +521,30 @@ export function WorkLogPanel({
     [analyzeScreenshot],
   )
 
-  const { isTracking, isCapturing, lastCaptureTime, startAutoCapture, stopCapture } = useScreenCapture({
+  // 共有していた画面が消えたとき（外部ディスプレイを外した・クラムシェル・
+  // ブラウザの「共有を停止」など）。ブラウザの仕様上ここから自動で共有を
+  // 取り直すことはできない（getDisplayMedia の再実行にはユーザー操作が要る）ため、
+  // 音と通知で気付けるようにして、ワンクリックで再開できる導線を出す
+  const handleInterrupted = useCallback(() => {
+    playAlertTone()
+    showCaptureInterruptedNotification(t('wlp_interruptedNotifTitle'), t('wlp_interruptedNotifBody'))
+  }, [t])
+
+  const {
+    isTracking,
+    isCapturing,
+    isInterrupted,
+    isSourcePaused,
+    lastCaptureTime,
+    startAutoCapture,
+    stopCapture,
+    dismissInterruption,
+  } = useScreenCapture({
     interval: captureInterval * 1000,
     quality: 0.8,
     onCapture: handleCapture,
     onError: handleError,
+    onInterrupted: handleInterrupted,
   })
 
   // 実際のトラッキング状態の変化だけを親に通知する。
@@ -516,6 +569,13 @@ export function WorkLogPanel({
     }
   }
 
+  // 中断からの再開。ブラウザの共有ピッカーはユーザー操作からしか開けないため、
+  // このクリックを起点に取り直す（選び直す画面が1回だけ出る）
+  const handleResumeTracking = async () => {
+    console.log("🔁 Resuming screen capture after interruption...")
+    await startAutoCapture()
+  }
+
   // 警告音の連鳴防止（通知側 lib/notification.ts の60秒クールダウンと同型）。
   // 30秒間隔化により、脱線継続中や保存リトライ中はキャプチャごとに
   // このパスへ到達するため、スロットルが無いと30秒ごとに鳴り続ける
@@ -528,35 +588,7 @@ export function WorkLogPanel({
       return
     }
     lastAlertSoundAtRef.current = now
-    try {
-      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
-
-      for (let i = 0; i < 2; i++) {
-        setTimeout(() => {
-          const oscillator = audioContext.createOscillator()
-          const gainNode = audioContext.createGain()
-
-          oscillator.connect(gainNode)
-          gainNode.connect(audioContext.destination)
-
-          oscillator.frequency.setValueAtTime(800, audioContext.currentTime)
-          oscillator.frequency.setValueAtTime(600, audioContext.currentTime + 0.15)
-
-          gainNode.gain.setValueAtTime(0.1, audioContext.currentTime)
-          gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3)
-
-          oscillator.start(audioContext.currentTime)
-          oscillator.stop(audioContext.currentTime + 0.3)
-        }, i * 400)
-      }
-
-      // 再生完了後にAudioContextを解放（作りっぱなしだとブラウザの上限に達して音が鳴らなくなる）
-      setTimeout(() => {
-        audioContext.close().catch(() => {})
-      }, 1200)
-    } catch (error) {
-      console.error("❌ Failed to play alert sound:", error)
-    }
+    playAlertTone()
   }
 
   const onPlayAlert = () => {
@@ -638,6 +670,45 @@ export function WorkLogPanel({
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* 画面共有が意図せず切れたときの復帰導線。
+              ブラウザは終了したストリームを復帰できず、getDisplayMedia の再実行にも
+              ユーザー操作が必要なため、押すだけで再開できるボタンを前面に出す */}
+          {isInterrupted && (
+            <div className="p-3 bg-amber-50 border border-amber-300 rounded-lg flex items-start gap-2">
+              <MonitorX className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+              <div className="text-sm text-amber-900 flex-1">
+                <div className="font-medium">{t('wlp_interruptedTitle')}</div>
+                <div className="text-xs mt-1">{t('wlp_interruptedDesc')}</div>
+                <div className="text-xs mt-1 text-amber-800">{t('wlp_interruptedHint')}</div>
+                <div className="flex gap-2 mt-2">
+                  <Button
+                    size="sm"
+                    onClick={handleResumeTracking}
+                    disabled={!isApiKeyValid || isCapturing}
+                    className="flex items-center gap-1.5"
+                  >
+                    <RefreshCw className="h-3.5 w-3.5" />
+                    {t('wlp_interruptedResume')}
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={dismissInterruption} className="flex items-center gap-1.5">
+                    <X className="h-3.5 w-3.5" />
+                    {t('wlp_interruptedDismiss')}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 映像の供給だけが一時的に止まっている状態。トラックは生きているので
+              復帰すれば自動で解析が続く（真っ黒な画像を解析して無料枠を
+              消費しないよう、この間はキャプチャを見送る） */}
+          {isTracking && isSourcePaused && (
+            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
+              <div className="font-medium">{t('wlp_sourcePausedTitle')}</div>
+              <div className="text-xs mt-1">{t('wlp_sourcePausedDesc')}</div>
+            </div>
+          )}
+
           {lastAnalysisError && (
             <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg flex items-start gap-2">
               <AlertCircle className="h-4 w-4 text-orange-600 mt-0.5 shrink-0" />

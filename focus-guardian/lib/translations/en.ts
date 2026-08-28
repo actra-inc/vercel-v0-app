@@ -123,6 +123,15 @@ export const en: Record<TranslationKey, string> = {
   wlp_errUnexpected: 'Analysis error: {msg} - analysis is still running and will retry on the next capture',
   wlp_errCapture: 'Screen capture error: {msg} - will retry on the next capture. If it keeps happening, stop and restart the analysis',
   wlp_skipStreak: 'Skipping analysis because the screen has not changed ({count} in a row). It resumes automatically on a change or after {max} skips',
+  wlp_interruptedTitle: 'Screen sharing was interrupted',
+  wlp_interruptedDesc: 'The shared display was disconnected, or sharing was stopped in the browser. Screen analysis is paused. Browsers cannot restore an ended share automatically — picking the screen again requires a click.',
+  wlp_interruptedHint: '💡 To keep running when you unplug an external monitor, share your built-in display or a window instead of the external screen.',
+  wlp_interruptedResume: 'Resume sharing',
+  wlp_interruptedDismiss: 'Dismiss',
+  wlp_interruptedNotifTitle: 'Screen sharing stopped',
+  wlp_interruptedNotifBody: 'FlowNudge screen analysis is paused. Open the tab and press "Resume sharing".',
+  wlp_sourcePausedTitle: 'The shared screen is temporarily unavailable',
+  wlp_sourcePausedDesc: 'The video feed is paused (display asleep or shared window hidden). The share itself is still alive, so analysis resumes automatically once it comes back (captures are skipped until then).',
 
   // ReportsTab
   rt_deleted: 'Report deleted',

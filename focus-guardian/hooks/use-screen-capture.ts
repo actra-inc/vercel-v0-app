@@ -7,6 +7,8 @@ interface UseScreenCaptureOptions {
   quality?: number
   onCapture?: (blob: Blob) => void
   onError?: (error: Error) => void
+  /** ユーザーの停止操作以外でストリームが終了したとき（ディスプレイの接続が外れた等） */
+  onInterrupted?: () => void
 }
 
 // フレーム取得系のPromiseが永遠に解決しないケース（バックグラウンドタブで
@@ -25,27 +27,38 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
 }
 
 export function useScreenCapture(options: UseScreenCaptureOptions = {}) {
-  const { interval = 30000, quality = 0.8, onCapture, onError } = options
+  const { interval = 30000, quality = 0.8, onCapture, onError, onInterrupted } = options
 
   const [mediaStream, setMediaStream] = useState<MediaStream | null>(null)
   const [isTracking, setIsTracking] = useState(false)
   const [isCapturing, setIsCapturing] = useState(false)
   const [lastCaptureTime, setLastCaptureTime] = useState<Date | null>(null)
+  // ユーザーが止めたのではなく、共有していた画面自体が消えた状態
+  // （外部ディスプレイの取り外し・クラムシェル・ブラウザの「共有を停止」など）
+  const [isInterrupted, setIsInterrupted] = useState(false)
+  // 共有面が一時的に供給されない状態（ディスプレイのスリープ・クラムシェル・
+  // 最小化など）。トラックは生きているので、復帰すれば自動で解析が続く
+  const [isSourcePaused, setIsSourcePaused] = useState(false)
 
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
   const isCapturingRef = useRef(false)
   const streamRef = useRef<MediaStream | null>(null)
+  // 停止がユーザー起点かどうか。track の 'ended' はどちらでも発火するため、
+  // このフラグが無いと「意図的な停止」と「画面が消えた」を区別できない
+  const intentionalStopRef = useRef(false)
 
   // コールバックは ref 経由で常に最新を参照する
   // （トラッキング開始後にタスクやカテゴリを変更しても解析に反映されるように）
   const onCaptureRef = useRef(onCapture)
   const onErrorRef = useRef(onError)
+  const onInterruptedRef = useRef(onInterrupted)
   useEffect(() => {
     onCaptureRef.current = onCapture
     onErrorRef.current = onError
-  }, [onCapture, onError])
+    onInterruptedRef.current = onInterrupted
+  }, [onCapture, onError, onInterrupted])
 
-  const stopCapture = useCallback(() => {
+  const releaseStream = useCallback(() => {
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((track) => track.stop())
       streamRef.current = null
@@ -57,7 +70,35 @@ export function useScreenCapture(options: UseScreenCaptureOptions = {}) {
     }
     setIsTracking(false)
     setIsCapturing(false)
+    setIsSourcePaused(false)
+  }, [])
+
+  // ユーザー/アプリからの明示的な停止
+  const stopCapture = useCallback(() => {
+    intentionalStopRef.current = true
+    releaseStream()
+    setIsInterrupted(false)
     console.log("Screen capture stopped.")
+  }, [releaseStream])
+
+  // 共有していた画面が消えた（ディスプレイの接続が外れた・共有を停止された等）。
+  // ブラウザの仕様上、終了したトラックは復帰できず、getDisplayMedia の再実行には
+  // ユーザー操作が必要。ここでは状態を「中断」として保持し、呼び出し側が
+  // 気付ける通知とワンクリック再開を出せるようにする
+  const handleStreamEnded = useCallback(() => {
+    if (intentionalStopRef.current) return
+    // ended イベントとインターバル側の stream.active 判定の両方から呼ばれ得るため、
+    // 解放済みなら何もしない（通知や警告音が二重に出るのを防ぐ）
+    if (!streamRef.current) return
+    console.warn("Screen sharing ended unexpectedly (display disconnected or sharing stopped)")
+    releaseStream()
+    setIsInterrupted(true)
+    onInterruptedRef.current?.()
+  }, [releaseStream])
+
+  // 中断表示を閉じる（ユーザーが再開しないと決めたとき）
+  const dismissInterruption = useCallback(() => {
+    setIsInterrupted(false)
   }, [])
 
   // アンマウント時（タブ切り替え等）にストリームとインターバルを確実に解放する
@@ -78,12 +119,20 @@ export function useScreenCapture(options: UseScreenCaptureOptions = {}) {
     async (stream: MediaStream): Promise<Blob | null> => {
       if (!stream.active) {
         console.error("Stream is not active. Stopping capture.")
-        stopCapture()
+        handleStreamEnded()
         return null
       }
 
       if (isCapturingRef.current) {
         console.log("Capture already in progress, skipping.")
+        return null
+      }
+
+      // 供給が止まっている間に撮ると真っ黒な画像になり、無料枠と作業ログを
+      // 無駄に消費する。復帰(unmute)後の回で撮り直す
+      const track = stream.getVideoTracks()[0]
+      if (track?.muted) {
+        console.log("Video track is muted (display asleep or window hidden), skipping capture.")
         return null
       }
 
@@ -164,7 +213,7 @@ export function useScreenCapture(options: UseScreenCaptureOptions = {}) {
         isCapturingRef.current = false
       }
     },
-    [quality, stopCapture],
+    [quality, handleStreamEnded],
   )
 
   // トラッキング中にキャプチャ間隔の設定が変わったら、実際の周期にも反映する。
@@ -181,11 +230,10 @@ export function useScreenCapture(options: UseScreenCaptureOptions = {}) {
       if (stream.active) {
         captureFrame(stream)
       } else {
-        console.log("Stream is no longer active, stopping capture")
-        stopCapture()
+        handleStreamEnded()
       }
     }, interval)
-  }, [interval, captureFrame, stopCapture])
+  }, [interval, captureFrame, handleStreamEnded])
 
   const checkBrowserSupport = useCallback(() => {
     // HTTPS必須チェック
@@ -225,6 +273,9 @@ export function useScreenCapture(options: UseScreenCaptureOptions = {}) {
       console.warn("Screen capture already running; ignoring duplicate start request")
       return true
     }
+    // 中断表示は「実際に共有を取り直せたとき」に消す。
+    // ここで消すと、共有ピッカーをキャンセルしただけで再開導線が消えてしまう
+    intentionalStopRef.current = false
     console.log("=== Screen Capture Start Requested ===")
     console.log("User agent:", navigator.userAgent)
     console.log("Location:", location.href)
@@ -263,12 +314,27 @@ export function useScreenCapture(options: UseScreenCaptureOptions = {}) {
       streamRef.current = stream
       setMediaStream(stream)
       setIsTracking(true)
+      setIsInterrupted(false)
 
       // ストリーム終了イベントの監視
       const videoTrack = stream.getVideoTracks()[0]
+      // 共有停止・共有面の消失（ディスプレイを外した等）のどちらでも発火する。
+      // 意図的な停止かどうかは intentionalStopRef で見分ける
       videoTrack.addEventListener("ended", () => {
-        console.log("Screen sharing was stopped by the user")
-        stopCapture()
+        console.log("Screen sharing track ended")
+        handleStreamEnded()
+      })
+
+      // 一時的に映像が供給されない状態（ディスプレイのスリープ・クラムシェル等）。
+      // トラックは生きているため、復帰時に自動で解析が続く
+      setIsSourcePaused(videoTrack.muted)
+      videoTrack.addEventListener("mute", () => {
+        console.log("Screen sharing track muted (source temporarily unavailable)")
+        setIsSourcePaused(true)
+      })
+      videoTrack.addEventListener("unmute", () => {
+        console.log("Screen sharing track unmuted (source available again)")
+        setIsSourcePaused(false)
       })
 
       // 最初のフレームをキャプチャ
@@ -281,8 +347,7 @@ export function useScreenCapture(options: UseScreenCaptureOptions = {}) {
         if (stream.active) {
           captureFrame(stream)
         } else {
-          console.log("Stream is no longer active, stopping capture")
-          stopCapture()
+          handleStreamEnded()
         }
       }, interval)
 
@@ -360,14 +425,17 @@ export function useScreenCapture(options: UseScreenCaptureOptions = {}) {
       setIsTracking(false)
       return false
     }
-  }, [interval, stopCapture, captureFrame, checkBrowserSupport])
+  }, [interval, captureFrame, checkBrowserSupport, handleStreamEnded])
 
   return {
     mediaStream,
     isTracking,
     isCapturing,
+    isInterrupted,
+    isSourcePaused,
     lastCaptureTime,
     startAutoCapture,
     stopCapture,
+    dismissInterruption,
   }
 }

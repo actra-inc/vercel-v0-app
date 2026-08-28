@@ -155,6 +155,18 @@ export const showDistractionNotification = async ({
   return createNotification(title, body)
 }
 
+// 画面共有が意図せず切れたときの通知。
+// 脱線通知のクールダウンやアプリ内オン/オフとは独立させている
+// （気付かないと解析が止まったままになるうえ、頻発する種類の通知ではないため）
+export const showCaptureInterruptedNotification = async (
+  title: string,
+  body: string,
+): Promise<ShowNotificationResult> => {
+  if (!isNotificationSupported()) return { shown: false, reason: "unsupported" }
+  if (Notification.permission !== "granted") return { shown: false, reason: "not-granted" }
+  return createNotification(title, body, "flownudge-capture-interrupted")
+}
+
 // 設定画面から「通知が届くか」を確かめるためのテスト通知。
 // クールダウンとアプリ内オン/オフの影響を受けない（許可状態だけを検証する）
 export const sendTestNotification = async (title: string, body: string): Promise<ShowNotificationResult> => {

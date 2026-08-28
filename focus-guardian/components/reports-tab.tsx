@@ -396,7 +396,7 @@ export function ReportsTab({
                         {t('wsr_sourceScreenshots')}
                       </h4>
                       <div className="grid grid-cols-3 gap-2">
-                        {data.source_screenshots.map((url, imgIndex) => (
+                        {data.source_screenshots.map((url: string, imgIndex: number) => (
                           <a key={imgIndex} href={url} target="_blank" rel="noopener noreferrer">
                             <img
                               src={url}

@@ -121,6 +121,15 @@ export const ja = {
   wlp_errUnexpected: '解析エラー: {msg} - 解析は継続中です。次回キャプチャで再試行します',
   wlp_errCapture: '画面キャプチャエラー: {msg} - 次回キャプチャで再試行します。繰り返す場合は解析を停止し、「解析開始」からやり直してください',
   wlp_skipStreak: '画面に変化がないため解析をスキップ中（連続{count}回）。変化を検知するか{max}回に達すると自動で再解析します',
+  wlp_interruptedTitle: '画面共有が切断されました',
+  wlp_interruptedDesc: 'ディスプレイの接続が外れたか、ブラウザ側で共有が停止されました。画面解析は一時停止しています。ブラウザの仕様上、切れた共有は自動では復帰できず、取り直しにはクリック操作が必要です。',
+  wlp_interruptedHint: '💡 外部ディスプレイを外しても続けたいときは、共有する対象に「内蔵ディスプレイの画面全体」またはウィンドウを選ぶと切断されにくくなります。',
+  wlp_interruptedResume: '共有を再開',
+  wlp_interruptedDismiss: '閉じる',
+  wlp_interruptedNotifTitle: '画面共有が切れました',
+  wlp_interruptedNotifBody: 'FlowNudgeの画面解析が停止しています。タブを開いて「共有を再開」を押してください。',
+  wlp_sourcePausedTitle: '画面の映像が一時的に取得できません',
+  wlp_sourcePausedDesc: 'ディスプレイのスリープや共有ウィンドウの非表示などで映像が止まっています。共有自体は生きているので、復帰すると自動で解析を再開します（その間はキャプチャを見送ります）。',
 
   // ReportsTab
   rt_deleted: 'レポートを削除しました',
