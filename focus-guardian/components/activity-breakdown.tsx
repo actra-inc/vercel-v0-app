@@ -5,7 +5,7 @@ import { useState, useMemo, useEffect, useCallback, useRef } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { BarChart3, Plus, Loader2, AlertCircle, RefreshCw } from "lucide-react"
+import { BarChart3, Plus, Loader2, AlertCircle, RefreshCw, Info } from "lucide-react"
 import { getWorkLogsInRange, type WorkLog } from "@/lib/supabase"
 
 export interface ActivityCategory {
@@ -598,6 +598,54 @@ export function ActivityBreakdown({
             </div>
           </>
         )}
+
+        {/* 指標の見方（常設。各数値がどう算出されているかの解説） */}
+        <details className="rounded-lg border border-gray-200 bg-gray-50/60">
+          <summary className="cursor-pointer select-none px-3 py-2 text-sm font-medium text-gray-700 flex items-center gap-1.5">
+            <Info className="h-4 w-4 text-gray-400" />
+            {t('mx_title')}
+          </summary>
+          <div className="px-3 pb-3 space-y-2.5 text-xs text-gray-600 leading-relaxed">
+            <div className="p-2 bg-amber-50 border border-amber-200 rounded text-amber-800">
+              {t('mx_noTaskNote')}
+            </div>
+            <div>
+              <span className="font-medium text-gray-700">{t('mx_focus')}</span>
+              <span className="mx-1 text-gray-300">—</span>
+              {t('mx_focusDesc')}
+            </div>
+            <div>
+              <span className="font-medium text-gray-700">{t('mx_avgFocus')}</span>
+              <span className="mx-1 text-gray-300">—</span>
+              {t('mx_avgFocusDesc')}
+            </div>
+            <div>
+              <span className="font-medium text-gray-700">{t('mx_productive')}</span>
+              <span className="mx-1 text-gray-300">—</span>
+              {t('mx_productiveDesc')}
+            </div>
+            <div>
+              <span className="font-medium text-gray-700">{t('mx_category')}</span>
+              <span className="mx-1 text-gray-300">—</span>
+              {t('mx_categoryDesc')}
+            </div>
+            <div>
+              <span className="font-medium text-gray-700">{t('mx_distraction')}</span>
+              <span className="mx-1 text-gray-300">—</span>
+              {t('mx_distractionDesc')}
+            </div>
+            <div>
+              <span className="font-medium text-gray-700">{t('mx_confidence')}</span>
+              <span className="mx-1 text-gray-300">—</span>
+              {t('mx_confidenceDesc')}
+            </div>
+            <div>
+              <span className="font-medium text-gray-700">{t('mx_breakdownTime')}</span>
+              <span className="mx-1 text-gray-300">—</span>
+              {t('mx_breakdownTimeDesc')}
+            </div>
+          </div>
+        </details>
       </CardContent>
     </Card>
   )

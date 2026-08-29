@@ -4,7 +4,7 @@ import { useTranslation } from "@/lib/i18n"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import { Brain, Zap, TrendingUp } from "lucide-react"
+import { Brain, Zap, TrendingUp, Info } from "lucide-react"
 
 interface AIAnalysisStatusProps {
   totalLogs: number
@@ -68,6 +68,10 @@ export function AIAnalysisStatus({
                 <TrendingUp className="h-4 w-4 text-amber-600" />
               </div>
               <span className="text-sm font-medium text-gray-700">{t('ai_avgFocus')}</span>
+              {/* 算出方法の1行要約（詳細は作業内訳タブの「指標の見方」） */}
+              <span title={t('mx_focusTip')} className="cursor-help text-gray-400">
+                <Info className="h-3.5 w-3.5" />
+              </span>
             </div>
             <div className={`text-3xl font-bold mb-1 ${getFocusScoreColor(averageFocusScore)}`}>
               {Math.round(averageFocusScore)}
@@ -87,6 +91,9 @@ export function AIAnalysisStatus({
                 <Brain className="h-4 w-4 text-green-600" />
               </div>
               <span className="text-sm font-medium text-gray-700">{t('ai_productivityRate')}</span>
+              <span title={t('mx_productiveTip')} className="cursor-help text-gray-400">
+                <Info className="h-3.5 w-3.5" />
+              </span>
             </div>
             <div className={`text-3xl font-bold mb-1 ${getProductivityColor(productivePercentage)}`}>
               {Math.round(productivePercentage)}%
