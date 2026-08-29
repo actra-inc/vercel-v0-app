@@ -264,7 +264,14 @@ export function ActivityBreakdown({
   const requestIdRef = useRef(0)
 
   const fetchLogs = useCallback(async () => {
-    if (!userId || !range) return
+    if (!userId) return
+    if (!range) {
+      // カスタム期間が未確定の間、前の期間の集計を出したままにしない
+      setLogs([])
+      setTruncated(false)
+      setFetchError(false)
+      return
+    }
     const requestId = ++requestIdRef.current
     setLoading(true)
     setFetchError(false)
@@ -274,6 +281,8 @@ export function ActivityBreakdown({
         range.from.toISOString(),
         range.to.toISOString(),
         RANGE_FETCH_LIMIT,
+        // 集計に必要な列だけ取得（全列だと1か月ぶんで数MBになる）
+        "id, timestamp, work_category",
       )
       if (requestId !== requestIdRef.current) return // 古い応答は捨てる
       if (error || !data) {

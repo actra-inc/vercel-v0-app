@@ -172,6 +172,7 @@ export const en: Record<TranslationKey, string> = {
   rt_filterAll: 'All',
   rt_filterSummary: 'Summary reports',
   rt_filterDaily: 'Daily reports',
+  rt_filterEmpty: 'No reports of this type yet.',
   rt_sourceRange: 'Source: {count} work logs from {from} to {to}',
   rt_sourceDate: 'Source: {count} work logs on {date}',
 

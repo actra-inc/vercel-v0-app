@@ -538,10 +538,18 @@ export const getWorkLogsInRange = async (
   fromISO: string,
   toISO: string,
   limit = 5000,
+  // 集計用途では必要な列だけ取る（全列だと1か月ぶん×details等で数MBになる）。
+  // 部分選択時は created_at 等が無く parseWorkLog が例外になるため、そのまま返す
+  columns = "*",
 ) => {
+  // 呼び出し側は定数しか渡さないが、多重防御として列名以外の構文
+  // （埋め込みリソースの括弧など）を拒否する
+  if (!/^[a-zA-Z0-9_,\s*]+$/.test(columns)) {
+    return { data: null, error: { message: "invalid columns" } as any, truncated: false }
+  }
   const { data, error } = await supabase
     .from("work_logs")
-    .select("*")
+    .select(columns)
     .eq("user_id", userId)
     .gte("timestamp", fromISO)
     .lt("timestamp", toISO)
@@ -549,10 +557,11 @@ export const getWorkLogsInRange = async (
     .order("timestamp", { ascending: true })
     .limit(limit)
 
+  const rows = data as any[] | null
   return {
-    data: data ? data.map(parseWorkLog) : data,
+    data: rows ? (columns === "*" ? rows.map(parseWorkLog) : (rows as WorkLog[])) : rows,
     error,
-    truncated: (data?.length ?? 0) >= limit,
+    truncated: (rows?.length ?? 0) >= limit,
   }
 }
 

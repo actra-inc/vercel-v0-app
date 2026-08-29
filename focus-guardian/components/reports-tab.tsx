@@ -366,6 +366,9 @@ export function ReportsTab({
       {/* レポート一覧 */}
       <ScrollArea className="h-[750px]">
         <div className="space-y-6 px-6 pb-6">
+          {visibleReports.length === 0 && (
+            <div className="text-center py-10 text-sm text-gray-400">{t('rt_filterEmpty')}</div>
+          )}
           {visibleReports.map((report, index) => {
             // 日報は専用カードで表示
             if (report.report_type === "daily") {

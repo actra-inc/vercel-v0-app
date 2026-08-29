@@ -170,6 +170,7 @@ export const ja = {
   rt_filterAll: 'すべて',
   rt_filterSummary: 'まとめレポート',
   rt_filterDaily: '日報',
+  rt_filterEmpty: 'この種類のレポートはまだありません。',
   rt_sourceRange: '対象: {from}〜{to} の作業ログ{count}件',
   rt_sourceDate: '対象: {date} の作業ログ{count}件',
 

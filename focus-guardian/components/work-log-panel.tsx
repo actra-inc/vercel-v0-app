@@ -291,9 +291,12 @@ export function WorkLogPanel({
         consecutiveSkipsRef.current = 0
         setSkipStreak(0)
 
-        // 画像をリサイズしてbase64エンコード
+        // 画像をリサイズしてbase64エンコード。
+        // 2画面の横並び合成を1画面と同じ768pxまで縮めると各画面が約380pxになり
+        // 文字が読めず解析精度が崩れるため、合成時のみ上限を倍にする
+        const isComposite = (opts?.screenCount ?? 1) > 1
         console.log("🖼️ Resizing and encoding screenshot...")
-        const imageData = await resizeAndEncodeImage(blob, 768)
+        const imageData = await resizeAndEncodeImage(blob, isComposite ? 1536 : 768)
 
         const formData = new FormData()
         formData.append("imageData", imageData)

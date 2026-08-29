@@ -414,6 +414,14 @@ const Page = () => {
     }
     if (logsForToday.length === 0) throw new Error("No logs today")
 
+    // サーバー側は最終的に60件へ等間隔サンプリングするため、送信量だけ先に抑える
+    // （30秒間隔のフル稼働日は数千件になり、POSTボディが無駄に数MB膨らむ）
+    const MAX_UPLOAD_LOGS = 300
+    if (logsForToday.length > MAX_UPLOAD_LOGS) {
+      const stride = logsForToday.length / MAX_UPLOAD_LOGS
+      logsForToday = Array.from({ length: MAX_UPLOAD_LOGS }, (_, i) => logsForToday[Math.floor(i * stride)])
+    }
+
     const response = await fetch("/api/generate-daily-report", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
