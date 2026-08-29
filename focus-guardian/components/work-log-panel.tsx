@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Upload, Play, Pause, Camera, Zap, Trash2, AlertCircle, MonitorX, RefreshCw, X } from "lucide-react"
+import { Upload, Play, Pause, Camera, Zap, Trash2, AlertCircle, MonitorX, MonitorUp, RefreshCw, X } from "lucide-react"
 import { WorkLogItem } from "@/components/work-log-item"
 import { AIAnalysisStatus } from "@/components/ai-analysis-status"
 import { AudioPermissionManager } from "@/components/audio-permission-manager"
@@ -250,7 +250,7 @@ export function WorkLogPanel({
   const FORCE_ANALYZE_AFTER_SKIPS = 10
 
   const analyzeScreenshot = useCallback(
-    async (blob: Blob, opts?: { force?: boolean }) => {
+    async (blob: Blob, opts?: { force?: boolean; screenCount?: number }) => {
       if (!apiKey) {
         console.error("❌ API key not available")
         return
@@ -303,6 +303,9 @@ export function WorkLogPanel({
         formData.append("categories", JSON.stringify(categories))
         // 設定画面で選んだ解析モデルをサーバーに渡す（未設定ならサーバー既定）
         if (model) formData.append("model", model)
+        // 複数ディスプレイの横並び合成画像であることをサーバーに伝える
+        // （プロンプトに「左が画面1、右が画面2」の説明を挿し込ませる）
+        if ((opts?.screenCount ?? 1) > 1) formData.append("multiScreen", "1")
 
         console.log("[v0] Sending image to /api/analyze-screenshot")
 
@@ -492,9 +495,9 @@ export function WorkLogPanel({
   ) // 必要最小限の依存関係のみ
 
   const handleCapture = useCallback(
-    (blob: Blob) => {
+    (blob: Blob, info?: { screenCount: number }) => {
       console.log("📸 Screenshot captured, starting analysis...")
-      analyzeScreenshot(blob)
+      analyzeScreenshot(blob, { screenCount: info?.screenCount })
     },
     [analyzeScreenshot],
   )
@@ -547,9 +550,13 @@ export function WorkLogPanel({
     isInterrupted,
     isSourcePaused,
     lastCaptureTime,
+    screens,
     startAutoCapture,
+    addScreen,
+    removeScreen,
     stopCapture,
     dismissInterruption,
+    dismissScreen,
   } = useScreenCapture({
     interval: captureInterval * 1000,
     quality: 0.8,
@@ -569,6 +576,10 @@ export function WorkLogPanel({
     prevTrackingRef.current = isTracking
     onTrackingChange?.(isTracking, isTracking ? new Date() : null)
   }, [isTracking, onTrackingChange])
+
+  // 中断していない＝現在解析対象の画面
+  const activeScreens = screens.filter((sc) => !sc.interrupted)
+  const lostScreens = screens.filter((sc) => sc.interrupted)
 
   const handleToggleTracking = async () => {
     if (isTracking) {
@@ -674,7 +685,18 @@ export function WorkLogPanel({
               />
               {isTracking ? t('wlp_statusTracking') : t('wlp_statusStopped')}
             </span>
-            <Badge variant="outline" className="ml-auto border-amber-200 text-amber-700 bg-amber-50">
+            {activeScreens.length >= 2 && (
+              <Badge variant="outline" className="ml-auto border-blue-200 text-blue-700 bg-blue-50">
+                {t('wlp_screensBadge', { count: activeScreens.length })}
+              </Badge>
+            )}
+            <Badge
+              variant="outline"
+              className={cn(
+                "border-amber-200 text-amber-700 bg-amber-50",
+                activeScreens.length >= 2 ? "" : "ml-auto",
+              )}
+            >
               <Zap className="h-3 w-3 mr-1" />
               {captureInterval < 60 ? t('wlp_intervalSeconds', { count: captureInterval }) : t('wlp_intervalMinutes', { count: captureInterval / 60 })}
             </Badge>
@@ -709,6 +731,39 @@ export function WorkLogPanel({
               </div>
             </div>
           )}
+
+          {/* 2画面中の片方だけ共有が切れた場合。もう一方の解析は継続しているので、
+              全体バナーではなく画面単位の再共有導線を出す */}
+          {isTracking &&
+            lostScreens.map((sc) => (
+              <div key={sc.id} className="p-3 bg-amber-50 border border-amber-300 rounded-lg flex items-start gap-2">
+                <MonitorX className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+                <div className="text-sm text-amber-900 flex-1">
+                  <div className="font-medium">{t('wlp_screenLostTitle', { n: sc.label })}</div>
+                  <div className="text-xs mt-1">{t('wlp_screenLostDesc')}</div>
+                  <div className="flex gap-2 mt-2">
+                    <Button
+                      size="sm"
+                      onClick={() => addScreen()}
+                      disabled={isCapturing}
+                      className="flex items-center gap-1.5"
+                    >
+                      <RefreshCw className="h-3.5 w-3.5" />
+                      {t('wlp_interruptedResume')}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => dismissScreen(sc.id)}
+                      className="flex items-center gap-1.5"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                      {t('wlp_interruptedDismiss')}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ))}
 
           {/* 映像の供給だけが一時的に止まっている状態。トラックは生きているので
               復帰すれば自動で解析が続く（真っ黒な画像を解析して無料枠を
@@ -802,6 +857,30 @@ export function WorkLogPanel({
                 </>
               )}
             </Button>
+
+            {/* 複数ディスプレイ: 追加は必ずクリックから直接 getDisplayMedia を呼ぶ */}
+            {isTracking && activeScreens.length < 2 && (
+              <Button
+                variant="outline"
+                onClick={() => addScreen()}
+                disabled={isCapturing}
+                className="flex items-center gap-2"
+                title={t('wlp_addScreenHint')}
+              >
+                <MonitorUp className="h-4 w-4" />
+                {t('wlp_addScreen')}
+              </Button>
+            )}
+            {isTracking && activeScreens.length >= 2 && (
+              <Button
+                variant="outline"
+                onClick={() => removeScreen(activeScreens[activeScreens.length - 1].id)}
+                className="flex items-center gap-2"
+              >
+                <MonitorX className="h-4 w-4" />
+                {t('wlp_removeScreen', { n: activeScreens[activeScreens.length - 1].label })}
+              </Button>
+            )}
 
             <input
               ref={fileInputRef}

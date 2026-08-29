@@ -102,6 +102,8 @@ export async function POST(request: NextRequest) {
     const apiKey = formData.get("apiKey") as string
     const currentTask = formData.get("currentTask") as string
     const categoriesJson = formData.get("categories") as string
+    // 複数ディスプレイの横並び合成画像かどうか（クライアントが合成時のみ "1" を送る）
+    const isMultiScreen = formData.get("multiScreen") === "1"
     // 設定画面で選んだ解析モデル（未指定・不正値は既定にフォールバック）
     const modelParam = formData.get("model")
     const analysisModel = isValidModelId(modelParam) ? modelParam : DEFAULT_ANALYSIS_MODEL
@@ -135,9 +137,13 @@ export async function POST(request: NextRequest) {
     const analysisUrl = `https://generativelanguage.googleapis.com/v1beta/models/${analysisModel}:generateContent`
 
     const categoriesList = categories.join("、")
+    // 複数ディスプレイ合成時のみ追加する説明（1画面時は空文字＝プロンプト不変）
+    const multiScreenNote = isMultiScreen
+      ? `\n\n【画像について】\nこの画像は複数のディスプレイを横に並べて合成したものです。左が画面1、右が画面2です。両方の画面を見たうえで、ユーザーの主たる作業を判定してください。`
+      : ""
     const analysisPrompt = `あなたは作業効率モニタリングシステムです。このスクリーンショットを分析し、ユーザーが何をしているかを判定してください。
 
-現在の予定作業: "${currentTask || "未設定"}"
+現在の予定作業: "${currentTask || "未設定"}"${multiScreenNote}
 
 【脱線判定ルール】
 - 以下は予定作業に関わらず必ず distracted 扱い:

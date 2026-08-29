@@ -132,6 +132,12 @@ export const en: Record<TranslationKey, string> = {
   wlp_interruptedDismiss: 'Dismiss',
   wlp_interruptedNotifTitle: 'Screen sharing stopped',
   wlp_interruptedNotifBody: 'FlowNudge screen analysis is paused. Open the tab and press "Resume sharing".',
+  wlp_addScreen: 'Add a screen',
+  wlp_addScreenHint: 'Analyze a second display at the same time (up to 2 screens). Frames are combined into one image, so API usage does not increase.',
+  wlp_removeScreen: 'Remove screen {n}',
+  wlp_screensBadge: 'Analyzing {count} screens',
+  wlp_screenLostTitle: 'Screen {n} sharing was interrupted',
+  wlp_screenLostDesc: 'Analysis continues on the other screen. Press "Resume sharing" to share this screen again.',
   wlp_sourcePausedTitle: 'The shared screen is temporarily unavailable',
   wlp_sourcePausedDesc: 'The video feed is paused (display asleep or shared window hidden). The share itself is still alive, so analysis resumes automatically once it comes back (captures are skipped until then).',
 

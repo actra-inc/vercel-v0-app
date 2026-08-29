@@ -130,6 +130,12 @@ export const ja = {
   wlp_interruptedDismiss: '閉じる',
   wlp_interruptedNotifTitle: '画面共有が切れました',
   wlp_interruptedNotifBody: 'FlowNudgeの画面解析が停止しています。タブを開いて「共有を再開」を押してください。',
+  wlp_addScreen: '画面を追加',
+  wlp_addScreenHint: '2枚目のディスプレイも同時に解析できます（最大2画面）。1枚の画像に合成して解析するため、APIの使用回数は増えません。',
+  wlp_removeScreen: '画面{n}を解除',
+  wlp_screensBadge: '{count}画面を解析中',
+  wlp_screenLostTitle: '画面{n}の共有が切れました',
+  wlp_screenLostDesc: 'もう一方の画面の解析は継続しています。この画面も解析を続けるには「共有を再開」を押して共有し直してください。',
   wlp_sourcePausedTitle: '画面の映像が一時的に取得できません',
   wlp_sourcePausedDesc: 'ディスプレイのスリープや共有ウィンドウの非表示などで映像が止まっています。共有自体は生きているので、復帰すると自動で解析を再開します（その間はキャプチャを見送ります）。',
 
