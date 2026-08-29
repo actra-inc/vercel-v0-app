@@ -34,6 +34,8 @@ interface ReportData {
   recommendations: string[]
   overall_score: number
   source_screenshots?: string[]
+  /** もとになった作業ログの範囲（生成時に付与。旧レポートには無い） */
+  source_range?: { from: string; to: string; count: number }
 }
 
 // 日報（report_type='daily'）の report_data 構造
@@ -46,6 +48,7 @@ interface DailyReportData {
   blockers: string[]
   tomorrow: string[]
   markdown: string
+  source_range?: { from: string; to: string; count: number }
 }
 
 interface WorkLogEntry {
@@ -71,6 +74,18 @@ interface ReportsTabProps {
 // レポートに保存されたスクリーンショットURLのうち、そのまま描画してよいものだけを返す。
 // href/src にそのまま流すと javascript: などのスキームが混ざったときに
 // クリックでスクリプトが動くため、http(s)/data:image に限定する
+// まとめレポートの「対象」時刻表示。同日内なら時刻のみ、日をまたぐ場合は日付も付ける
+function formatSourceTime(iso: string, locale: string): string {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ""
+  return d.toLocaleString(locale, {
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  })
+}
+
 function safeScreenshotUrls(source: unknown): string[] {
   if (!Array.isArray(source)) return []
   return source.filter(
@@ -130,6 +145,9 @@ export function ReportsTab({
 
   // レポートのみを抽出し、日付順にソート
   // （summary=集中レポート、daily=日報。削除済みIDはローカルで即時除外）
+  // 種別フィルタ（すべて / まとめレポート / 日報）
+  const [typeFilter, setTypeFilter] = useState<"all" | "summary" | "daily">("all")
+
   const reports = workLogs
     .filter((log) => {
       return (
@@ -143,6 +161,13 @@ export function ReportsTab({
       const dateB = new Date(b.timestamp).getTime()
       return dateB - dateA
     })
+
+  // フィルタ表示中も番号が変わらないよう、通番は全まとめレポート基準で振る
+  const summaryIds = reports.filter((r) => r.report_type === "summary").map((r) => r.id)
+  const summaryNumber = (id: string) => summaryIds.length - summaryIds.indexOf(id)
+
+  const visibleReports =
+    typeFilter === "all" ? reports : reports.filter((r) => r.report_type === typeFilter)
 
   const handleDeleteReport = async (reportId: string) => {
     try {
@@ -312,10 +337,36 @@ export function ReportsTab({
         </div>
       </div>
 
+      {/* 作業ログとの違いの説明（「違いが分からない」への対応） */}
+      <div className="mx-6 p-3 bg-orange-50/70 border border-orange-100 rounded-lg text-xs text-gray-600 leading-relaxed space-y-0.5">
+        <div>{t('rt_explainWorkLog')}</div>
+        <div>{t('rt_explainSummary')}</div>
+        <div>{t('rt_explainDaily')}</div>
+      </div>
+
+      {/* 種別フィルタ */}
+      <div className="flex gap-1.5 px-6">
+        {([
+          ["all", t('rt_filterAll')],
+          ["summary", t('rt_filterSummary')],
+          ["daily", t('rt_filterDaily')],
+        ] as const).map(([key, label]) => (
+          <Button
+            key={key}
+            variant={typeFilter === key ? "default" : "outline"}
+            size="sm"
+            className="h-7 px-2.5 text-xs"
+            onClick={() => setTypeFilter(key)}
+          >
+            {label}
+          </Button>
+        ))}
+      </div>
+
       {/* レポート一覧 */}
       <ScrollArea className="h-[750px]">
         <div className="space-y-6 px-6 pb-6">
-          {reports.map((report, index) => {
+          {visibleReports.map((report, index) => {
             // 日報は専用カードで表示
             if (report.report_type === "daily") {
               return (
@@ -351,7 +402,7 @@ export function ReportsTab({
                         <FileText className="h-5 w-5 text-white" />
                       </div>
                       <div>
-                        <CardTitle className="text-xl text-gray-800">{t('rt_reportTitle', { num: String(reports.length - index) })}</CardTitle>
+                        <CardTitle className="text-xl text-gray-800">{t('rt_reportTitle', { num: String(summaryNumber(report.id)) })}</CardTitle>
                         <p className="text-sm text-gray-600 mt-1">
                           <Clock className="h-3 w-3 inline mr-1" />
                           {timestamp.toLocaleString(dateLocale, {
@@ -362,6 +413,16 @@ export function ReportsTab({
                             minute: "2-digit",
                           })}
                         </p>
+                        {/* もとになった作業ログの範囲（旧レポートには無いので条件付き） */}
+                        {data.source_range && (
+                          <p className="text-xs text-gray-500 mt-0.5">
+                            {t('rt_sourceRange', {
+                              from: formatSourceTime(data.source_range.from, dateLocale),
+                              to: formatSourceTime(data.source_range.to, dateLocale),
+                              count: data.source_range.count,
+                            })}
+                          </p>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
@@ -607,6 +668,14 @@ function DailyReportCard({
                 <Clock className="h-3 w-3 inline mr-1" />
                 {new Date(report.timestamp).toLocaleString(dateLocale)}
               </p>
+              {data.source_range && (
+                <p className="text-xs text-gray-500 mt-0.5">
+                  {t('rt_sourceDate', {
+                    date: new Date(data.source_range.from).toLocaleDateString(dateLocale),
+                    count: data.source_range.count,
+                  })}
+                </p>
+              )}
             </div>
           </div>
           <div className="flex items-center gap-2">

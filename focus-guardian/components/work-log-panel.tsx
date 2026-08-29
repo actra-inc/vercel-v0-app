@@ -65,6 +65,8 @@ interface WorkLogPanelProps {
   addWorkLog: (log: any) => Promise<any>
   clearWorkLogs: () => Promise<{ dbDeleteFailed: boolean } | void>
   onTrackingChange?: (isTracking: boolean, startTime: Date | null) => void
+  /** レポートタブへ切り替える（作業ログとレポートの違いの導線） */
+  onOpenReports?: () => void
 }
 
 // アラート音。コンポーネントの状態に依存しないのでモジュールスコープに置き、
@@ -111,6 +113,7 @@ export function WorkLogPanel({
   addWorkLog,
   clearWorkLogs,
   onTrackingChange,
+  onOpenReports,
 }: WorkLogPanelProps) {
   const { t, language } = useTranslation()
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -455,6 +458,14 @@ export function WorkLogPanel({
           .map(log => log.screenshot_url)
           .filter((url): url is string => typeof url === "string" && url.length > 0)
 
+        // もとになった作業ログの時刻レンジと件数（レポートカードの「対象」表示に使う）
+        const sourceTimes = sourceLogs.map((log) => new Date(log.timestamp).getTime())
+        const sourceRange = {
+          from: new Date(Math.min(...sourceTimes)).toISOString(),
+          to: new Date(Math.max(...sourceTimes)).toISOString(),
+          count: sourceLogs.length,
+        }
+
         // addWorkLog はネットワーク系エラーで throw せず null を返すため、
         // 戻り値を確認しないとレポートが無言で消えたまま節目キーも解放されない
         const savedReport = await addWorkLog({
@@ -463,7 +474,7 @@ export function WorkLogPanel({
           category: "neutral",
           details: reportData.summary,
           report_type: "summary",
-          report_data: { ...reportData, source_screenshots: sourceScreenshots },
+          report_data: { ...reportData, source_screenshots: sourceScreenshots, source_range: sourceRange },
         })
         if (!savedReport) {
           throw new Error("Report save returned null (network error)")
@@ -875,6 +886,19 @@ export function WorkLogPanel({
                 <Trash2 className="h-4 w-4" />
                 {t('wlp_clearAll')}
               </Button>
+            )}
+          </div>
+          {/* 作業ログとレポートの違いの導線（「違いが分からない」への対応） */}
+          <div className="text-xs text-gray-500 mt-1">
+            {t('wlp_logsAreRaw')}
+            {onOpenReports && (
+              <button
+                type="button"
+                onClick={onOpenReports}
+                className="ml-1 text-orange-600 hover:text-orange-700 underline underline-offset-2"
+              >
+                {t('wlp_openReports')}
+              </button>
             )}
           </div>
         </CardHeader>

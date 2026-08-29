@@ -51,6 +51,9 @@ export interface ReportData {
   key_findings: string[]
   recommendations: string[]
   overall_score: number
+  source_screenshots?: string[]
+  /** もとになった作業ログの範囲（生成時に付与。旧レポートには無い） */
+  source_range?: { from: string; to: string; count: number }
 }
 
 export interface WorkLog {

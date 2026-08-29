@@ -336,6 +336,14 @@ const Page = () => {
       .map((log: any) => log.screenshot_url)
       .filter((url: any): url is string => typeof url === "string" && url.length > 0)
 
+    // もとになった作業ログの時刻レンジと件数（レポートカードの「対象」表示に使う）
+    const sourceTimes = sourceLogs.map((log: any) => new Date(log.timestamp).getTime())
+    const sourceRange = {
+      from: new Date(Math.min(...sourceTimes)).toISOString(),
+      to: new Date(Math.max(...sourceTimes)).toISOString(),
+      count: sourceLogs.length,
+    }
+
     const savedReport = await addWorkLog({
       user_id: user?.id || "",
       timestamp: new Date().toISOString(),
@@ -344,7 +352,7 @@ const Page = () => {
       details: reportData.summary,
       applications: [],
       report_type: "summary",
-      report_data: { ...reportData, source_screenshots: sourceScreenshots },
+      report_data: { ...reportData, source_screenshots: sourceScreenshots, source_range: sourceRange },
     })
     if (!savedReport) {
       // addWorkLogはネットワーク系エラーでthrowせずnullを返す。
@@ -429,7 +437,11 @@ const Page = () => {
       details: reportData.summary,
       applications: [],
       report_type: "daily",
-      report_data: reportData,
+      report_data: {
+        ...reportData,
+        // 対象日と件数（日報カードの「対象」表示に使う）
+        source_range: { from: dayStart.toISOString(), to: dayEnd.toISOString(), count: logsForToday.length },
+      },
     })
     if (!savedReport) {
       // addWorkLogはネットワーク系エラーでthrowせずnullを返す。
@@ -726,6 +738,7 @@ const Page = () => {
                   addWorkLog={addWorkLog}
                   clearWorkLogs={clearWorkLogs}
                   onTrackingChange={handleTrackingChange}
+                  onOpenReports={() => setCurrentTab("reports")}
                 />
               </div>
             </div>
