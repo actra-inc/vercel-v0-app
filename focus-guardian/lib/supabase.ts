@@ -525,6 +525,34 @@ export const createWorkLog = async (log: Omit<WorkLog, "id" | "created_at">) => 
   return { data, error }
 }
 
+// 期間を指定して作業ログ（レポート行を除く）を取得する。
+// getWorkLogs は「直近500件」の窓しか持たず、30秒間隔では約4時間ぶんに
+// しかならないため、作業内訳の期間集計や日報の対象抽出はこちらを使う。
+// 返り値の truncated が true のときは期間内の全件を取り切れていない
+// （呼び出し側で「一部のみ集計」と明示すること）
+export const getWorkLogsInRange = async (
+  userId: string,
+  fromISO: string,
+  toISO: string,
+  limit = 5000,
+) => {
+  const { data, error } = await supabase
+    .from("work_logs")
+    .select("*")
+    .eq("user_id", userId)
+    .gte("timestamp", fromISO)
+    .lt("timestamp", toISO)
+    .is("report_type", null)
+    .order("timestamp", { ascending: true })
+    .limit(limit)
+
+  return {
+    data: data ? data.map(parseWorkLog) : data,
+    error,
+    truncated: (data?.length ?? 0) >= limit,
+  }
+}
+
 // 注意: RLSのDELETEポリシーが無い環境では、Supabaseはエラーを返さず
 // 「0行削除」で成功扱いになる。.select("id") で削除された行を返させ、
 // 削除件数を呼び出し側で検証できるようにする。

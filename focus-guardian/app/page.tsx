@@ -5,6 +5,7 @@ import {
   supabase,
   signInWithGoogle,
   diagnoseUserSettings,
+  getWorkLogsInRange,
   type UserSettingsDiagnosis,
 } from "@/lib/supabase"
 import { useSupabaseData } from "@/hooks/use-supabase-data"
@@ -364,11 +365,45 @@ const Page = () => {
     const apiKey = userSettings?.gemini_api_key
     if (!apiKey) throw new Error("API key not set")
     // 「今日」はクリック時点で判定し直す（useMemo版は日付をまたぐと
-    // 前日のまま固定され、昨日のログが今日の日報になっていた）
-    const todayStr = new Date().toDateString()
-    const logsForToday = workLogs.filter(
-      (log: any) => !log.report_type && new Date(log.timestamp).toDateString() === todayStr,
-    )
+    // 前日のまま固定され、昨日のログが今日の日報になっていた）。
+    // メモリ上のworkLogsは直近500件の窓しか無く、30秒間隔だと約4時間で
+    // あふれて古いログが日報から静かに欠落するため、DBから今日ぶんを取り直す
+    const dayStart = new Date()
+    dayStart.setHours(0, 0, 0, 0)
+    const dayEnd = new Date(dayStart)
+    dayEnd.setDate(dayEnd.getDate() + 1)
+
+    let logsForToday: any[] = []
+    if (user?.id) {
+      const { data: rangeLogs, error: rangeError } = await getWorkLogsInRange(
+        user.id,
+        dayStart.toISOString(),
+        dayEnd.toISOString(),
+      )
+      if (!rangeError && rangeLogs) {
+        // 「全てクリア」済みのログはUI表示と同様に対象外にする
+        let visible = rangeLogs
+        try {
+          const clearedAt = localStorage.getItem(`work_logs_cleared_at_${user.id}`)
+          if (clearedAt) {
+            const clearedTime = new Date(clearedAt).getTime()
+            visible = rangeLogs.filter((log) => new Date(log.timestamp).getTime() > clearedTime)
+          }
+        } catch {
+          /* localStorage不可の環境ではそのまま */
+        }
+        logsForToday = visible
+      } else {
+        console.warn("Range fetch for daily report failed; falling back to in-memory logs:", rangeError)
+      }
+    }
+    if (logsForToday.length === 0) {
+      // DB取得に失敗した場合のみ、従来どおりメモリ上の窓から抽出する
+      const todayStr = new Date().toDateString()
+      logsForToday = workLogs.filter(
+        (log: any) => !log.report_type && new Date(log.timestamp).toDateString() === todayStr,
+      )
+    }
     if (logsForToday.length === 0) throw new Error("No logs today")
 
     const response = await fetch("/api/generate-daily-report", {
@@ -710,7 +745,7 @@ const Page = () => {
 
           <TabsContent value="breakdown">
             <ActivityBreakdown
-              workLogs={workLogs as any}
+              userId={user?.id || ""}
               categories={categories}
               captureInterval={userSettings?.capture_interval || DEFAULT_CAPTURE_INTERVAL_SECONDS}
               onCategoriesChange={handleCategoriesChange}
