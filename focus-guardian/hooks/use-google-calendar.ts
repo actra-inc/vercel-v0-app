@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from "react"
 import { supabase } from "@/lib/supabase"
+import { useTranslation } from "@/lib/i18n"
 
 export interface CalendarEvent {
   id: string
@@ -32,6 +33,8 @@ export const getEventColor = (colorId?: string): string => {
 }
 
 export function useGoogleCalendar() {
+  const { t, language } = useTranslation()
+  const timeLocale = language === "ja" ? "ja-JP" : "en-US"
   const [events, setEvents] = useState<CalendarEvent[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -48,7 +51,7 @@ export function useGoogleCalendar() {
 
       if (!providerToken) {
         setNeedsReauth(true)
-        setError("カレンダーへのアクセス権限がありません。再ログインが必要です。")
+        setError(t('cal_noAccess'))
         return
       }
 
@@ -65,7 +68,7 @@ export function useGoogleCalendar() {
 
       if (response.status === 401) {
         setNeedsReauth(true)
-        setError("アクセストークンが期限切れです。再ログインしてください。")
+        setError(t('cal_tokenExpired'))
         return
       }
 
@@ -77,26 +80,26 @@ export function useGoogleCalendar() {
       const data = await response.json()
       setEvents(data.items || [])
     } catch (err) {
-      setError(err instanceof Error ? err.message : "カレンダーの取得に失敗しました")
+      setError(err instanceof Error ? err.message : t('cal_fetchFailed'))
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [t])
 
   const formatEventTime = (event: CalendarEvent): string => {
     const start = event.start.dateTime || event.start.date
     if (!start) return ""
 
     if (event.start.date && !event.start.dateTime) {
-      return "終日"
+      return t('cal_allDay')
     }
 
     const startDate = new Date(start)
     const endDate = event.end.dateTime ? new Date(event.end.dateTime) : null
 
-    const timeStr = startDate.toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" })
+    const timeStr = startDate.toLocaleTimeString(timeLocale, { hour: "2-digit", minute: "2-digit" })
     if (endDate) {
-      const endStr = endDate.toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" })
+      const endStr = endDate.toLocaleTimeString(timeLocale, { hour: "2-digit", minute: "2-digit" })
       return `${timeStr}〜${endStr}`
     }
     return timeStr

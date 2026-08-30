@@ -276,9 +276,9 @@ export function TogglSettings({
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <ShieldCheck className="h-5 w-5 text-green-600" />
-            Toggl Integration
+            {t('tg_cardTitle')}
           </CardTitle>
-          <CardDescription>Your Toggl integration is configured and active.</CardDescription>
+          <CardDescription>{t('tg_cardConfiguredDesc')}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <Alert variant="default" className="bg-green-50 border-green-200">
@@ -393,14 +393,14 @@ export function TogglSettings({
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Settings className="h-5 w-5" />
-          Integrations → Toggl
+          {t('tg_formTitle')}
         </CardTitle>
         <CardDescription>{t('tg_description')}</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSaveCredentials} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="apiToken">API Token</Label>
+            <Label htmlFor="apiToken">{t('tg_apiTokenLabel')}</Label>
             <div className="relative">
               <Input
                 id="apiToken"
@@ -426,15 +426,15 @@ export function TogglSettings({
                 {showApiToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </Button>
             </div>
-            <p className="text-xs text-gray-500">Find your API token in your Toggl Track profile settings.</p>
+            <p className="text-xs text-gray-500">{t('tg_apiTokenHint')}</p>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="workspaceId">Workspace ID</Label>
+            <Label htmlFor="workspaceId">{t('tg_workspaceIdLabel')}</Label>
             <Input
               id="workspaceId"
               name="workspaceId"
               type="text"
-              placeholder="Enter your Toggl Workspace ID"
+              placeholder={t('tg_workspaceIdPlaceholder')}
               value={workspaceId}
               onChange={(e) => setWorkspaceId(e.target.value)}
               required
@@ -443,18 +443,16 @@ export function TogglSettings({
               data-lpignore="true"
               data-form-type="other"
             />
-            <p className="text-xs text-gray-500">
-              You can find your Workspace ID in the URL when viewing your workspace settings.
-            </p>
+            <p className="text-xs text-gray-500">{t('tg_workspaceIdHint')}</p>
           </div>
           <div className="flex items-center justify-between">
             <Button type="submit" disabled={isSaving || !apiToken || !workspaceId} className="flex items-center gap-2">
               {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-              {isSaving ? "Validating..." : "Save Credentials"}
+              {isSaving ? t('tg_validating') : t('tg_saveCredentials')}
             </Button>
             <Button variant="link" asChild>
               <a href="https://track.toggl.com/profile" target="_blank" rel="noopener noreferrer" className="text-sm">
-                Find your credentials <ExternalLink className="ml-1 h-3 w-3 inline" />
+                {t('tg_findCredentials')} <ExternalLink className="ml-1 h-3 w-3 inline" />
               </a>
             </Button>
           </div>

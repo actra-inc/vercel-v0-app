@@ -25,7 +25,14 @@ export function I18nProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const saved = localStorage.getItem('flownudge_language') as Language
-    if (saved === 'ja' || saved === 'en') setLanguageState(saved)
+    if (saved === 'ja' || saved === 'en') {
+      setLanguageState(saved)
+      return
+    }
+    // 未設定ならブラウザの言語設定に合わせる（日本語以外は英語）。
+    // 設定画面で切り替えた値は localStorage に保存され、以後はそちらが優先される
+    const browserLang = typeof navigator !== 'undefined' ? navigator.language || '' : ''
+    setLanguageState(browserLang.toLowerCase().startsWith('ja') ? 'ja' : 'en')
   }, [])
 
   const setLanguage = (lang: Language) => {
