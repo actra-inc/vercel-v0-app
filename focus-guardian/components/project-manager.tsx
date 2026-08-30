@@ -9,6 +9,16 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Plus, Edit2, Trash2, Folder } from "lucide-react"
 
 interface Project {
@@ -96,14 +106,29 @@ export function ProjectManager({
     setIsOpen(true)
   }
 
-  const handleDelete = async (projectId: string) => {
+  // alert()/confirm() はモーダルで JS スレッドを止め、解析ループのタイマーまで止めるため
+  // インライン表示と AlertDialog に置き換えている
+  const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
+
+  const handleDelete = (projectId: string) => {
+    setDeleteError(null)
     if (projects.length <= 1) {
-      alert(t('pm_minRequired'))
+      setDeleteError(t('pm_minRequired'))
       return
     }
+    setPendingDeleteId(projectId)
+  }
 
-    if (confirm(t('pm_confirmDelete'))) {
-      await removeProject(projectId)
+  const confirmDelete = async () => {
+    const id = pendingDeleteId
+    setPendingDeleteId(null)
+    if (!id) return
+    try {
+      await removeProject(id)
+    } catch (error) {
+      console.error("Project delete error:", error)
+      setDeleteError(t('pm_saveError'))
     }
   }
 
@@ -179,7 +204,7 @@ export function ProjectManager({
                     {editingProject ? t('common_update') : t('common_create')}
                   </Button>
                   <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>
-                    キャンセル
+                    {t('common_cancel')}
                   </Button>
                 </div>
               </form>
@@ -188,6 +213,21 @@ export function ProjectManager({
         </div>
       </CardHeader>
       <CardContent>
+        {deleteError && <p className="mb-2 text-sm text-red-600">{deleteError}</p>}
+        <AlertDialog open={pendingDeleteId !== null} onOpenChange={(open) => { if (!open) setPendingDeleteId(null) }}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>{t('pm_confirmDelete')}</AlertDialogTitle>
+              <AlertDialogDescription>{t('pm_confirmDeleteDesc')}</AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>{t('common_cancel')}</AlertDialogCancel>
+              <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">
+                {t('common_delete')}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
         <div className="space-y-2">
           {projects.map((project) => (
             <div key={project.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">

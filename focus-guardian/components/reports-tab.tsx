@@ -109,6 +109,13 @@ export function ReportsTab({
   const [isGenerating, setIsGenerating] = useState(false)
   const [isGeneratingDaily, setIsGeneratingDaily] = useState(false)
   const [generateError, setGenerateError] = useState<string | null>(null)
+  // alert() はモーダルで JS スレッドを止め、作業ログタブで動いている解析ループの
+  // タイマーまで止めてしまうため、結果はインラインで表示する
+  const [notice, setNotice] = useState<{ text: string; variant: "success" | "error" } | null>(null)
+  const showNotice = (text: string, variant: "success" | "error") => {
+    setNotice({ text, variant })
+    if (variant === "success") setTimeout(() => setNotice(null), 5000)
+  }
   // 削除成功したレポートを即座に画面から消すためのローカル状態
   // （onRefreshの再取得を待たずにUIへ反映する）
   const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set())
@@ -137,7 +144,7 @@ export function ReportsTab({
       // 日付跨ぎでボタンが活性のまま残った場合、「今日のログがない」のに
       // 汎用の失敗メッセージが出て誤解を招くため、原因別に文言を出し分ける
       const msg = e instanceof Error ? e.message : ""
-      alert(msg === "No logs today" ? t('dr_noLogsToday') : t('dr_generateError'))
+      showNotice(msg === "No logs today" ? t('dr_noLogsToday') : t('dr_generateError'), "error")
     } finally {
       setIsGeneratingDaily(false)
     }
@@ -188,11 +195,11 @@ export function ReportsTab({
         next.add(reportId)
         return next
       })
-      alert(t('rt_deleted'))
+      showNotice(t('rt_deleted'), "success")
       onRefresh()
     } catch (error) {
       console.error("Delete report error:", error)
-      alert(error instanceof Error ? error.message : t('rt_deleteError'))
+      showNotice(error instanceof Error ? error.message : t('rt_deleteError'), "error")
     } finally {
       setDeletingId(null)
     }
@@ -216,11 +223,11 @@ export function ReportsTab({
         reports.forEach((r) => next.add(r.id))
         return next
       })
-      alert(t('rt_allDeleted'))
+      showNotice(t('rt_allDeleted'), "success")
       onRefresh()
     } catch (error) {
       console.error("Delete all reports error:", error)
-      alert(error instanceof Error ? error.message : t('rt_allDeleteError'))
+      showNotice(error instanceof Error ? error.message : t('rt_allDeleteError'), "error")
     } finally {
       setDeletingAll(false)
     }
@@ -239,6 +246,11 @@ export function ReportsTab({
           </p>
           {generateError && (
             <p className="text-sm text-red-500 mb-3">{generateError}</p>
+          )}
+          {notice && (
+            <p className={`text-sm mb-3 ${notice.variant === "success" ? "text-green-700" : "text-red-600"}`}>
+              {notice.text}
+            </p>
           )}
           <div className="flex items-center justify-center gap-3 mt-4 flex-wrap">
             {onGenerateReport && (
@@ -336,6 +348,18 @@ export function ReportsTab({
           )}
         </div>
       </div>
+
+      {notice && (
+        <div
+          className={`mx-6 rounded-lg border px-3 py-2 text-sm ${
+            notice.variant === "success"
+              ? "border-green-200 bg-green-50 text-green-800"
+              : "border-red-200 bg-red-50 text-red-800"
+          }`}
+        >
+          {notice.text}
+        </div>
+      )}
 
       {/* 作業ログとの違いの説明（「違いが分からない」への対応） */}
       <div className="mx-6 p-3 bg-orange-50/70 border border-orange-100 rounded-lg text-xs text-gray-600 leading-relaxed space-y-0.5">
