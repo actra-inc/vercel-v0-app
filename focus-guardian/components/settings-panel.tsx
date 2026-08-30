@@ -10,6 +10,7 @@ import { GeminiApiSettings } from "@/components/gemini-api-settings"
 import { TogglSettings, type TogglSaveResult } from "@/components/toggl-settings"
 import { ProjectManager } from "@/components/project-manager"
 import { AppSettings } from "@/components/app-settings"
+import type { NudgePreferences } from "@/lib/config"
 import { VersionInfo } from "@/components/version-info"
 import { useTranslation } from "@/lib/i18n"
 
@@ -25,6 +26,8 @@ interface SettingsPanelProps {
   onModelChange: (model: string) => void
   onTogglCredentialsChange: (token: string, workspaceId: string) => void | Promise<TogglSaveResult | void>
   onCaptureIntervalChange: (interval: number) => void
+  nudgePreferences?: NudgePreferences
+  onNudgePreferencesChange?: (prefs: NudgePreferences) => void | Promise<void>
   onClose: () => void
   /** 開いたときに選択しておくタブ（他画面から「Toggl設定へ」などで飛べるように） */
   initialTab?: string
@@ -46,6 +49,8 @@ export function SettingsPanel({
   onModelChange,
   onTogglCredentialsChange,
   onCaptureIntervalChange,
+  nudgePreferences,
+  onNudgePreferencesChange,
   onClose,
   initialTab = "gemini",
   projects = [],
@@ -184,7 +189,12 @@ export function SettingsPanel({
             </TabsContent>
 
             <TabsContent value="app" className="mt-6">
-              <AppSettings captureInterval={captureInterval} onCaptureIntervalChange={onCaptureIntervalChange} />
+              <AppSettings
+                captureInterval={captureInterval}
+                onCaptureIntervalChange={onCaptureIntervalChange}
+                nudgePreferences={nudgePreferences}
+                onNudgePreferencesChange={onNudgePreferencesChange}
+              />
             </TabsContent>
 
             <TabsContent value="version" className="mt-6">

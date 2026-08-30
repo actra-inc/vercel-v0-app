@@ -26,7 +26,7 @@ import { Settings, LogOut, Activity, FileText, BarChart3, Camera, Brain, Calenda
 import { ActivityBreakdown, DEFAULT_CATEGORIES, type ActivityCategory } from "@/components/activity-breakdown"
 import { VersionBadge } from "@/components/version-badge"
 import { useTranslation } from "@/lib/i18n"
-import { DEFAULT_CAPTURE_INTERVAL_SECONDS } from "@/lib/config"
+import { DEFAULT_CAPTURE_INTERVAL_SECONDS, normalizeNudgePreferences } from "@/lib/config"
 
 const Page = () => {
   const { t } = useTranslation()
@@ -303,6 +303,12 @@ const Page = () => {
       }
     },
     [updateSettings, user],
+  )
+
+  // 休憩・無操作リマインドの設定（DB値を正規化。列が無くても既定値で動く）
+  const nudgePreferences = useMemo(
+    () => normalizeNudgePreferences(userSettings?.nudge_preferences),
+    [userSettings?.nudge_preferences],
   )
 
   const handleSignOut = useCallback(async () => {
@@ -747,6 +753,7 @@ const Page = () => {
                   clearWorkLogs={clearWorkLogs}
                   onTrackingChange={handleTrackingChange}
                   onOpenReports={() => setCurrentTab("reports")}
+                  nudgePreferences={nudgePreferences}
                 />
               </div>
             </div>
@@ -789,6 +796,10 @@ const Page = () => {
               }}
               onCaptureIntervalChange={async (interval) => {
                 await updateSettings({ capture_interval: interval })
+              }}
+              nudgePreferences={nudgePreferences}
+              onNudgePreferencesChange={async (prefs) => {
+                await updateSettings({ nudge_preferences: prefs })
               }}
               onTogglCredentialsChange={handleTogglCredentialsChange}
               projects={projects}

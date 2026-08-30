@@ -217,6 +217,24 @@ export const ja = {
   as_notifTestSent: 'テスト通知を送信しました。表示されない場合は①macOSの集中モード/おやすみモードがOFFか、②システム設定 > 通知 で「Google Chrome Helper (Alerts)」（Chromeの場合）の通知が許可されているか確認してください。',
   as_notifTestFailed: 'テスト通知を表示できませんでした。ブラウザの通知許可を確認してください。',
 
+  // 休憩・無操作リマインド
+  nd_breakBannerTitle: '連続{n}分作業しています',
+  nd_breakBannerDesc: '少し休憩しませんか？短い休憩は集中の回復に効果的です。',
+  nd_breakSnooze: 'あと15分',
+  nd_breakNotifTitle: 'そろそろ休憩しませんか？',
+  nd_breakNotifBody: '連続{n}分作業しています。少し画面から離れましょう。',
+  nd_idleBannerTitle: '画面が{n}分動いていません',
+  nd_idleBannerDesc: '休憩中ですか？スマホを見ているなら、そろそろ作業に戻りましょう。',
+  nd_idleNotifTitle: 'そろそろ作業に戻りましょう',
+  nd_idleNotifBody: '画面が{n}分動いていません。',
+  as_reminderSection: 'リマインド',
+  as_breakReminder: '休憩リマインド',
+  as_breakReminderHint: '連続作業が設定時間を超えたら、休憩を提案します（スヌーズ可）',
+  as_idleReminder: '無操作リマインド',
+  as_idleReminderHint: '画面が設定時間動いていないとき「作業に戻りましょう」と1回だけ知らせます（スマホ・離席対策）',
+  as_minutes: '{n}分',
+  as_saveFailed: '設定を保存できませんでした。データベースに列が不足している場合は、Supabaseで scripts/align-schema-with-code.sql を実行してください（保存されるまでは既定値で動作します）。',
+
   // WorkSummaryReport
   wsr_title: 'まとめレポート（自動生成）',
   wsr_overview: '概要',

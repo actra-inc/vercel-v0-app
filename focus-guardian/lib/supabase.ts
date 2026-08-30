@@ -1,4 +1,5 @@
 import { createBrowserClient } from "@supabase/ssr"
+import type { NudgePreferences } from "./config"
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -79,6 +80,21 @@ export interface WorkLog {
   created_at: string
 }
 
+/** 誤判定フィードバックから育てる、ユーザー編集可能な判定ルール */
+export interface AnalysisRule {
+  id: string
+  text: string
+  enabled: boolean
+  created_at: string
+}
+
+export interface WeeklyReportSettings {
+  enabled: boolean
+  channel: "email" | "slack" | "both"
+  slackWebhookUrl?: string
+  timezone?: string
+}
+
 export interface UserSettings {
   id: string
   user_id: string
@@ -88,6 +104,12 @@ export interface UserSettings {
   toggl_workspace_id?: string
   capture_interval: number
   auto_sync_toggl: boolean
+  /** 判定ルール（最大20件・各200文字。analyze-screenshot のプロンプトへ挿入される） */
+  analysis_rules?: AnalysisRule[]
+  /** 休憩・無操作リマインドの設定 */
+  nudge_preferences?: NudgePreferences
+  /** 週次レポート配信の設定 */
+  weekly_report?: WeeklyReportSettings
   created_at: string
   updated_at: string
 }
@@ -568,6 +590,23 @@ export const getWorkLogsInRange = async (
 // 注意: RLSのDELETEポリシーが無い環境では、Supabaseはエラーを返さず
 // 「0行削除」で成功扱いになる。.select("id") で削除された行を返させ、
 // 削除件数を呼び出し側で検証できるようにする。
+// 作業ログの部分更新（誤判定フィードバックによる再分類などに使う）。
+// 必ず所有者条件を付ける（RLSが効いていない環境でも他人の行を書き換えられない多重防御）
+export const updateWorkLog = async (id: string, userId: string, updates: Partial<WorkLog>) => {
+  const { data, error } = await supabase
+    .from("work_logs")
+    .update(updates)
+    .eq("id", id)
+    .eq("user_id", userId)
+    .select()
+  if (error) return { data: null, error }
+  if (!data || data.length === 0) {
+    // RLSのUPDATEポリシー欠落や他人の行の指定は「エラーなし0行」になる
+    return { data: null, error: { message: "Update affected 0 rows" } as any }
+  }
+  return { data: parseWorkLog(data[0]), error: null }
+}
+
 // userId を渡すと所有者条件も付ける（RLSが正しく効いていない環境でも
 // 他人の行のidを指定して消せないようにする多重防御）
 export const deleteWorkLog = async (id: string, userId?: string) => {

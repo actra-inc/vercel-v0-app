@@ -155,6 +155,27 @@ export const showDistractionNotification = async ({
   return createNotification(title, body)
 }
 
+// 休憩・無操作リマインドの通知。
+// 脱線通知とは別タグ・別クールダウン（同じ種類の連投だけを5分抑制する安全弁。
+// 発火頻度の制御は呼び出し側のロジックが担う）
+const reminderLastShownAt: Record<string, number> = {}
+const REMINDER_MIN_GAP_MS = 5 * 60 * 1000
+
+export const showReminderNotification = async (
+  kind: "break" | "idle",
+  title: string,
+  body: string,
+): Promise<ShowNotificationResult> => {
+  if (!isNotificationSupported()) return { shown: false, reason: "unsupported" }
+  if (Notification.permission !== "granted") return { shown: false, reason: "not-granted" }
+  const now = Date.now()
+  if (now - (reminderLastShownAt[kind] ?? 0) < REMINDER_MIN_GAP_MS) {
+    return { shown: false, reason: "cooldown" }
+  }
+  reminderLastShownAt[kind] = now
+  return createNotification(title, body, `flownudge-reminder-${kind}`)
+}
+
 // 画面共有が意図せず切れたときの通知。
 // 脱線通知のクールダウンやアプリ内オン/オフとは独立させている
 // （気付かないと解析が止まったままになるうえ、頻発する種類の通知ではないため）

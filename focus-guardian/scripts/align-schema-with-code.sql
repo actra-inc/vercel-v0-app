@@ -48,6 +48,14 @@ ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS gemini_model TEXT DEFAULT 'ge
 ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS capture_interval INTEGER DEFAULT 30;
 ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS auto_sync_toggl BOOLEAN DEFAULT false;
 
+-- 2c. 2026-08-30 追加機能の列（いずれもJSONB・冪等）
+--     analysis_rules: 誤判定フィードバックから作る判定ルール（最大20件）
+--     nudge_preferences: 休憩・無操作リマインドの設定
+--     weekly_report: 週次レポート配信の設定（enabled/channel/slackWebhookUrl/timezone）
+ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS analysis_rules JSONB;
+ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS nudge_preferences JSONB;
+ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS weekly_report JSONB;
+
 -- 3. user_settings の既定値をコード側と一致させる
 ALTER TABLE user_settings ALTER COLUMN gemini_model SET DEFAULT 'gemini-3.5-flash-lite';
 ALTER TABLE user_settings ALTER COLUMN capture_interval SET DEFAULT 30;
@@ -111,7 +119,8 @@ WHERE table_schema = 'public'
   AND table_name IN ('work_logs', 'user_settings')
   AND column_name IN ('work_category', 'report_type', 'report_data', 'confidence', 'focus_score',
                       'gemini_model', 'capture_interval',
-                      'toggl_api_token', 'toggl_workspace_id', 'gemini_api_key', 'auto_sync_toggl')
+                      'toggl_api_token', 'toggl_workspace_id', 'gemini_api_key', 'auto_sync_toggl',
+                      'analysis_rules', 'nudge_preferences', 'weekly_report')
 ORDER BY table_name, column_name;
 
 -- 確認用(2): user_settings に書き込みできるRLSポリシーがあるか

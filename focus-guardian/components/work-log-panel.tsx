@@ -7,15 +7,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Upload, Play, Pause, Camera, Zap, Trash2, AlertCircle, MonitorX, MonitorUp, RefreshCw, X } from "lucide-react"
+import { Upload, Play, Pause, Camera, Zap, Trash2, AlertCircle, MonitorX, MonitorUp, RefreshCw, X, Coffee, Smartphone } from "lucide-react"
 import { WorkLogItem } from "@/components/work-log-item"
 import { AIAnalysisStatus } from "@/components/ai-analysis-status"
 import { AudioPermissionManager } from "@/components/audio-permission-manager"
 import { NotificationPermissionManager } from "@/components/notification-permission-manager"
-import { showDistractionNotification, showCaptureInterruptedNotification } from "@/lib/notification"
+import { showDistractionNotification, showCaptureInterruptedNotification, showReminderNotification } from "@/lib/notification"
 import { useScreenCapture } from "@/hooks/use-screen-capture"
 import { cn } from "@/lib/utils"
 import { useTranslation } from "@/lib/i18n"
+import { DEFAULT_NUDGE_PREFERENCES, type NudgePreferences } from "@/lib/config"
 import type { ActivityCategory } from "@/components/activity-breakdown"
 
 interface DistractionCheck {
@@ -67,6 +68,8 @@ interface WorkLogPanelProps {
   onTrackingChange?: (isTracking: boolean, startTime: Date | null) => void
   /** レポートタブへ切り替える（作業ログとレポートの違いの導線） */
   onOpenReports?: () => void
+  /** 休憩・無操作リマインドの設定（page.tsx側で正規化済み） */
+  nudgePreferences?: NudgePreferences
 }
 
 // アラート音。コンポーネントの状態に依存しないのでモジュールスコープに置き、
@@ -114,6 +117,7 @@ export function WorkLogPanel({
   clearWorkLogs,
   onTrackingChange,
   onOpenReports,
+  nudgePreferences = DEFAULT_NUDGE_PREFERENCES,
 }: WorkLogPanelProps) {
   const { t, language } = useTranslation()
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -133,6 +137,32 @@ export function WorkLogPanel({
   // 差分スキップの可視化と強制解析（静的画面で解析が無音停止して見える問題への対応）
   const consecutiveSkipsRef = useRef(0)
   const [skipStreak, setSkipStreak] = useState(0)
+
+  // ---- 休憩・無操作リマインド ----
+  // 設定は ref 経由で最新を参照（チェッカーintervalを張り替えずに済む）
+  const nudgePrefsRef = useRef(nudgePreferences)
+  useEffect(() => {
+    nudgePrefsRef.current = nudgePreferences
+  }, [nudgePreferences])
+  // 連続作業の起点と次回休憩提案時刻
+  const trackingStartAtRef = useRef<number | null>(null)
+  const nextBreakAtRef = useRef<number | null>(null)
+  // スヌーズ期限。この間は休憩・無操作の両リマインドを抑制する
+  // （「休憩して」と言った直後に「作業に戻れ」と言う矛盾を避ける）
+  const breakSnoozeUntilRef = useRef(0)
+  // 画面が最後に変化した時刻。差分スキップのカウンタ（consecutiveSkipsRef）は
+  // 強制解析（FORCE_ANALYZE_AFTER_SKIPS）で0に戻るため無操作検知には使えない
+  const lastScreenChangeAtRef = useRef<number | null>(null)
+  // 無操作リマインドは1エピソード1回だけ（画面が変化したら解除）
+  const idleFiredRef = useRef(false)
+  const [breakBanner, setBreakBanner] = useState<{ minutes: number } | null>(null)
+  const [idleBanner, setIdleBanner] = useState<{ minutes: number } | null>(null)
+
+  const markScreenChanged = useCallback(() => {
+    lastScreenChangeAtRef.current = Date.now()
+    idleFiredRef.current = false
+    setIdleBanner(null)
+  }, [])
 
   const resizeAndEncodeImage = useCallback(async (blob: Blob, maxWidth: number): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -274,8 +304,17 @@ export function WorkLogPanel({
         // 前回と画面が変わっていなければAPIをスキップ（閾値2%）。
         // 手動アップロード時（opts.force）は差分チェックをバイパスする
         const currentImageData = await getImageData(blob)
+        // 初回キャプチャは「画面が動いている」起点として扱う
+        if (!opts?.force && !prevImageDataRef.current) {
+          markScreenChanged()
+        }
         if (!opts?.force && prevImageDataRef.current) {
           const diff = calculateDiff(prevImageDataRef.current, currentImageData)
+          if (diff >= 0.02) {
+            // 実際に画面が変化した時だけ無操作タイマーをリセットする
+            // （強制解析は変化ではないので更新しない）
+            markScreenChanged()
+          }
           if (diff < 0.02 && consecutiveSkipsRef.current < FORCE_ANALYZE_AFTER_SKIPS - 1) {
             consecutiveSkipsRef.current += 1
             setSkipStreak(consecutiveSkipsRef.current)
@@ -578,7 +617,71 @@ export function WorkLogPanel({
     if (prevTrackingRef.current === isTracking) return
     prevTrackingRef.current = isTracking
     onTrackingChange?.(isTracking, isTracking ? new Date() : null)
+
+    // リマインドの状態をトラッキング境界でリセットする
+    if (isTracking) {
+      const now = Date.now()
+      trackingStartAtRef.current = now
+      nextBreakAtRef.current = now + nudgePrefsRef.current.breakMinutes * 60_000
+      breakSnoozeUntilRef.current = 0
+      lastScreenChangeAtRef.current = now
+      idleFiredRef.current = false
+    } else {
+      trackingStartAtRef.current = null
+      nextBreakAtRef.current = null
+      lastScreenChangeAtRef.current = null
+      idleFiredRef.current = false
+      setBreakBanner(null)
+      setIdleBanner(null)
+    }
   }, [isTracking, onTrackingChange])
+
+  // 休憩・無操作の定期チェック。解析ループ（interval + analyzeScreenshot）とは
+  // 独立したタイマーで、既存の再入防止・クールダウン・差分スキップには一切触れない
+  useEffect(() => {
+    if (!isTracking) return
+    const timer = setInterval(() => {
+      const now = Date.now()
+      const prefs = nudgePrefsRef.current
+
+      // 休憩リマインド: 連続作業が閾値を超えるたびに提案（スヌーズで+15分）
+      if (
+        prefs.breakEnabled &&
+        trackingStartAtRef.current != null &&
+        nextBreakAtRef.current != null &&
+        now >= nextBreakAtRef.current
+      ) {
+        const workedMin = Math.round((now - trackingStartAtRef.current) / 60_000)
+        setBreakBanner({ minutes: workedMin })
+        showReminderNotification("break", t('nd_breakNotifTitle'), t('nd_breakNotifBody', { n: workedMin }))
+        // 次回は現時点から閾値後（設定変更は次のサイクルから反映される）
+        nextBreakAtRef.current = now + prefs.breakMinutes * 60_000
+      }
+
+      // 無操作リマインド: 画面が閾値以上変化していなければ1回だけ知らせる。
+      // 休憩スヌーズ中は抑制（休憩を促した直後に「戻れ」と言わない）
+      if (
+        prefs.idleEnabled &&
+        !idleFiredRef.current &&
+        lastScreenChangeAtRef.current != null &&
+        now - lastScreenChangeAtRef.current >= prefs.idleMinutes * 60_000 &&
+        now >= breakSnoozeUntilRef.current
+      ) {
+        const idleMin = Math.round((now - lastScreenChangeAtRef.current) / 60_000)
+        idleFiredRef.current = true
+        setIdleBanner({ minutes: idleMin })
+        showReminderNotification("idle", t('nd_idleNotifTitle'), t('nd_idleNotifBody', { n: idleMin }))
+      }
+    }, 20_000)
+    return () => clearInterval(timer)
+  }, [isTracking, t])
+
+  const handleBreakSnooze = useCallback(() => {
+    const now = Date.now()
+    breakSnoozeUntilRef.current = now + 15 * 60_000
+    nextBreakAtRef.current = now + 15 * 60_000
+    setBreakBanner(null)
+  }, [])
 
   // 中断していない＝現在解析対象の画面
   const activeScreens = screens.filter((sc) => !sc.interrupted)
@@ -775,6 +878,53 @@ export function WorkLogPanel({
             <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
               <div className="font-medium">{t('wlp_sourcePausedTitle')}</div>
               <div className="text-xs mt-1">{t('wlp_sourcePausedDesc')}</div>
+            </div>
+          )}
+
+          {/* 休憩リマインド（設定でオフ可。スヌーズで15分後に再提案） */}
+          {breakBanner && (
+            <div className="p-3 bg-sky-50 border border-sky-200 rounded-lg flex items-start gap-2">
+              <Coffee className="h-4 w-4 text-sky-600 mt-0.5 shrink-0" />
+              <div className="text-sm text-sky-900 flex-1">
+                <div className="font-medium">{t('nd_breakBannerTitle', { n: breakBanner.minutes })}</div>
+                <div className="text-xs mt-1">{t('nd_breakBannerDesc')}</div>
+                <div className="flex gap-2 mt-2">
+                  <Button size="sm" variant="outline" onClick={handleBreakSnooze} className="h-7 text-xs">
+                    {t('nd_breakSnooze')}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setBreakBanner(null)}
+                    className="h-7 text-xs flex items-center gap-1"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                    {t('wlp_interruptedDismiss')}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 無操作リマインド（画面が変化するまで再発火しない） */}
+          {idleBanner && (
+            <div className="p-3 bg-violet-50 border border-violet-200 rounded-lg flex items-start gap-2">
+              <Smartphone className="h-4 w-4 text-violet-600 mt-0.5 shrink-0" />
+              <div className="text-sm text-violet-900 flex-1">
+                <div className="font-medium">{t('nd_idleBannerTitle', { n: idleBanner.minutes })}</div>
+                <div className="text-xs mt-1">{t('nd_idleBannerDesc')}</div>
+                <div className="flex gap-2 mt-2">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setIdleBanner(null)}
+                    className="h-7 text-xs flex items-center gap-1"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                    {t('wlp_interruptedDismiss')}
+                  </Button>
+                </div>
+              </div>
             </div>
           )}
 

@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import { useTranslation, type Language } from "@/lib/i18n"
+import { DEFAULT_NUDGE_PREFERENCES, type NudgePreferences } from "@/lib/config"
 import {
   isDistractionNotificationEnabled,
   setDistractionNotificationEnabled,
@@ -19,9 +20,16 @@ import {
 interface AppSettingsProps {
   captureInterval: number
   onCaptureIntervalChange: (interval: number) => void
+  nudgePreferences?: NudgePreferences
+  onNudgePreferencesChange?: (prefs: NudgePreferences) => void | Promise<void>
 }
 
-export function AppSettings({ captureInterval, onCaptureIntervalChange }: AppSettingsProps) {
+export function AppSettings({
+  captureInterval,
+  onCaptureIntervalChange,
+  nudgePreferences = DEFAULT_NUDGE_PREFERENCES,
+  onNudgePreferencesChange,
+}: AppSettingsProps) {
   const { t, language, setLanguage } = useTranslation()
   const [mounted, setMounted] = useState(false)
   const [notifEnabled, setNotifEnabled] = useState(true)
@@ -47,6 +55,19 @@ export function AppSettings({ captureInterval, onCaptureIntervalChange }: AppSet
   }
 
   // 通知が実際に届くかをその場で確認する（届かない場合の切り分け用）
+  const [nudgeSaveError, setNudgeSaveError] = useState(false)
+  const handleNudgeChange = async (patch: Partial<NudgePreferences>) => {
+    setNudgeSaveError(false)
+    try {
+      await onNudgePreferencesChange?.({ ...nudgePreferences, ...patch })
+    } catch (e) {
+      // 列が無い環境（align-schema未実行）では保存に失敗する。
+      // 機能自体はローカル既定値で動き続けるため、案内だけ出す
+      console.warn("Failed to save nudge preferences:", e)
+      setNudgeSaveError(true)
+    }
+  }
+
   const handleTestNotification = async () => {
     const result = await sendTestNotification(t('as_notifTestTitle'), t('as_notifTestBody'))
     setNotifPermission(getNotificationPermission())
@@ -119,6 +140,91 @@ export function AppSettings({ captureInterval, onCaptureIntervalChange }: AppSet
             </SelectContent>
           </Select>
           <p className="text-xs text-gray-500">{t('as_intervalHint')}</p>
+        </div>
+
+        {/* 休憩・無操作リマインド */}
+        <div className="space-y-3">
+          <Label>{t('as_reminderSection')}</Label>
+
+          <div className="rounded-lg border border-gray-200 p-3 space-y-2">
+            <div className="text-sm font-medium text-gray-700">{t('as_breakReminder')}</div>
+            <div className="flex gap-2">
+              <Select
+                value={nudgePreferences.breakEnabled ? "on" : "off"}
+                onValueChange={(v) => handleNudgeChange({ breakEnabled: v === "on" })}
+              >
+                <SelectTrigger className="w-28">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="on">{t('as_notifEnabled')}</SelectItem>
+                  <SelectItem value="off">{t('as_notifDisabled')}</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select
+                value={String(nudgePreferences.breakMinutes)}
+                onValueChange={(v) => handleNudgeChange({ breakMinutes: Number(v) })}
+                disabled={!nudgePreferences.breakEnabled}
+              >
+                <SelectTrigger className="w-32">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {![45, 60, 90, 120].includes(nudgePreferences.breakMinutes) && (
+                    <SelectItem value={String(nudgePreferences.breakMinutes)}>
+                      {t('as_minutes', { n: nudgePreferences.breakMinutes })}
+                    </SelectItem>
+                  )}
+                  <SelectItem value="45">{t('as_minutes', { n: 45 })}</SelectItem>
+                  <SelectItem value="60">{t('as_minutes', { n: 60 })}</SelectItem>
+                  <SelectItem value="90">{t('as_minutes', { n: 90 })}</SelectItem>
+                  <SelectItem value="120">{t('as_minutes', { n: 120 })}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <p className="text-xs text-gray-500">{t('as_breakReminderHint')}</p>
+          </div>
+
+          <div className="rounded-lg border border-gray-200 p-3 space-y-2">
+            <div className="text-sm font-medium text-gray-700">{t('as_idleReminder')}</div>
+            <div className="flex gap-2">
+              <Select
+                value={nudgePreferences.idleEnabled ? "on" : "off"}
+                onValueChange={(v) => handleNudgeChange({ idleEnabled: v === "on" })}
+              >
+                <SelectTrigger className="w-28">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="on">{t('as_notifEnabled')}</SelectItem>
+                  <SelectItem value="off">{t('as_notifDisabled')}</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select
+                value={String(nudgePreferences.idleMinutes)}
+                onValueChange={(v) => handleNudgeChange({ idleMinutes: Number(v) })}
+                disabled={!nudgePreferences.idleEnabled}
+              >
+                <SelectTrigger className="w-32">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {![5, 10, 15, 20].includes(nudgePreferences.idleMinutes) && (
+                    <SelectItem value={String(nudgePreferences.idleMinutes)}>
+                      {t('as_minutes', { n: nudgePreferences.idleMinutes })}
+                    </SelectItem>
+                  )}
+                  <SelectItem value="5">{t('as_minutes', { n: 5 })}</SelectItem>
+                  <SelectItem value="10">{t('as_minutes', { n: 10 })}</SelectItem>
+                  <SelectItem value="15">{t('as_minutes', { n: 15 })}</SelectItem>
+                  <SelectItem value="20">{t('as_minutes', { n: 20 })}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <p className="text-xs text-gray-500">{t('as_idleReminderHint')}</p>
+          </div>
+
+          {nudgeSaveError && <p className="text-xs text-red-600">{t('as_saveFailed')}</p>}
         </div>
 
         {/* 脱線のブラウザ通知 */}

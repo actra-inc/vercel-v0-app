@@ -219,6 +219,24 @@ export const en: Record<TranslationKey, string> = {
   as_notifTestSent: 'Test notification sent. If nothing appeared, check: ① Focus / Do Not Disturb is OFF, and ② on macOS with Chrome, "Google Chrome Helper (Alerts)" is allowed in System Settings > Notifications.',
   as_notifTestFailed: 'Could not show the test notification. Please check the browser notification permission.',
 
+  // Break / idle reminders
+  nd_breakBannerTitle: 'You have been working for {n} minutes straight',
+  nd_breakBannerDesc: 'How about a short break? Brief pauses help restore focus.',
+  nd_breakSnooze: '15 more minutes',
+  nd_breakNotifTitle: 'Time for a break?',
+  nd_breakNotifBody: 'You have been working for {n} minutes straight. Step away from the screen for a bit.',
+  nd_idleBannerTitle: 'Your screen has not changed for {n} minutes',
+  nd_idleBannerDesc: 'On a break? If you are on your phone, it may be time to get back to work.',
+  nd_idleNotifTitle: 'Time to get back to work',
+  nd_idleNotifBody: 'Your screen has not changed for {n} minutes.',
+  as_reminderSection: 'Reminders',
+  as_breakReminder: 'Break reminder',
+  as_breakReminderHint: 'Suggests a break when you have worked past the set duration (snoozable)',
+  as_idleReminder: 'Idle reminder',
+  as_idleReminderHint: 'Notifies you once when the screen has not changed for the set duration (phone / away-from-desk)',
+  as_minutes: '{n} min',
+  as_saveFailed: 'Could not save the settings. If the database is missing columns, run scripts/align-schema-with-code.sql in Supabase (defaults are used until saved).',
+
   // WorkSummaryReport
   wsr_title: 'Summary report (auto-generated)',
   wsr_overview: 'Overview',

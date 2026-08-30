@@ -6,6 +6,35 @@
 // （経緯: 旧バグで 180、その後 60、検証の結果 30 が採用）
 export const DEFAULT_CAPTURE_INTERVAL_SECONDS = 30
 
+// 休憩・無操作リマインドの既定値。
+// user_settings.nudge_preferences（JSONB）が未設定・列欠落でもこの値で動作する
+export interface NudgePreferences {
+  breakEnabled: boolean
+  breakMinutes: number
+  idleEnabled: boolean
+  idleMinutes: number
+}
+
+export const DEFAULT_NUDGE_PREFERENCES: NudgePreferences = {
+  breakEnabled: true,
+  breakMinutes: 90,
+  idleEnabled: true,
+  idleMinutes: 10,
+}
+
+// DBから来た値を安全に正規化する（部分的な保存・不正値でも既定値で埋める）
+export function normalizeNudgePreferences(raw: unknown): NudgePreferences {
+  const r = (raw ?? {}) as Partial<NudgePreferences>
+  const num = (v: unknown, fallback: number) =>
+    typeof v === "number" && Number.isFinite(v) && v >= 1 && v <= 480 ? Math.round(v) : fallback
+  return {
+    breakEnabled: typeof r.breakEnabled === "boolean" ? r.breakEnabled : DEFAULT_NUDGE_PREFERENCES.breakEnabled,
+    breakMinutes: num(r.breakMinutes, DEFAULT_NUDGE_PREFERENCES.breakMinutes),
+    idleEnabled: typeof r.idleEnabled === "boolean" ? r.idleEnabled : DEFAULT_NUDGE_PREFERENCES.idleEnabled,
+    idleMinutes: num(r.idleMinutes, DEFAULT_NUDGE_PREFERENCES.idleMinutes),
+  }
+}
+
 export const config = {
   supabase: {
     url: process.env.NEXT_PUBLIC_SUPABASE_URL!,
