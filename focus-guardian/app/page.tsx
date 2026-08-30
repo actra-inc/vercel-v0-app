@@ -318,6 +318,31 @@ const Page = () => {
     [updateSettings],
   )
 
+  // 週次レポート配信の設定（DB値を正規化）
+  const weeklyReport = useMemo(() => {
+    const wr = (userSettings?.weekly_report ?? {}) as any
+    return {
+      enabled: wr?.enabled === true,
+      channel: (wr?.channel === "slack" || wr?.channel === "both" ? wr.channel : "email") as
+        | "email"
+        | "slack"
+        | "both",
+      slackWebhookUrl: typeof wr?.slackWebhookUrl === "string" ? wr.slackWebhookUrl : "",
+    }
+  }, [userSettings?.weekly_report])
+  const handleWeeklyReportChange = useCallback(
+    async (settings: any) => {
+      await updateSettings({
+        weekly_report: {
+          ...settings,
+          // 配信時刻の週境界は利用者のタイムゾーンで計算させる
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        },
+      })
+    },
+    [updateSettings],
+  )
+
   // 休憩・無操作リマインドの設定（DB値を正規化。列が無くても既定値で動く）
   const nudgePreferences = useMemo(
     () => normalizeNudgePreferences(userSettings?.nudge_preferences),
@@ -819,6 +844,8 @@ const Page = () => {
               }}
               analysisRules={analysisRules}
               onAnalysisRulesChange={handleAnalysisRulesChange}
+              weeklyReport={weeklyReport}
+              onWeeklyReportChange={handleWeeklyReportChange}
               onTogglCredentialsChange={handleTogglCredentialsChange}
               projects={projects}
               addProject={addProject}

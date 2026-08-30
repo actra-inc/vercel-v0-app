@@ -8,6 +8,8 @@ import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import { useTranslation, type Language } from "@/lib/i18n"
 import { DEFAULT_NUDGE_PREFERENCES, type NudgePreferences } from "@/lib/config"
+import type { WeeklyReportSettings } from "@/lib/supabase"
+import { Input } from "@/components/ui/input"
 import {
   isDistractionNotificationEnabled,
   setDistractionNotificationEnabled,
@@ -22,6 +24,8 @@ interface AppSettingsProps {
   onCaptureIntervalChange: (interval: number) => void
   nudgePreferences?: NudgePreferences
   onNudgePreferencesChange?: (prefs: NudgePreferences) => void | Promise<void>
+  weeklyReport?: WeeklyReportSettings
+  onWeeklyReportChange?: (settings: WeeklyReportSettings) => void | Promise<void>
 }
 
 export function AppSettings({
@@ -29,6 +33,8 @@ export function AppSettings({
   onCaptureIntervalChange,
   nudgePreferences = DEFAULT_NUDGE_PREFERENCES,
   onNudgePreferencesChange,
+  weeklyReport = { enabled: false, channel: "email" },
+  onWeeklyReportChange,
 }: AppSettingsProps) {
   const { t, language, setLanguage } = useTranslation()
   const [mounted, setMounted] = useState(false)
@@ -56,6 +62,67 @@ export function AppSettings({
 
   // 通知が実際に届くかをその場で確認する（届かない場合の切り分け用）
   const [nudgeSaveError, setNudgeSaveError] = useState(false)
+
+  // 週次レポート配信
+  const [wrSaveError, setWrSaveError] = useState(false)
+  const [slackUrlDraft, setSlackUrlDraft] = useState(weeklyReport.slackWebhookUrl ?? "")
+  const [slackUrlError, setSlackUrlError] = useState(false)
+  const [wrTesting, setWrTesting] = useState(false)
+  const [wrTestResult, setWrTestResult] = useState<string | null>(null)
+  useEffect(() => {
+    setSlackUrlDraft(weeklyReport.slackWebhookUrl ?? "")
+  }, [weeklyReport.slackWebhookUrl])
+
+  const handleWeeklyChange = async (patch: Partial<WeeklyReportSettings>) => {
+    setWrSaveError(false)
+    try {
+      await onWeeklyReportChange?.({ ...weeklyReport, ...patch })
+    } catch (e) {
+      console.warn("Failed to save weekly report settings:", e)
+      setWrSaveError(true)
+    }
+  }
+
+  const handleSaveSlackUrl = async () => {
+    const url = slackUrlDraft.trim()
+    // SSRF防止: Slackの正規Webhook以外は保存させない（サーバー側でも再検証される）
+    if (url && !url.startsWith("https://hooks.slack.com/")) {
+      setSlackUrlError(true)
+      return
+    }
+    setSlackUrlError(false)
+    await handleWeeklyChange({ slackWebhookUrl: url })
+  }
+
+  const handleWeeklyTest = async () => {
+    setWrTesting(true)
+    setWrTestResult(null)
+    try {
+      const res = await fetch("/api/weekly-report/test", { method: "POST" })
+      const data = await res.json().catch(() => null)
+      if (!res.ok || !data) {
+        setWrTestResult(t('wr_errFailed'))
+        return
+      }
+      if (data.errors?.includes("no_email_key")) {
+        setWrTestResult(t('wr_errNoEmailKey'))
+      } else if (data.errors?.includes("no_slack_url")) {
+        setWrTestResult(t('wr_errNoSlackUrl'))
+      } else if (data.emailSent && data.slackSent) {
+        setWrTestResult(t('wr_testOkBoth'))
+      } else if (data.emailSent) {
+        setWrTestResult(t('wr_testOkEmail'))
+      } else if (data.slackSent) {
+        setWrTestResult(t('wr_testOkSlack'))
+      } else {
+        setWrTestResult(t('wr_errFailed'))
+      }
+    } catch {
+      setWrTestResult(t('wr_errFailed'))
+    } finally {
+      setWrTesting(false)
+    }
+  }
   const handleNudgeChange = async (patch: Partial<NudgePreferences>) => {
     setNudgeSaveError(false)
     try {
@@ -225,6 +292,72 @@ export function AppSettings({
           </div>
 
           {nudgeSaveError && <p className="text-xs text-red-600">{t('as_saveFailed')}</p>}
+        </div>
+
+        {/* 週次レポート配信 */}
+        <div className="space-y-2">
+          <Label>{t('wr_section')}</Label>
+          <div className="rounded-lg border border-gray-200 p-3 space-y-3">
+            <p className="text-xs text-gray-500">{t('wr_hint')}</p>
+            <div className="flex gap-2">
+              <Select
+                value={weeklyReport.enabled ? "on" : "off"}
+                onValueChange={(v) => handleWeeklyChange({ enabled: v === "on" })}
+              >
+                <SelectTrigger className="w-28">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="on">{t('as_notifEnabled')}</SelectItem>
+                  <SelectItem value="off">{t('as_notifDisabled')}</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select
+                value={weeklyReport.channel}
+                onValueChange={(v) => handleWeeklyChange({ channel: v as WeeklyReportSettings["channel"] })}
+                disabled={!weeklyReport.enabled}
+              >
+                <SelectTrigger className="flex-1">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="email">{t('wr_channelEmail')}</SelectItem>
+                  <SelectItem value="slack">{t('wr_channelSlack')}</SelectItem>
+                  <SelectItem value="both">{t('wr_channelBoth')}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {(weeklyReport.channel === "slack" || weeklyReport.channel === "both") && (
+              <div className="space-y-1.5">
+                <Label htmlFor="slack-webhook" className="text-xs">{t('wr_slackUrlLabel')}</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="slack-webhook"
+                    type="url"
+                    placeholder="https://hooks.slack.com/services/..."
+                    value={slackUrlDraft}
+                    onChange={(e) => { setSlackUrlDraft(e.target.value); setSlackUrlError(false) }}
+                    className="text-sm"
+                    autoComplete="off"
+                  />
+                  <Button size="sm" variant="outline" onClick={handleSaveSlackUrl}>
+                    {t('common_save')}
+                  </Button>
+                </div>
+                {slackUrlError && <p className="text-xs text-red-600">{t('wr_slackUrlInvalid')}</p>}
+                <p className="text-xs text-gray-500">{t('wr_slackUrlHint')}</p>
+              </div>
+            )}
+
+            <div className="flex items-center gap-2">
+              <Button size="sm" variant="outline" onClick={handleWeeklyTest} disabled={wrTesting}>
+                {wrTesting ? t('wr_testing') : t('wr_test')}
+              </Button>
+              {wrTestResult && <p className="text-xs text-gray-600">{wrTestResult}</p>}
+            </div>
+            {wrSaveError && <p className="text-xs text-red-600">{t('as_saveFailed')}</p>}
+          </div>
         </div>
 
         {/* 脱線のブラウザ通知 */}

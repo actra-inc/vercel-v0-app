@@ -258,6 +258,24 @@ export const ja = {
   ar_editAria: 'ルールを編集',
   ar_deleteAria: 'ルールを削除',
 
+  // 週次レポート配信
+  wr_section: '週次レポート配信',
+  wr_hint: '毎週月曜の朝に、先週の作業時間・集中度・内訳のまとめを自動で届けます。',
+  wr_channelEmail: 'メール（登録アドレス宛）',
+  wr_channelSlack: 'Slack',
+  wr_channelBoth: 'メールとSlack',
+  wr_slackUrlLabel: 'Slack Webhook URL',
+  wr_slackUrlHint: 'Slackアプリの「Incoming Webhook」で作成したURLを貼り付けてください。',
+  wr_slackUrlInvalid: 'https://hooks.slack.com/ で始まるURLを入力してください。',
+  wr_test: 'テスト送信',
+  wr_testing: '送信中...',
+  wr_testOkEmail: 'メールを送信しました。受信ボックスを確認してください（届かない場合は迷惑メールも確認）。',
+  wr_testOkSlack: 'Slackへ送信しました。チャンネルを確認してください。',
+  wr_testOkBoth: 'メールとSlackへ送信しました。',
+  wr_errNoEmailKey: 'メール送信の設定（RESEND_API_KEY）がサーバーにありません。Vercelの環境変数を設定してください。',
+  wr_errNoSlackUrl: 'Slack Webhook URLが未設定です。上の欄に入力して保存してください。',
+  wr_errFailed: 'テスト送信に失敗しました。通信状態とサーバー設定を確認してください。',
+
   // WorkSummaryReport
   wsr_title: 'まとめレポート（自動生成）',
   wsr_overview: '概要',

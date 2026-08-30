@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { BarChart3, Plus, Loader2, AlertCircle, RefreshCw, Info } from "lucide-react"
 import { getWorkLogsInRange, type WorkLog } from "@/lib/supabase"
+import { computePerLogDurations } from "@/lib/log-stats"
 
 export interface ActivityCategory {
   id: string
@@ -124,27 +125,6 @@ export function resolveRange(
       return { from: f, to: addDays(t, 1) }
     }
   }
-}
-
-// ---- 時間推定 --------------------------------------------------------------
-
-// 「件数 × 現在のキャプチャ間隔」は (a) 間隔変更後に過去ログを誤って数える
-// (b) 解析を止めていた空白まで数えない、の2点で不正確だった。
-// 代わりに、時刻昇順の隣接ログの実時間差をそのログの所要時間とし、
-// 差が min(間隔×3, 300秒) を超える区間は「中断」とみなして上限でクリップする。
-// 期間内の最後のログは現在のキャプチャ間隔ぶんとして数える
-export function computePerLogDurations(
-  sortedLogs: Array<{ timestamp: string }>,
-  captureIntervalSeconds: number,
-): number[] {
-  const cap = Math.min(captureIntervalSeconds * 3, 300)
-  return sortedLogs.map((log, i) => {
-    if (i === sortedLogs.length - 1) return captureIntervalSeconds
-    const delta =
-      (new Date(sortedLogs[i + 1].timestamp).getTime() - new Date(log.timestamp).getTime()) / 1000
-    if (!Number.isFinite(delta) || delta < 0) return captureIntervalSeconds
-    return Math.min(delta, cap)
-  })
 }
 
 // ---- 選択期間の永続化 ------------------------------------------------------

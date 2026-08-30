@@ -11,7 +11,7 @@ import { TogglSettings, type TogglSaveResult } from "@/components/toggl-settings
 import { ProjectManager } from "@/components/project-manager"
 import { AppSettings } from "@/components/app-settings"
 import type { NudgePreferences } from "@/lib/config"
-import type { AnalysisRule } from "@/lib/supabase"
+import type { AnalysisRule, WeeklyReportSettings } from "@/lib/supabase"
 import { AnalysisRulesSettings } from "@/components/analysis-rules-settings"
 import { VersionInfo } from "@/components/version-info"
 import { useTranslation } from "@/lib/i18n"
@@ -32,6 +32,8 @@ interface SettingsPanelProps {
   onNudgePreferencesChange?: (prefs: NudgePreferences) => void | Promise<void>
   analysisRules?: AnalysisRule[]
   onAnalysisRulesChange?: (rules: AnalysisRule[]) => void | Promise<void>
+  weeklyReport?: WeeklyReportSettings
+  onWeeklyReportChange?: (settings: WeeklyReportSettings) => void | Promise<void>
   onClose: () => void
   /** 開いたときに選択しておくタブ（他画面から「Toggl設定へ」などで飛べるように） */
   initialTab?: string
@@ -57,6 +59,8 @@ export function SettingsPanel({
   onNudgePreferencesChange,
   analysisRules = [],
   onAnalysisRulesChange,
+  weeklyReport,
+  onWeeklyReportChange,
   onClose,
   initialTab = "gemini",
   projects = [],
@@ -204,6 +208,8 @@ export function SettingsPanel({
                 onCaptureIntervalChange={onCaptureIntervalChange}
                 nudgePreferences={nudgePreferences}
                 onNudgePreferencesChange={onNudgePreferencesChange}
+                weeklyReport={weeklyReport}
+                onWeeklyReportChange={onWeeklyReportChange}
               />
             </TabsContent>
 

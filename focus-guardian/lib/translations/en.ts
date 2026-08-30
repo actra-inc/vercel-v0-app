@@ -260,6 +260,24 @@ export const en: Record<TranslationKey, string> = {
   ar_editAria: 'Edit rule',
   ar_deleteAria: 'Delete rule',
 
+  // Weekly report delivery
+  wr_section: 'Weekly report delivery',
+  wr_hint: "Automatically delivers last week's work time, focus and breakdown every Monday morning.",
+  wr_channelEmail: 'Email (registered address)',
+  wr_channelSlack: 'Slack',
+  wr_channelBoth: 'Email and Slack',
+  wr_slackUrlLabel: 'Slack Webhook URL',
+  wr_slackUrlHint: 'Paste the URL created with Slack\'s "Incoming Webhook" app.',
+  wr_slackUrlInvalid: 'Enter a URL starting with https://hooks.slack.com/.',
+  wr_test: 'Send test',
+  wr_testing: 'Sending...',
+  wr_testOkEmail: 'Email sent. Check your inbox (and spam folder).',
+  wr_testOkSlack: 'Sent to Slack. Check the channel.',
+  wr_testOkBoth: 'Sent to email and Slack.',
+  wr_errNoEmailKey: 'Email sending (RESEND_API_KEY) is not configured on the server. Set the Vercel environment variable.',
+  wr_errNoSlackUrl: 'Slack Webhook URL is not set. Enter and save it above.',
+  wr_errFailed: 'Test delivery failed. Check your connection and server configuration.',
+
   // WorkSummaryReport
   wsr_title: 'Summary report (auto-generated)',
   wsr_overview: 'Overview',
