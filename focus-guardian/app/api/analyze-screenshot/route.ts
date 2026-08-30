@@ -3,6 +3,11 @@ import { cookies } from "next/headers"
 import { type NextRequest, NextResponse } from "next/server"
 import { MAX_ANALYSIS_RULES, MAX_ANALYSIS_RULE_LENGTH } from "@/lib/config"
 
+// 実行時間の上限（秒）。vercel.json の functions グロブは App Router の出力パスに
+// 一致しない可能性があるため、Next.js 公式のルートセグメント設定で明示する
+// （Gemini/Gemma の待ち・リトライが既定上限を超えてタイムアウトしないように）
+export const maxDuration = 30
+
 // クライアントが model を指定しなかった場合のフォールバック既定モデル
 const DEFAULT_ANALYSIS_MODEL = "gemini-3.5-flash-lite"
 
@@ -255,16 +260,14 @@ export async function POST(request: NextRequest) {
     }
 
     if (!analysis) {
-      console.warn("Gemini JSON parse failed, using fallback")
-      analysis = {
-        activity: "画面解析",
-        category: "neutral",
-        work_category: fallbackCategory,
-        details: currentTask ? `「${currentTask}」の作業中` : "作業内容を解析しました",
-        confidence: 0.5,
-        apps: [],
-        distraction_check: { is_distracted: false, reason: "", task_alignment: 0.5 },
-      }
+      // 以前は中身のない「画面解析 / neutral」をフォールバック保存していたが、
+      // 集計・日報に失敗回が混ざるうえ利用者にも見えなかった。
+      // 保存せずエラーとして返し、クライアント側で次回キャプチャに任せる
+      console.warn("Gemini JSON parse failed; not saving a placeholder log")
+      return NextResponse.json(
+        { error: "parse_failed", message: "AI response could not be parsed" },
+        { status: 502 },
+      )
     }
 
     const validCategory = categories.includes(analysis.work_category)

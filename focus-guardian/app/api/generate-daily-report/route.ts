@@ -2,6 +2,11 @@ import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import { type NextRequest, NextResponse } from "next/server"
 
+// 実行時間の上限（秒）。vercel.json の functions グロブは App Router の出力パスに
+// 一致しない可能性があるため、Next.js 公式のルートセグメント設定で明示する
+// （Gemini/Gemma の待ち・リトライが既定上限を超えてタイムアウトしないように）
+export const maxDuration = 30
+
 // クライアントが model を指定しなかった場合のフォールバック既定モデル。
 // 既定を Gemini 系へ切り替えるかはプロダクト判断のため、ここでは変更しない
 const DEFAULT_REPORT_MODEL = "gemma-4-26b-a4b-it"

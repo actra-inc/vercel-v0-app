@@ -11,6 +11,11 @@ import {
   isValidSlackWebhookUrl,
 } from "@/lib/weekly-report"
 
+// 実行時間の上限（秒）。vercel.json の functions グロブは App Router の出力パスに
+// 一致しない可能性があるため、Next.js 公式のルートセグメント設定で明示する
+// （Gemini/Gemma の待ち・リトライが既定上限を超えてタイムアウトしないように）
+export const maxDuration = 30
+
 // 週次レポートの定期配信（Vercel Cron から毎週月曜 0:00 UTC に呼ばれる）。
 // ユーザーセッションが無いため service role で読む。このルート以外で
 // service role を使ってはならない

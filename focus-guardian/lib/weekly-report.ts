@@ -122,6 +122,10 @@ export function buildSubject(digest: WeeklyDigest): string {
   return `FlowNudge 週次レポート（${digest.range.fromLabel}〜${digest.range.toLabel}）`
 }
 
+// Slack は `<...>` をリンク/メンション、`&` をエンティティとして解釈するため、
+// 集計由来の文字列（カテゴリ名・活動名・AIコメント）はエスケープしてから載せる
+const slackEsc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+
 export function buildSlackText(digest: WeeklyDigest): string {
   const { stats, prevStats, range } = digest
   const lines = [
@@ -130,14 +134,14 @@ export function buildSlackText(digest: WeeklyDigest): string {
     `⏱ 合計作業時間: ${formatSeconds(stats.totalSeconds)} ${hoursDelta(stats.totalSeconds, prevStats.totalSeconds)}`,
     `🎯 平均集中度: ${stats.avgFocus ?? "-"} /100 ${deltaLabel(stats.avgFocus, prevStats.avgFocus, "点")}`,
     `✅ 生産的ログの割合: ${stats.productivePct ?? "-"}%`,
-    `⚠️ 脱線: ${stats.distractedCount}回${stats.topDistractions.length > 0 ? `（主に ${stats.topDistractions.map((d) => d.activity).join("、")}）` : ""}`,
+    `⚠️ 脱線: ${stats.distractedCount}回${stats.topDistractions.length > 0 ? `（主に ${stats.topDistractions.map((d) => slackEsc(d.activity)).join("、")}）` : ""}`,
   ]
   if (stats.categorySeconds.length > 0) {
     lines.push(``, `内訳:`)
-    stats.categorySeconds.forEach((c) => lines.push(`  • ${c.name}: ${formatSeconds(c.seconds)}`))
+    stats.categorySeconds.forEach((c) => lines.push(`  • ${slackEsc(c.name)}: ${formatSeconds(c.seconds)}`))
   }
   if (digest.aiComment) {
-    lines.push(``, `💬 ${digest.aiComment}`)
+    lines.push(``, `💬 ${slackEsc(digest.aiComment)}`)
   }
   return lines.join("\n")
 }
