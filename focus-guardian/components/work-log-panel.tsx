@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils"
 import { useTranslation } from "@/lib/i18n"
 import { DEFAULT_NUDGE_PREFERENCES, MAX_ANALYSIS_RULES, MAX_ANALYSIS_RULE_LENGTH, type NudgePreferences } from "@/lib/config"
 import type { AnalysisRule, WorkLog } from "@/lib/supabase"
+import { evaluateNudgeTick, initialNudgeState, snoozeBreak, type NudgeState } from "@/lib/nudge-logic"
 import { Textarea } from "@/components/ui/textarea"
 import {
   Dialog,
@@ -143,6 +144,24 @@ export function WorkLogPanel({
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [lastAnalysisError, setLastAnalysisError] = useState<string | null>(null)
   const prevImageDataRef = useRef<ImageData | null>(null)
+  // 作業ログ表示用に作った object URL。revoke しないと元の Blob（PNGで数MB）が
+  // ページ寿命の間ずっと保持され、30秒間隔の長時間運用でメモリが際限なく増える。
+  // 直近 MAX_LIVE_SCREENSHOTS 件だけ生かし、古いものから解放する
+  const objectUrlsRef = useRef<string[]>([])
+  const MAX_LIVE_SCREENSHOTS = 30
+  const registerObjectUrl = useCallback((url: string) => {
+    objectUrlsRef.current.push(url)
+    while (objectUrlsRef.current.length > MAX_LIVE_SCREENSHOTS) {
+      const old = objectUrlsRef.current.shift()
+      if (old) URL.revokeObjectURL(old)
+    }
+  }, [])
+  useEffect(() => {
+    return () => {
+      objectUrlsRef.current.forEach((u) => URL.revokeObjectURL(u))
+      objectUrlsRef.current = []
+    }
+  }, [])
   // 解析の再入ガード（解析がキャプチャ間隔より長引いたとき、intervalの
   // 次ティックから並行実行されて重複ログ・基準画像のレースが起きるのを防ぐ。
   // isAnalyzing state はUI表示用で、非同期更新のためガードには使えない）
@@ -157,28 +176,21 @@ export function WorkLogPanel({
   const [skipStreak, setSkipStreak] = useState(0)
 
   // ---- 休憩・無操作リマインド ----
-  // 設定は ref 経由で最新を参照（チェッカーintervalを張り替えずに済む）
+  // 判定ロジックは lib/nudge-logic.ts（純関数・単体テスト済み）。ここでは状態の保持と
+  // 20秒ごとの評価・UI反映だけを行う。設定は ref 経由で最新を参照する
   const nudgePrefsRef = useRef(nudgePreferences)
   useEffect(() => {
     nudgePrefsRef.current = nudgePreferences
   }, [nudgePreferences])
-  // 連続作業の起点と次回休憩提案時刻
-  const trackingStartAtRef = useRef<number | null>(null)
-  const nextBreakAtRef = useRef<number | null>(null)
-  // スヌーズ期限。この間は休憩・無操作の両リマインドを抑制する
-  // （「休憩して」と言った直後に「作業に戻れ」と言う矛盾を避ける）
-  const breakSnoozeUntilRef = useRef(0)
-  // 画面が最後に変化した時刻。差分スキップのカウンタ（consecutiveSkipsRef）は
-  // 強制解析（FORCE_ANALYZE_AFTER_SKIPS）で0に戻るため無操作検知には使えない
-  const lastScreenChangeAtRef = useRef<number | null>(null)
-  // 無操作リマインドは1エピソード1回だけ（画面が変化したら解除）
-  const idleFiredRef = useRef(false)
+  const nudgeStateRef = useRef<NudgeState>(initialNudgeState(Date.now(), nudgePreferences))
+  const isSourcePausedRef = useRef(false)
   const [breakBanner, setBreakBanner] = useState<{ minutes: number } | null>(null)
   const [idleBanner, setIdleBanner] = useState<{ minutes: number } | null>(null)
 
+  // 画面が実際に変化した（差分≥2%）: 無操作エピソードを解除する
   const markScreenChanged = useCallback(() => {
-    lastScreenChangeAtRef.current = Date.now()
-    idleFiredRef.current = false
+    nudgeStateRef.current.lastScreenChangeAt = Date.now()
+    nudgeStateRef.current.idleFired = false
     setIdleBanner(null)
   }, [])
 
@@ -413,6 +425,7 @@ export function WorkLogPanel({
         // 前回と画面が変わっていなければAPIをスキップ（閾値2%）。
         // 手動アップロード時（opts.force）は差分チェックをバイパスする
         const currentImageData = await getImageData(blob)
+        if (!opts?.force) nudgeStateRef.current.lastDiffEvaluatedAt = Date.now()
         // 初回キャプチャは「画面が動いている」起点として扱う
         if (!opts?.force && !prevImageDataRef.current) {
           markScreenChanged()
@@ -520,6 +533,7 @@ export function WorkLogPanel({
         cooldownUntilRef.current = 0
         quotaBannerRef.current = false
         const imageUrl = URL.createObjectURL(blob)
+        registerObjectUrl(imageUrl)
 
         const logEntry = {
           timestamp: new Date().toISOString(),
@@ -579,7 +593,7 @@ export function WorkLogPanel({
         setIsAnalyzing(false)
       }
     },
-    [apiKey, currentTask, model, addWorkLog, resizeAndEncodeImage, categories, t, language],
+    [apiKey, currentTask, model, addWorkLog, resizeAndEncodeImage, categories, t, language, registerObjectUrl],
   ) // 必要最小限の依存関係のみ
 
   const handleAutoGenerateReport = useCallback(
@@ -721,6 +735,9 @@ export function WorkLogPanel({
     onError: handleError,
     onInterrupted: handleInterrupted,
   })
+  useEffect(() => {
+    isSourcePausedRef.current = isSourcePaused
+  }, [isSourcePaused])
 
   // 実際のトラッキング状態の変化だけを親に通知する。
   // ボタン操作時に手動で通知していたため、
@@ -734,18 +751,8 @@ export function WorkLogPanel({
     onTrackingChange?.(isTracking, isTracking ? new Date() : null)
 
     // リマインドの状態をトラッキング境界でリセットする
-    if (isTracking) {
-      const now = Date.now()
-      trackingStartAtRef.current = now
-      nextBreakAtRef.current = now + nudgePrefsRef.current.breakMinutes * 60_000
-      breakSnoozeUntilRef.current = 0
-      lastScreenChangeAtRef.current = now
-      idleFiredRef.current = false
-    } else {
-      trackingStartAtRef.current = null
-      nextBreakAtRef.current = null
-      lastScreenChangeAtRef.current = null
-      idleFiredRef.current = false
+    nudgeStateRef.current = initialNudgeState(Date.now(), nudgePrefsRef.current)
+    if (!isTracking) {
       setBreakBanner(null)
       setIdleBanner(null)
     }
@@ -758,43 +765,33 @@ export function WorkLogPanel({
     const timer = setInterval(() => {
       const now = Date.now()
       const prefs = nudgePrefsRef.current
-
-      // 休憩リマインド: 連続作業が閾値を超えるたびに提案（スヌーズで+15分）
-      if (
-        prefs.breakEnabled &&
-        trackingStartAtRef.current != null &&
-        nextBreakAtRef.current != null &&
-        now >= nextBreakAtRef.current
-      ) {
-        const workedMin = Math.round((now - trackingStartAtRef.current) / 60_000)
-        setBreakBanner({ minutes: workedMin })
-        showReminderNotification("break", t('nd_breakNotifTitle'), t('nd_breakNotifBody', { n: workedMin }))
-        // 次回は現時点から閾値後（設定変更は次のサイクルから反映される）
-        nextBreakAtRef.current = now + prefs.breakMinutes * 60_000
+      const result = evaluateNudgeTick(nudgeStateRef.current, {
+        now,
+        prefs,
+        captureIntervalSec: captureInterval,
+        inCooldown: now < cooldownUntilRef.current,
+        sourcePaused: isSourcePausedRef.current,
+      })
+      nudgeStateRef.current = result.state
+      if (result.clearBreakBanner) setBreakBanner(null)
+      if (result.fireBreak) {
+        setBreakBanner(result.fireBreak)
+        showReminderNotification(
+          "break",
+          t('nd_breakNotifTitle'),
+          t('nd_breakNotifBody', { n: result.fireBreak.minutes }),
+        )
       }
-
-      // 無操作リマインド: 画面が閾値以上変化していなければ1回だけ知らせる。
-      // 休憩スヌーズ中は抑制（休憩を促した直後に「戻れ」と言わない）
-      if (
-        prefs.idleEnabled &&
-        !idleFiredRef.current &&
-        lastScreenChangeAtRef.current != null &&
-        now - lastScreenChangeAtRef.current >= prefs.idleMinutes * 60_000 &&
-        now >= breakSnoozeUntilRef.current
-      ) {
-        const idleMin = Math.round((now - lastScreenChangeAtRef.current) / 60_000)
-        idleFiredRef.current = true
-        setIdleBanner({ minutes: idleMin })
-        showReminderNotification("idle", t('nd_idleNotifTitle'), t('nd_idleNotifBody', { n: idleMin }))
+      if (result.fireIdle) {
+        setIdleBanner(result.fireIdle)
+        showReminderNotification("idle", t('nd_idleNotifTitle'), t('nd_idleNotifBody', { n: result.fireIdle.minutes }))
       }
     }, 20_000)
     return () => clearInterval(timer)
-  }, [isTracking, t])
+  }, [isTracking, t, captureInterval])
 
   const handleBreakSnooze = useCallback(() => {
-    const now = Date.now()
-    breakSnoozeUntilRef.current = now + 15 * 60_000
-    nextBreakAtRef.current = now + 15 * 60_000
+    nudgeStateRef.current = snoozeBreak(nudgeStateRef.current, Date.now())
     setBreakBanner(null)
   }, [])
 
@@ -861,8 +858,13 @@ export function WorkLogPanel({
       }
     }
 
-    const totalFocusScore = regularLogs.reduce((sum, log) => sum + (log.focus_score || 0), 0)
-    const averageFocusScore = totalFocusScore / regularLogs.length
+    // focus_score が数値の行だけで平均する（未設定の旧ログを0点扱いすると
+    // 実態より低く出る。週次レポート側 lib/log-stats.ts と同じ定義）
+    const focusScores = regularLogs
+      .map((log) => log.focus_score)
+      .filter((v): v is number => typeof v === "number" && Number.isFinite(v))
+    const averageFocusScore =
+      focusScores.length > 0 ? focusScores.reduce((sum, v) => sum + v, 0) / focusScores.length : 0
 
     const productiveLogs = regularLogs.filter((log) => log.category === "productive").length
     const productivePercentage = (productiveLogs / regularLogs.length) * 100
