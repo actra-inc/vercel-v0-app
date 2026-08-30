@@ -28,6 +28,54 @@ import { VersionBadge } from "@/components/version-badge"
 import { useTranslation } from "@/lib/i18n"
 import { DEFAULT_CAPTURE_INTERVAL_SECONDS, normalizeNudgePreferences } from "@/lib/config"
 
+// ---- 作業種類カテゴリの端末退避（DBが正。ここは移行元とフォールバック） ----
+const LEGACY_CATEGORIES_KEY = "activity_categories"
+const categoriesKey = (userId: string) => `activity_categories_${userId}`
+
+function normalizeCategories(raw: unknown): ActivityCategory[] | null {
+  if (!Array.isArray(raw)) return null
+  const list = raw
+    .filter((c): c is ActivityCategory => !!c && typeof c === "object" && typeof (c as any).name === "string")
+    .map((c) => ({
+      id: typeof c.id === "string" && c.id ? c.id : `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      // "その他" → "未分類" へ移行
+      name: c.name === "その他" ? "未分類" : c.name,
+      color: typeof c.color === "string" && c.color ? c.color : "#6B7280",
+    }))
+  return list
+}
+
+function readLocalCategories(userId: string): ActivityCategory[] | null {
+  if (typeof window === "undefined") return null
+  try {
+    const scoped = localStorage.getItem(categoriesKey(userId))
+    const legacy = localStorage.getItem(LEGACY_CATEGORIES_KEY)
+    const raw = scoped ?? legacy
+    if (!raw) return null
+    return normalizeCategories(JSON.parse(raw))
+  } catch {
+    return null
+  }
+}
+
+function writeLocalCategories(userId: string, categories: ActivityCategory[]) {
+  try {
+    localStorage.setItem(categoriesKey(userId), JSON.stringify(categories))
+  } catch {
+    /* 保存できない環境では無視 */
+  }
+}
+
+function clearLocalCategories(userId: string) {
+  try {
+    localStorage.removeItem(categoriesKey(userId))
+    // 旧共有キーは共有端末で他アカウントへ漏れるため、DB移行後は必ず消す
+    localStorage.removeItem(LEGACY_CATEGORIES_KEY)
+  } catch {
+    /* no-op */
+  }
+}
+
 const Page = () => {
   const { t } = useTranslation()
   const [isLoggedIn, setIsLoggedIn] = useState(false)
@@ -48,25 +96,11 @@ const Page = () => {
     setCurrentTab("settings")
   }, [])
   const screenSessionStartRef = useRef<{ time: Date; task: string } | null>(null)
-  // Toggl資格情報はuser_settings（DB）が正。旧localStorage保存は
-  // use-supabase-data側で一度だけDBへ移行される
-  const [categories, setCategories] = useState<ActivityCategory[]>(() => {
-    if (typeof window === "undefined") return DEFAULT_CATEGORIES
-    try {
-      const saved = localStorage.getItem("activity_categories")
-      if (!saved) return DEFAULT_CATEGORIES
-      const parsed: ActivityCategory[] = JSON.parse(saved)
-      // "その他" → "未分類" へ移行
-      return parsed.map((c) => c.name === "その他" ? { ...c, name: "未分類" } : c)
-    } catch {
-      return DEFAULT_CATEGORIES
-    }
-  })
-
-  const handleCategoriesChange = useCallback((newCategories: ActivityCategory[]) => {
-    setCategories(newCategories)
-    localStorage.setItem("activity_categories", JSON.stringify(newCategories))
-  }, [])
+  // 作業種類カテゴリ。正は user_settings.activity_categories（DB・端末間同期）。
+  // 旧仕様のlocalStorage（ユーザー非依存キー）は初回にDBへ移行する。
+  // DBに保存できない環境（列未追加）ではユーザースコープのlocalStorageへ退避する
+  const [categories, setCategories] = useState<ActivityCategory[]>(DEFAULT_CATEGORIES)
+  const categoriesSyncedForRef = useRef<string | null>(null)
 
   const handleTrackingChange = useCallback((isTracking: boolean, startTime: Date | null) => {
     setIsScreenTracking(isTracking)
@@ -101,6 +135,48 @@ const Page = () => {
     clearWorkLogs,
     refreshData,
   } = useSupabaseData()
+
+  // カテゴリの読み込み・移行（ユーザーごとに1回）
+  useEffect(() => {
+    if (!user?.id || !userSettings) return
+    if (categoriesSyncedForRef.current === user.id) return
+    categoriesSyncedForRef.current = user.id
+
+    const fromDb = Array.isArray(userSettings.activity_categories)
+      ? normalizeCategories(userSettings.activity_categories)
+      : null
+    if (fromDb && fromDb.length > 0) {
+      setCategories(fromDb)
+      clearLocalCategories(user.id)
+      return
+    }
+    // DBに無ければ端末保存（本人スコープ → 旧共有キー）から取り込み、DBへ移行する
+    const local = readLocalCategories(user.id)
+    if (local && local.length > 0) {
+      setCategories(local)
+      updateSettings({ activity_categories: local })
+        .then(() => clearLocalCategories(user.id))
+        .catch((e) => {
+          console.warn("Category migration to DB failed; keeping device-local copy:", e)
+          writeLocalCategories(user.id, local)
+        })
+    }
+  }, [user?.id, userSettings, updateSettings])
+
+  const handleCategoriesChange = useCallback(
+    async (newCategories: ActivityCategory[]) => {
+      setCategories(newCategories)
+      try {
+        await updateSettings({ activity_categories: newCategories })
+        if (user?.id) clearLocalCategories(user.id)
+      } catch (e) {
+        // 列が無い環境（align-schema未実行）では端末に退避して次回ロードで再移行する
+        console.warn("Failed to save categories to DB; keeping device-local copy:", e)
+        if (user?.id) writeLocalCategories(user.id, newCategories)
+      }
+    },
+    [updateSettings, user?.id],
+  )
 
   // ログイン失敗理由をURLから拾って表示する（拾ったらURLからは消す）
   useEffect(() => {
@@ -141,7 +217,7 @@ const Page = () => {
             code: "code_on_root",
             detail:
               error?.message ||
-              "認証コードがトップページに届きましたが、セッションを作成できませんでした。",
+              t('lp_codeOnRoot'),
           })
           return
         }
@@ -545,7 +621,7 @@ const Page = () => {
             </div>
             <Button onClick={handleSignIn} className="bg-orange-500 hover:bg-orange-600 text-white gap-2">
               <GoogleIcon />
-              Sign in with Google
+              {t('lp_signIn')}
             </Button>
           </div>
         </header>
@@ -554,13 +630,15 @@ const Page = () => {
         {authError && (
           <div className="border-b border-red-200 bg-red-50 px-6 py-3">
             <div className="container mx-auto max-w-4xl text-sm text-red-800">
-              <span className="font-semibold">ログインに失敗しました</span>
+              <span className="font-semibold">{t('lp_loginFailed')}</span>
               <span className="ml-2 font-mono text-xs">[{authError.code}]</span>
               {authError.detail && <div className="mt-1 text-xs text-red-700">{authError.detail}</div>}
               <div className="mt-1 text-xs text-red-600">
                 {authError.code === "no_code" || authError.code === "code_on_root"
-                  ? `Supabase の Authentication → URL Configuration → Redirect URLs に ${typeof window !== "undefined" ? window.location.origin : ""}/auth/callback を追加してください。`
-                  : "ブラウザのCookieを削除して再度お試しください。解決しない場合は設定をご確認ください。"}
+                  ? t('lp_loginFailedRedirect', {
+                      url: `${typeof window !== "undefined" ? window.location.origin : ""}/auth/callback`,
+                    })
+                  : t('lp_loginFailedCookie')}
               </div>
             </div>
           </div>
@@ -571,14 +649,11 @@ const Page = () => {
           <div className="container mx-auto max-w-4xl text-center">
             <img src="/flownudge-logo.png" alt="FlowNudge" className="h-24 w-24 object-contain mx-auto mb-6" />
             <h1 className="text-5xl font-bold text-gray-900 mb-4">FlowNudge</h1>
-            <p className="text-2xl font-medium text-orange-600 mb-6">AI-Powered Focus & Productivity Tracking</p>
-            <p className="text-lg text-gray-600 mb-10 max-w-2xl mx-auto leading-relaxed">
-              FlowNudge automatically monitors your screen activity, detects distractions using AI,
-              and generates detailed productivity reports to help you stay focused and achieve deep work.
-            </p>
+            <p className="text-2xl font-medium text-orange-600 mb-6">{t('lp_tagline')}</p>
+            <p className="text-lg text-gray-600 mb-10 max-w-2xl mx-auto leading-relaxed">{t('lp_heroDesc')}</p>
             <Button onClick={handleSignIn} size="lg" className="bg-white text-gray-800 hover:bg-gray-50 border border-gray-300 shadow-md text-base px-8 py-6 h-auto gap-3">
               <GoogleIcon />
-              Get Started with Google
+              {t('lp_getStarted')}
             </Button>
           </div>
         </section>
@@ -586,14 +661,14 @@ const Page = () => {
         {/* Features */}
         <section className="py-20 px-6 bg-white">
           <div className="container mx-auto max-w-5xl">
-            <h2 className="text-3xl font-bold text-center text-gray-900 mb-4">How FlowNudge Works</h2>
-            <p className="text-center text-gray-500 mb-14 text-lg">Four powerful features to maximize your productivity</p>
+            <h2 className="text-3xl font-bold text-center text-gray-900 mb-4">{t('lp_howTitle')}</h2>
+            <p className="text-center text-gray-500 mb-14 text-lg">{t('lp_howSub')}</p>
             <div className="grid md:grid-cols-2 gap-8">
               {[
-                { Icon: Camera, title: "Automatic Screen Analysis", desc: "Captures your screen every 30 seconds and analyzes it with Gemini Vision using your own API key, identifying what you're working on in real time." },
-                { Icon: Brain, title: "AI Distraction Detection", desc: "Gemini AI compares your screen activity with your planned task and alerts you instantly when you go off-track." },
-                { Icon: TrendingUp, title: "Productivity Reports", desc: "Automatically generates consolidated reports every 3 sessions with focus scores, time distribution, and personalized improvement suggestions." },
-                { Icon: Calendar, title: "Google Calendar Integration", desc: "Reads your Google Calendar (read-only) to display today's schedule and help you align your work sessions with your planned tasks." },
+                { Icon: Camera, title: t('lp_f1Title'), desc: t('lp_f1Desc') },
+                { Icon: Brain, title: t('lp_f2Title'), desc: t('lp_f2Desc') },
+                { Icon: TrendingUp, title: t('lp_f3Title'), desc: t('lp_f3Desc') },
+                { Icon: Calendar, title: t('lp_f4Title'), desc: t('lp_f4Desc') },
               ].map(({ Icon, title, desc }) => (
                 <div key={title} className="flex gap-5 p-6 rounded-2xl border border-orange-100 bg-orange-50/50">
                   <div className="flex-shrink-0 flex h-12 w-12 items-center justify-center rounded-xl bg-orange-500 text-white">
@@ -614,14 +689,14 @@ const Page = () => {
           <div className="container mx-auto max-w-3xl">
             <div className="flex items-center justify-center gap-3 mb-4">
               <Shield className="h-7 w-7 text-orange-500" />
-              <h2 className="text-3xl font-bold text-gray-900">How We Use Your Google Data</h2>
+              <h2 className="text-3xl font-bold text-gray-900">{t('lp_dataTitle')}</h2>
             </div>
-            <p className="text-center text-gray-500 mb-12 text-lg">FlowNudge requests only the minimum permissions necessary</p>
+            <p className="text-center text-gray-500 mb-12 text-lg">{t('lp_dataSub')}</p>
             <div className="space-y-5">
               {[
-                { title: "Google Account (name, email, profile photo)", desc: "Used solely for authentication and to display your account information in the app header. Never shared with third parties." },
-                { title: "Google Calendar (read-only)", desc: "Used only to display today's schedule in the Time Tracker. FlowNudge never creates, modifies, or deletes calendar events. Calendar data is not stored externally." },
-                { title: "Screen Capture (analyzed with your own API key)", desc: "Screenshots are captured only while analysis is running, resized in your browser, and sent to Google's Gemini API using your own API key. FlowNudge's servers never store the images — only the resulting text logs are saved to your account." },
+                { title: t('lp_d1Title'), desc: t('lp_d1Desc') },
+                { title: t('lp_d2Title'), desc: t('lp_d2Desc') },
+                { title: t('lp_d3Title'), desc: t('lp_d3Desc') },
               ].map(({ title, desc }) => (
                 <div key={title} className="flex gap-4 p-5 rounded-xl bg-white border border-gray-200 shadow-sm">
                   <CheckCircle className="h-6 w-6 text-green-500 flex-shrink-0 mt-0.5" />
@@ -637,11 +712,11 @@ const Page = () => {
 
         {/* CTA */}
         <section className="py-16 px-6 bg-gradient-to-r from-orange-500 to-amber-500 text-white text-center">
-          <h2 className="text-3xl font-bold mb-4">Ready to boost your focus?</h2>
-          <p className="text-orange-100 mb-8 text-lg">Sign in with your Google account to get started for free.</p>
+          <h2 className="text-3xl font-bold mb-4">{t('lp_ctaTitle')}</h2>
+          <p className="text-orange-100 mb-8 text-lg">{t('lp_ctaSub')}</p>
           <Button onClick={handleSignIn} size="lg" className="bg-white text-orange-600 hover:bg-orange-50 text-base px-8 py-6 h-auto gap-3 font-semibold">
             <GoogleIcon />
-            Sign in with Google
+            {t('lp_signIn')}
           </Button>
         </section>
 
@@ -651,7 +726,7 @@ const Page = () => {
             <div className="flex items-center gap-2">
               <img src="/flownudge-logo.png" alt="FlowNudge" className="h-6 w-6 object-contain" />
               <span className="text-sm font-medium text-gray-700">FlowNudge</span>
-              <span className="text-sm text-gray-400">— AI-powered focus tracking</span>
+              <span className="text-sm text-gray-400">{t('lp_footerTagline')}</span>
             </div>
             <div className="flex items-center gap-6 text-sm text-gray-400">
               <a href="/privacy" className="hover:text-gray-600 hover:underline">{t('page_privacyPolicy')}</a>
@@ -775,6 +850,7 @@ const Page = () => {
                   togglWorkspaceId={togglWorkspaceId}
                   togglCredentialsLocalOnly={togglCredentialsLocalOnly}
                   onOpenTogglSettings={() => openSettings("toggl")}
+                  userId={user?.id || ""}
                 />
               </div>
 

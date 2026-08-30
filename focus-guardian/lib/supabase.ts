@@ -110,6 +110,8 @@ export interface UserSettings {
   nudge_preferences?: NudgePreferences
   /** 週次レポート配信の設定 */
   weekly_report?: WeeklyReportSettings
+  /** 作業種類カテゴリ（内訳の分類・解析プロンプトに渡す一覧）。端末間で同期する */
+  activity_categories?: Array<{ id: string; name: string; color: string }>
   created_at: string
   updated_at: string
 }

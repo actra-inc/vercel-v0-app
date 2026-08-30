@@ -55,6 +55,8 @@ ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS auto_sync_toggl BOOLEAN DEFAU
 ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS analysis_rules JSONB;
 ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS nudge_preferences JSONB;
 ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS weekly_report JSONB;
+--     activity_categories: 作業種類カテゴリ（旧localStorage保存から端末間同期へ移行）
+ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS activity_categories JSONB;
 
 -- 3. user_settings の既定値をコード側と一致させる
 ALTER TABLE user_settings ALTER COLUMN gemini_model SET DEFAULT 'gemini-3.5-flash-lite';
@@ -120,7 +122,7 @@ WHERE table_schema = 'public'
   AND column_name IN ('work_category', 'report_type', 'report_data', 'confidence', 'focus_score',
                       'gemini_model', 'capture_interval',
                       'toggl_api_token', 'toggl_workspace_id', 'gemini_api_key', 'auto_sync_toggl',
-                      'analysis_rules', 'nudge_preferences', 'weekly_report')
+                      'analysis_rules', 'nudge_preferences', 'weekly_report', 'activity_categories')
 ORDER BY table_name, column_name;
 
 -- 確認用(2): user_settings に書き込みできるRLSポリシーがあるか

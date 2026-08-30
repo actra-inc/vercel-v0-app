@@ -38,7 +38,14 @@ interface TimeTrackerProps {
   togglCredentialsLocalOnly?: boolean
   /** Toggl設定画面を開く（未設定のときの導線） */
   onOpenTogglSettings?: () => void
+  /** 手動タイマー履歴の保存キーをユーザーごとに分けるためのID（共有端末対策） */
+  userId?: string
 }
+
+// 手動タイマー履歴の localStorage キー。ユーザーIDでスコープし、
+// 同じ端末で別アカウントにログインしても他人の履歴（作業内容を含む）が見えないようにする
+const LEGACY_TIME_ENTRIES_KEY = "time_entries"
+const timeEntriesKey = (userId: string) => `time_entries_${userId}`
 
 type TaskSource = "calendar" | "toggl"
 
@@ -51,6 +58,7 @@ export function TimeTracker({
   togglWorkspaceId = "",
   togglCredentialsLocalOnly = false,
   onOpenTogglSettings,
+  userId = "",
 }: TimeTrackerProps) {
   const isTogglConfigured = Boolean(togglApiToken && togglWorkspaceId)
   const [isRunning, setIsRunning] = useState(false)
@@ -84,11 +92,24 @@ export function TimeTracker({
     isRunningRef.current = isRunning
   }, [isRunning])
 
-  // 保存済みの手動タイマー履歴を localStorage から復元
+  // 保存済みの手動タイマー履歴を localStorage から復元（ユーザーIDが確定してから）。
+  // 旧仕様のユーザー非依存キーが残っていれば本人のキーへ移してから削除する
   useEffect(() => {
+    if (!userId) return
     try {
-      const saved = localStorage.getItem("time_entries")
-      if (!saved) return
+      let saved = localStorage.getItem(timeEntriesKey(userId))
+      if (!saved) {
+        const legacy = localStorage.getItem(LEGACY_TIME_ENTRIES_KEY)
+        if (legacy) {
+          localStorage.setItem(timeEntriesKey(userId), legacy)
+          localStorage.removeItem(LEGACY_TIME_ENTRIES_KEY)
+          saved = legacy
+        }
+      }
+      if (!saved) {
+        setLocalEntries([])
+        return
+      }
       const parsed = JSON.parse(saved)
       if (!Array.isArray(parsed)) return
       setLocalEntries(
@@ -103,7 +124,7 @@ export function TimeTracker({
     } catch (err) {
       console.warn("Failed to load saved time entries:", err)
     }
-  }, [])
+  }, [userId])
 
   // 「開始」を押す前に、どの時刻から計測されるかを表示するための値。
   // 依存配列で使うため Date ではなくミリ秒で保持する
@@ -212,7 +233,12 @@ export function TimeTracker({
   }, [taskSource, isTogglConfigured, fetchTogglCurrentEntry])
 
   const saveToStorage = (entries: TimeEntry[]) => {
-    localStorage.setItem("time_entries", JSON.stringify(entries))
+    if (!userId) return // ユーザー未確定の間は永続化しない（他人のキーへ書かない）
+    try {
+      localStorage.setItem(timeEntriesKey(userId), JSON.stringify(entries))
+    } catch (err) {
+      console.warn("Failed to save time entries:", err)
+    }
   }
 
   // 計測の起点。「開始」を押した時刻ではなく、実際に作業が始まった時刻に合わせる
