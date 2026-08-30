@@ -97,6 +97,7 @@ const Page = () => {
     editProject,
     removeProject,
     addWorkLog,
+    editWorkLog,
     clearWorkLogs,
     refreshData,
   } = useSupabaseData()
@@ -303,6 +304,18 @@ const Page = () => {
       }
     },
     [updateSettings, user],
+  )
+
+  // 判定ルール（誤判定フィードバック）。配列でなければ空扱い
+  const analysisRules = useMemo(
+    () => (Array.isArray(userSettings?.analysis_rules) ? userSettings.analysis_rules : []),
+    [userSettings?.analysis_rules],
+  )
+  const handleAnalysisRulesChange = useCallback(
+    async (rules: any[]) => {
+      await updateSettings({ analysis_rules: rules })
+    },
+    [updateSettings],
   )
 
   // 休憩・無操作リマインドの設定（DB値を正規化。列が無くても既定値で動く）
@@ -754,6 +767,9 @@ const Page = () => {
                   onTrackingChange={handleTrackingChange}
                   onOpenReports={() => setCurrentTab("reports")}
                   nudgePreferences={nudgePreferences}
+                  analysisRules={analysisRules}
+                  onAnalysisRulesChange={handleAnalysisRulesChange}
+                  editWorkLog={editWorkLog}
                 />
               </div>
             </div>
@@ -801,6 +817,8 @@ const Page = () => {
               onNudgePreferencesChange={async (prefs) => {
                 await updateSettings({ nudge_preferences: prefs })
               }}
+              analysisRules={analysisRules}
+              onAnalysisRulesChange={handleAnalysisRulesChange}
               onTogglCredentialsChange={handleTogglCredentialsChange}
               projects={projects}
               addProject={addProject}

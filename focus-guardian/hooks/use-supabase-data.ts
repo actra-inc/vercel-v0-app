@@ -15,6 +15,7 @@ import {
   deleteTimeEntry,
   getWorkLogs,
   createWorkLog,
+  updateWorkLog,
   deleteAllWorkLogs,
   type User,
   type Project,
@@ -354,6 +355,28 @@ export function useSupabaseData() {
     return data
   }
 
+  // 作業ログの部分更新（誤判定フィードバックの再分類など）。
+  // distraction_check 等のローカル専用フィールドはDBに無い場合があるため、
+  // 返り値ではなくローカルのマージで表示を更新する
+  const editWorkLog = async (id: string, updates: Partial<WorkLog>) => {
+    if (!user) {
+      throw new Error("User not authenticated")
+    }
+    // DBに実在する列だけをUPDATEに載せる。distraction_check はinsert時に
+    // 除去される（列が無い）ため、そのまま送るとPGRST204で失敗する。
+    // 表示は全フィールドをローカルへマージして更新する
+    const DB_SAFE_FIELDS = ["activity", "category", "details", "work_category", "focus_score", "confidence"] as const
+    const dbUpdates = Object.fromEntries(
+      Object.entries(updates).filter(([key]) => (DB_SAFE_FIELDS as readonly string[]).includes(key)),
+    ) as Partial<WorkLog>
+    if (Object.keys(dbUpdates).length > 0) {
+      const { error } = await updateWorkLog(id, user.id, dbUpdates)
+      if (error) throw new Error(error.message || "Failed to update work log")
+    }
+    setWorkLogs((prev) => prev.map((log) => (log.id === id ? { ...log, ...updates } : log)))
+    return true
+  }
+
   const clearWorkLogs = async (): Promise<{ dbDeleteFailed: boolean }> => {
     if (!user) {
       throw new Error("User not authenticated")
@@ -398,6 +421,7 @@ export function useSupabaseData() {
     editTimeEntry,
     removeTimeEntry,
     addWorkLog,
+    editWorkLog,
     clearWorkLogs,
     refreshData: loadUserData,
   }

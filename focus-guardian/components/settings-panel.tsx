@@ -11,6 +11,8 @@ import { TogglSettings, type TogglSaveResult } from "@/components/toggl-settings
 import { ProjectManager } from "@/components/project-manager"
 import { AppSettings } from "@/components/app-settings"
 import type { NudgePreferences } from "@/lib/config"
+import type { AnalysisRule } from "@/lib/supabase"
+import { AnalysisRulesSettings } from "@/components/analysis-rules-settings"
 import { VersionInfo } from "@/components/version-info"
 import { useTranslation } from "@/lib/i18n"
 
@@ -28,6 +30,8 @@ interface SettingsPanelProps {
   onCaptureIntervalChange: (interval: number) => void
   nudgePreferences?: NudgePreferences
   onNudgePreferencesChange?: (prefs: NudgePreferences) => void | Promise<void>
+  analysisRules?: AnalysisRule[]
+  onAnalysisRulesChange?: (rules: AnalysisRule[]) => void | Promise<void>
   onClose: () => void
   /** 開いたときに選択しておくタブ（他画面から「Toggl設定へ」などで飛べるように） */
   initialTab?: string
@@ -51,6 +55,8 @@ export function SettingsPanel({
   onCaptureIntervalChange,
   nudgePreferences,
   onNudgePreferencesChange,
+  analysisRules = [],
+  onAnalysisRulesChange,
   onClose,
   initialTab = "gemini",
   projects = [],
@@ -160,6 +166,10 @@ export function SettingsPanel({
                 onModelChange={onModelChange}
                 captureInterval={captureInterval}
               />
+              {/* 「これは仕事です」フィードバックから作られた判定ルールの管理 */}
+              {onAnalysisRulesChange && (
+                <AnalysisRulesSettings rules={analysisRules} onChange={onAnalysisRulesChange} />
+              )}
             </TabsContent>
 
             <TabsContent value="toggl" className="mt-6">

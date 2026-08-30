@@ -4,7 +4,7 @@ import { useTranslation } from "@/lib/i18n"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Volume2, AlertTriangle, CheckCircle, Clock, Zap } from "lucide-react"
+import { Volume2, AlertTriangle, CheckCircle, Clock, Zap, ThumbsUp } from "lucide-react"
 import { WorkSummaryReport } from "@/components/work-summary-report"
 
 interface DistractionCheck {
@@ -45,9 +45,11 @@ interface WorkLogItemProps {
     report_data?: ReportData
   }
   onPlayAlert: () => void
+  /** 誤判定フィードバック（「これは仕事です」）。渡されたときだけボタンを出す */
+  onMarkAsWork?: (log: WorkLogItemProps["log"]) => void
 }
 
-export function WorkLogItem({ log, onPlayAlert }: WorkLogItemProps) {
+export function WorkLogItem({ log, onPlayAlert, onMarkAsWork }: WorkLogItemProps) {
   const { t, language } = useTranslation()
   const dateLocale = language === "ja" ? "ja-JP" : "en-US"
   // レポートタイプの場合は専用コンポーネントで表示
@@ -163,6 +165,18 @@ export function WorkLogItem({ log, onPlayAlert }: WorkLogItemProps) {
                 <Volume2 className="h-4 w-4" />
                 {t('wli_playAlert')}
               </Button>
+              {/* 誤判定フィードバック: 押すと判定ルールの提案文を編集して保存できる */}
+              {onMarkAsWork && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onMarkAsWork(log)}
+                  className="w-full flex items-center justify-center gap-2 border-green-300 text-green-700 hover:bg-green-50 bg-transparent"
+                >
+                  <ThumbsUp className="h-4 w-4" />
+                  {t('wli_markAsWork')}
+                </Button>
+              )}
             </div>
           )}
 

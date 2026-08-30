@@ -16,7 +16,17 @@ import { showDistractionNotification, showCaptureInterruptedNotification, showRe
 import { useScreenCapture } from "@/hooks/use-screen-capture"
 import { cn } from "@/lib/utils"
 import { useTranslation } from "@/lib/i18n"
-import { DEFAULT_NUDGE_PREFERENCES, type NudgePreferences } from "@/lib/config"
+import { DEFAULT_NUDGE_PREFERENCES, MAX_ANALYSIS_RULES, MAX_ANALYSIS_RULE_LENGTH, type NudgePreferences } from "@/lib/config"
+import type { AnalysisRule, WorkLog } from "@/lib/supabase"
+import { Textarea } from "@/components/ui/textarea"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import type { ActivityCategory } from "@/components/activity-breakdown"
 
 interface DistractionCheck {
@@ -70,6 +80,11 @@ interface WorkLogPanelProps {
   onOpenReports?: () => void
   /** 休憩・無操作リマインドの設定（page.tsx側で正規化済み） */
   nudgePreferences?: NudgePreferences
+  /** 判定ルール（誤判定フィードバック）。渡されたときだけ「これは仕事です」を出す */
+  analysisRules?: AnalysisRule[]
+  onAnalysisRulesChange?: (rules: AnalysisRule[]) => void | Promise<void>
+  /** 誤判定ログの再分類（DB更新＋ローカル反映） */
+  editWorkLog?: (id: string, updates: Partial<WorkLog>) => Promise<any>
 }
 
 // アラート音。コンポーネントの状態に依存しないのでモジュールスコープに置き、
@@ -118,6 +133,9 @@ export function WorkLogPanel({
   onTrackingChange,
   onOpenReports,
   nudgePreferences = DEFAULT_NUDGE_PREFERENCES,
+  analysisRules = [],
+  onAnalysisRulesChange,
+  editWorkLog,
 }: WorkLogPanelProps) {
   const { t, language } = useTranslation()
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -163,6 +181,97 @@ export function WorkLogPanel({
     idleFiredRef.current = false
     setIdleBanner(null)
   }, [])
+
+  // ---- 誤判定フィードバック（「これは仕事です」） ----
+  // 解析リクエストへは ref 経由で最新ルールを渡す
+  const analysisRulesRef = useRef(analysisRules)
+  useEffect(() => {
+    analysisRulesRef.current = analysisRules
+  }, [analysisRules])
+  const [feedbackDialog, setFeedbackDialog] = useState<{ log: any; text: string } | null>(null)
+  const [feedbackError, setFeedbackError] = useState<string | null>(null)
+  const [feedbackSaving, setFeedbackSaving] = useState(false)
+  const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null)
+
+  const handleMarkAsWork = useCallback(
+    (log: any) => {
+      // アプリ名（先頭）か活動名から、条件付きの文章ルールを提案する。
+      // アプリ名の単純な許可リストではなく「◯◯を△△の作業中に使うのは仕事」
+      // という形にする（同じアプリでも文脈で判定が変わるため）
+      const app = (Array.isArray(log.applications) && log.applications[0]) || log.activity || ""
+      const task = log.distraction_check?.planned_task || currentTask || ""
+      const text = task
+        ? t('fb_ruleTemplateWithTask', { app, task })
+        : t('fb_ruleTemplate', { app })
+      setFeedbackError(null)
+      setFeedbackDialog({ log, text })
+    },
+    [currentTask, t],
+  )
+
+  const handleSaveFeedback = useCallback(async () => {
+    if (!feedbackDialog || !onAnalysisRulesChange) return
+    const text = feedbackDialog.text.trim()
+    if (!text) {
+      setFeedbackError(t('fb_empty'))
+      return
+    }
+    if (text.length > MAX_ANALYSIS_RULE_LENGTH) {
+      setFeedbackError(t('fb_tooLong'))
+      return
+    }
+    const rules = analysisRulesRef.current ?? []
+    if (rules.some((r) => r.text.trim() === text)) {
+      setFeedbackError(t('fb_duplicate'))
+      return
+    }
+    if (rules.length >= MAX_ANALYSIS_RULES) {
+      setFeedbackError(t('fb_limitReached'))
+      return
+    }
+
+    setFeedbackSaving(true)
+    setFeedbackError(null)
+    try {
+      const newRule: AnalysisRule = {
+        id:
+          typeof crypto !== "undefined" && "randomUUID" in crypto
+            ? crypto.randomUUID()
+            : `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        text,
+        enabled: true,
+        created_at: new Date().toISOString(),
+      }
+      await onAnalysisRulesChange([...rules, newRule])
+
+      // 本人の申告が正なので、当該ログ自体も「生産的」へ再分類する。
+      // distraction_check はDBに保存されない（insert時に除去）ため、
+      // DB更新は category のみ・表示はローカルマージで直す
+      let reclassified = false
+      if (editWorkLog) {
+        try {
+          await editWorkLog(feedbackDialog.log.id, {
+            category: "productive",
+            distraction_check: feedbackDialog.log.distraction_check
+              ? { ...feedbackDialog.log.distraction_check, is_distracted: false }
+              : undefined,
+          })
+          reclassified = true
+        } catch (e) {
+          console.warn("Failed to reclassify the log:", e)
+        }
+      }
+
+      setFeedbackDialog(null)
+      setFeedbackMessage(reclassified ? t('fb_saved') : t('fb_savedRuleOnly'))
+      setTimeout(() => setFeedbackMessage(null), 8000)
+    } catch (e) {
+      console.error("Failed to save analysis rule:", e)
+      setFeedbackError(t('fb_saveFailed'))
+    } finally {
+      setFeedbackSaving(false)
+    }
+  }, [feedbackDialog, onAnalysisRulesChange, editWorkLog, t])
 
   const resizeAndEncodeImage = useCallback(async (blob: Blob, maxWidth: number): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -348,6 +457,12 @@ export function WorkLogPanel({
         // 複数ディスプレイの横並び合成画像であることをサーバーに伝える
         // （プロンプトに「左が画面1、右が画面2」の説明を挿し込ませる）
         if ((opts?.screenCount ?? 1) > 1) formData.append("multiScreen", "1")
+        // ユーザー定義の判定ルール（有効なものだけ。0件なら送らない＝プロンプト不変）
+        const enabledRules = (analysisRulesRef.current ?? [])
+          .filter((r) => r?.enabled && typeof r.text === "string" && r.text.trim().length > 0)
+          .map((r) => r.text.trim())
+          .slice(0, MAX_ANALYSIS_RULES)
+        if (enabledRules.length > 0) formData.append("userRules", JSON.stringify(enabledRules))
 
         console.log("[v0] Sending image to /api/analyze-screenshot")
 
@@ -881,6 +996,13 @@ export function WorkLogPanel({
             </div>
           )}
 
+          {/* 誤判定フィードバックの結果通知 */}
+          {feedbackMessage && (
+            <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-800">
+              {feedbackMessage}
+            </div>
+          )}
+
           {/* 休憩リマインド（設定でオフ可。スヌーズで15分後に再提案） */}
           {breakBanner && (
             <div className="p-3 bg-sky-50 border border-sky-200 rounded-lg flex items-start gap-2">
@@ -1093,6 +1215,40 @@ export function WorkLogPanel({
         isAnalyzing={isAnalyzing}
       />
 
+      {/* 誤判定フィードバック: ルール提案文の編集ダイアログ */}
+      <Dialog open={feedbackDialog !== null} onOpenChange={(open) => { if (!open) setFeedbackDialog(null) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('fb_dialogTitle')}</DialogTitle>
+            <DialogDescription>{t('fb_dialogDesc')}</DialogDescription>
+          </DialogHeader>
+          <Textarea
+            value={feedbackDialog?.text ?? ""}
+            onChange={(e) => {
+              setFeedbackError(null)
+              setFeedbackDialog((prev) => (prev ? { ...prev, text: e.target.value } : prev))
+            }}
+            rows={3}
+            className="text-sm"
+          />
+          <div className="flex items-center justify-between text-xs text-gray-500">
+            <span className={(feedbackDialog?.text.trim().length ?? 0) > MAX_ANALYSIS_RULE_LENGTH ? "text-red-600" : ""}>
+              {t('fb_charCount', { n: feedbackDialog?.text.trim().length ?? 0, max: MAX_ANALYSIS_RULE_LENGTH })}
+            </span>
+            <span>{t('ar_count', { n: analysisRules.length, max: MAX_ANALYSIS_RULES })}</span>
+          </div>
+          {feedbackError && <div className="text-sm text-red-600">{feedbackError}</div>}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setFeedbackDialog(null)} disabled={feedbackSaving}>
+              {t('common_cancel')}
+            </Button>
+            <Button onClick={handleSaveFeedback} disabled={feedbackSaving}>
+              {feedbackSaving ? t('common_loading') : t('fb_save')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* 作業ログ一覧 */}
       <Card className="flex-1 shadow-lg border-0 bg-white/90 backdrop-blur-sm">
         <CardHeader className="pb-3 bg-gradient-to-r from-gray-50 to-slate-50 rounded-t-lg border-b border-gray-100">
@@ -1140,7 +1296,12 @@ export function WorkLogPanel({
               {workLogs
                 .filter((log) => !log.report_type)
                 .map((log) => (
-                  <WorkLogItem key={log.id} log={log} onPlayAlert={onPlayAlert} />
+                  <WorkLogItem
+                    key={log.id}
+                    log={log}
+                    onPlayAlert={onPlayAlert}
+                    onMarkAsWork={onAnalysisRulesChange ? handleMarkAsWork : undefined}
+                  />
                 ))}
               {regularLogsCount === 0 && (
                 <div className="text-center py-8 text-gray-500">

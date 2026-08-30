@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import { type NextRequest, NextResponse } from "next/server"
+import { MAX_ANALYSIS_RULES, MAX_ANALYSIS_RULE_LENGTH } from "@/lib/config"
 
 // クライアントが model を指定しなかった場合のフォールバック既定モデル
 const DEFAULT_ANALYSIS_MODEL = "gemini-3.5-flash-lite"
@@ -104,6 +105,25 @@ export async function POST(request: NextRequest) {
     const categoriesJson = formData.get("categories") as string
     // 複数ディスプレイの横並び合成画像かどうか（クライアントが合成時のみ "1" を送る）
     const isMultiScreen = formData.get("multiScreen") === "1"
+    // ユーザー定義の判定ルール（誤判定フィードバック由来）。
+    // ユーザー自身の入力で自身の解析にのみ影響するが、件数・長さ・型は
+    // ここで必ず検証する（出力JSONの形式・数値は既存のサーバー側検証が担保）
+    let userRules: string[] = []
+    const userRulesRaw = formData.get("userRules")
+    if (typeof userRulesRaw === "string" && userRulesRaw) {
+      try {
+        const parsed = JSON.parse(userRulesRaw)
+        if (Array.isArray(parsed)) {
+          userRules = parsed
+            .filter((r): r is string => typeof r === "string" && r.trim().length > 0)
+            .slice(0, MAX_ANALYSIS_RULES)
+            // 改行はプロンプトの構造を崩すため空白へ潰す
+            .map((r) => r.replace(/\s+/g, " ").trim().slice(0, MAX_ANALYSIS_RULE_LENGTH))
+        }
+      } catch {
+        // 不正なJSONはルール無しとして続行
+      }
+    }
     // 設定画面で選んだ解析モデル（未指定・不正値は既定にフォールバック）
     const modelParam = formData.get("model")
     const analysisModel = isValidModelId(modelParam) ? modelParam : DEFAULT_ANALYSIS_MODEL
@@ -141,6 +161,11 @@ export async function POST(request: NextRequest) {
     const multiScreenNote = isMultiScreen
       ? `\n\n【画像について】\nこの画像は複数のディスプレイを横に並べて合成したものです。左が画面1、右が画面2です。両方の画面を見たうえで、ユーザーの主たる作業を判定してください。`
       : ""
+    // ユーザー定義ルールがあるときだけ挿入する（0件時はプロンプト不変）
+    const userRulesNote =
+      userRules.length > 0
+        ? `\n\n【ユーザー定義の判定ルール（最優先で尊重すること）】\n${userRules.map((r) => `- ${r}`).join("\n")}`
+        : ""
     const analysisPrompt = `あなたは作業効率モニタリングシステムです。このスクリーンショットを分析し、ユーザーが何をしているかを判定してください。
 
 現在の予定作業: "${currentTask || "未設定"}"${multiScreenNote}
@@ -151,7 +176,7 @@ export async function POST(request: NextRequest) {
   動画サービス(YouTube/Netflix/Hulu等)、ゲーム、まとめサイト、掲示板(5ch等)
 - ニュースサイトや技術ブログは作業内容によっては neutral や productive でもよい
 - 予定作業が設定されており、task_alignmentが0.35未満の場合のみ is_distracted: true にすること
-- 予定作業が「未設定」の場合は判定を緩める
+- 予定作業が「未設定」の場合は判定を緩める${userRulesNote}
 
 必須回答項目（JSON形式のみ、余計な説明不要）：
 {

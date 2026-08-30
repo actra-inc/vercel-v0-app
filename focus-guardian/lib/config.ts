@@ -6,6 +6,11 @@
 // （経緯: 旧バグで 180、その後 60、検証の結果 30 が採用）
 export const DEFAULT_CAPTURE_INTERVAL_SECONDS = 30
 
+// 判定ルール（誤判定フィードバック）の上限。
+// UI・APIサーバーの両方から参照して検証を揃える
+export const MAX_ANALYSIS_RULES = 20
+export const MAX_ANALYSIS_RULE_LENGTH = 200
+
 // 休憩・無操作リマインドの既定値。
 // user_settings.nudge_preferences（JSONB）が未設定・列欠落でもこの値で動作する
 export interface NudgePreferences {
