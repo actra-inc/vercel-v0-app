@@ -4,14 +4,8 @@
 
 ### 1. 環境変数の問題
 
-#### NEXTAUTH_URL が設定されていない
-\`\`\`bash
-# Vercel Dashboard で設定
-NEXTAUTH_URL=https://your-app.vercel.app
-NEXTAUTH_SECRET=your-random-secret-32-chars-long
-\`\`\`
-
 #### Supabase環境変数の問題
+（`NEXTAUTH_URL` / `NEXTAUTH_SECRET` は本アプリでは使用しません。認証は Supabase Auth です）
 \`\`\`bash
 # 正しい形式で設定されているか確認
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co

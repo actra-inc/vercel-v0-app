@@ -13,7 +13,8 @@ import { AIAnalysisStatus } from "@/components/ai-analysis-status"
 import { AudioPermissionManager } from "@/components/audio-permission-manager"
 import { NotificationPermissionManager } from "@/components/notification-permission-manager"
 import { showDistractionNotification, showCaptureInterruptedNotification, showReminderNotification } from "@/lib/notification"
-import { useScreenCapture } from "@/hooks/use-screen-capture"
+import { useScreenCapture, type CaptureStartErrorCode } from "@/hooks/use-screen-capture"
+import type { TranslationKey } from "@/lib/translations/ja"
 import { cn } from "@/lib/utils"
 import { useTranslation } from "@/lib/i18n"
 import { DEFAULT_NUDGE_PREFERENCES, MAX_ANALYSIS_RULES, MAX_ANALYSIS_RULE_LENGTH, type NudgePreferences } from "@/lib/config"
@@ -130,6 +131,19 @@ function playAlertTone() {
   } catch (error) {
     console.error("❌ Failed to play alert sound:", error)
   }
+}
+
+// 共有開始エラーのコード→文言キー。hooks 側はブラウザ非依存のコードだけを返す
+const START_ERROR_KEYS: Record<CaptureStartErrorCode, TranslationKey> = {
+  insecure_context: 'wlp_startErr_insecureContext',
+  unsupported: 'wlp_startErr_unsupported',
+  not_allowed: 'wlp_startErr_notAllowed',
+  not_found: 'wlp_startErr_notFound',
+  not_supported: 'wlp_startErr_notSupported',
+  security: 'wlp_startErr_security',
+  invalid_state: 'wlp_startErr_invalidState',
+  type_error: 'wlp_startErr_typeError',
+  unknown: 'wlp_startErr_unknown',
 }
 
 export function WorkLogPanel({
@@ -692,9 +706,9 @@ export function WorkLogPanel({
 
   const handleError = useCallback((error: Error) => {
     console.error("❌ Screen capture error:", error)
-    // 共有ダイアログのキャンセル(AbortError)・拒否(NotAllowedError)は開始前の
-    // ユーザー操作起点エラーで、useScreenCapture 側が適切に案内する（キャンセルは無通知）。
-    // ここで「次回キャプチャで再試行します」と出すと虚偽になるためスキップする
+    // 開始・追加時の失敗は useScreenCapture が startError として返し、下のバナーで
+    // 案内する（onError には流れてこない）。念のためユーザー操作起点の名前は
+    // ここでも弾く。「次回キャプチャで再試行します」と出すと虚偽になるため
     if (error.name === "AbortError" || error.name === "NotAllowedError") return
     // キャプチャ失敗は次回インターバルで再試行される。ストリーム自体が死んだ場合は
     // useScreenCapture 側が stopCapture するのでステータス表示が「停止中」に変わる。
@@ -739,12 +753,14 @@ export function WorkLogPanel({
     isSourcePaused,
     lastCaptureTime,
     screens,
+    startError,
     startAutoCapture,
     addScreen,
     removeScreen,
     stopCapture,
     dismissInterruption,
     dismissScreen,
+    dismissStartError,
   } = useScreenCapture({
     interval: captureInterval * 1000,
     quality: 0.8,
@@ -949,6 +965,29 @@ export function WorkLogPanel({
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* 共有の開始・追加がユーザー操作の直後に失敗したとき。alert() はモーダルで
+              JSスレッドを止め、走っている解析ループのタイマーまで止めるためインライン表示にする */}
+          {startError && (
+            <div className="p-3 bg-red-50 border border-red-300 rounded-lg flex items-start gap-2">
+              <AlertCircle className="h-4 w-4 text-red-600 mt-0.5 shrink-0" />
+              <div className="text-sm text-red-900 flex-1">
+                <div className="font-medium">
+                  {startError.phase === "add" ? t('wlp_startErrAddTitle') : t('wlp_startErrTitle')}
+                </div>
+                <div className="text-xs mt-1 whitespace-pre-line">{t(START_ERROR_KEYS[startError.code])}</div>
+                {startError.message && (
+                  <div className="text-xs mt-1 font-mono break-all text-red-800">{startError.message}</div>
+                )}
+                <div className="flex gap-2 mt-2">
+                  <Button size="sm" variant="ghost" onClick={dismissStartError} className="flex items-center gap-1.5">
+                    <X className="h-3.5 w-3.5" />
+                    {t('wlp_interruptedDismiss')}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* 画面共有が意図せず切れたときの復帰導線。
               ブラウザは終了したストリームを復帰できず、getDisplayMedia の再実行にも
               ユーザー操作が必要なため、押すだけで再開できるボタンを前面に出す */}

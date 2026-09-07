@@ -98,7 +98,12 @@ export function AppSettings({
     setWrTesting(true)
     setWrTestResult(null)
     try {
-      const res = await fetch("/api/weekly-report/test", { method: "POST" })
+      // 本文の言語は今のUI言語に合わせる（保存前でも試せるようにリクエストで渡す）
+      const res = await fetch("/api/weekly-report/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ language }),
+      })
       const data = await res.json().catch(() => null)
       if (!res.ok || !data) {
         setWrTestResult(t('wr_errFailed'))

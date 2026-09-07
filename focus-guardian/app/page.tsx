@@ -123,7 +123,6 @@ const Page = () => {
     user,
     userSettings,
     projects,
-    timeEntries,
     workLogs,
     loading,
     updateSettings,
@@ -415,11 +414,27 @@ const Page = () => {
           ...settings,
           // 配信時刻の週境界は利用者のタイムゾーンで計算させる
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          // 本文の言語（サーバーはUI言語を知らないため設定に載せる）
+          language,
         },
       })
     },
-    [updateSettings],
+    [updateSettings, language],
   )
+
+  // UI言語を切り替えたら、配信オンの週次レポートの言語も追従させる。
+  // 保存に失敗しても書き込みを繰り返さないよう、ユーザー×言語ごとに1回だけ試みる
+  const weeklyLangSyncedRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (loading || !user) return
+    const wr = userSettings?.weekly_report
+    if (!wr || wr.enabled !== true) return
+    if ((wr.language ?? "ja") === language) return
+    const key = `${user.id}:${language}`
+    if (weeklyLangSyncedRef.current === key) return
+    weeklyLangSyncedRef.current = key
+    void Promise.resolve(updateSettings({ weekly_report: { ...wr, language } })).catch(() => {})
+  }, [loading, user, userSettings?.weekly_report, language, updateSettings])
 
   // 休憩・無操作リマインドの設定（DB値を正規化。列が無くても既定値で動く）
   const nudgePreferences = useMemo(
@@ -846,7 +861,6 @@ const Page = () => {
                 <TimeTracker
                   onTimeEntryChange={() => {}}
                   onCurrentTaskChange={setCurrentTask}
-                  timeEntries={timeEntries}
                   screenSessions={screenSessions}
                   togglApiToken={togglApiToken}
                   togglWorkspaceId={togglWorkspaceId}

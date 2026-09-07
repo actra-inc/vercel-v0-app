@@ -93,6 +93,8 @@ export interface WeeklyReportSettings {
   channel: "email" | "slack" | "both"
   slackWebhookUrl?: string
   timezone?: string
+  /** 本文の言語。UI言語は端末側にしか無いため、設定保存時・言語切替時にここへ同期する */
+  language?: "ja" | "en"
 }
 
 export interface UserSettings {

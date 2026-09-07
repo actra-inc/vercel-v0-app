@@ -5,7 +5,7 @@
 ### ✅ 必要な準備
 - [ ] Supabaseプロジェクトが作成済み
 - [ ] Google OAuth設定が完了
-- [ ] ストレージバケット「screenshots」が作成済み
+- [ ] `scripts/align-schema-with-code.sql` を Supabase の SQL Editor で実行済み
 - [ ] ローカルでの動作確認が完了
 
 ## 🔧 Step 1: Vercelデプロイ
@@ -30,17 +30,25 @@ Vercel Dashboard → Settings → Environment Variables で以下を設定：
 \`\`\`
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-NEXTAUTH_URL=https://your-app.vercel.app
-NEXTAUTH_SECRET=your-random-secret
 \`\`\`
 
-### オプション環境変数
+### 週次レポート配信を使う場合
 \`\`\`
-GEMINI_API_KEY=your-gemini-api-key
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+CRON_SECRET=your-random-secret-32-chars-minimum
+RESEND_API_KEY=re_xxxxxxxx
+WEEKLY_REPORT_FROM=FlowNudge <report@your-domain.example>   # 任意
+\`\`\`
+
+### オプション（Toggl の環境変数フォールバック。所有者1名のみ）
+\`\`\`
 TOGGL_API_TOKEN=your-toggl-token
 TOGGL_WORKSPACE_ID=your-workspace-id
+TOGGL_OWNER_EMAIL=owner@example.com   # または TOGGL_OWNER_USER_ID
 \`\`\`
+
+Gemini / Toggl のキーは通常、各ユーザーがアプリの設定画面から登録します。
+一覧と説明は `docs/environment-variables.md` を参照してください。
 
 ## 🌍 Step 3: Supabase本番設定
 

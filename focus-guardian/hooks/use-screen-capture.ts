@@ -25,6 +25,52 @@ export interface CaptureInfo {
   screenCount: number
 }
 
+/** 共有の開始・追加がユーザー操作の直後に失敗した理由（UI側で文言に変換する） */
+export type CaptureStartErrorCode =
+  | "insecure_context"
+  | "unsupported"
+  | "not_allowed"
+  | "not_found"
+  | "not_supported"
+  | "security"
+  | "invalid_state"
+  | "type_error"
+  | "unknown"
+
+export interface CaptureStartError {
+  code: CaptureStartErrorCode
+  /** "start": 解析開始時 / "add": 2画面目の追加時（既存画面の解析は継続している） */
+  phase: "start" | "add"
+  /** code が unknown のときの生メッセージ（診断用） */
+  message?: string
+}
+
+// 例外→エラーコード。alert() はモーダルで JS スレッドを止め、走っている解析ループの
+// タイマーまで止めるため、開始時エラーは state に載せて UI でインライン表示する。
+// getDisplayMedia は制約不正時に DOMException ではない素の TypeError を投げる
+function toStartErrorCode(error: unknown): CaptureStartErrorCode {
+  if (error instanceof DOMException) {
+    switch (error.name) {
+      case "NotAllowedError":
+        return "not_allowed"
+      case "NotFoundError":
+        return "not_found"
+      case "NotSupportedError":
+        return "not_supported"
+      case "SecurityError":
+        return "security"
+      case "InvalidStateError":
+        return "invalid_state"
+      case "TypeError":
+        return "type_error"
+      default:
+        return "unknown"
+    }
+  }
+  if (error instanceof TypeError) return "type_error"
+  return "unknown"
+}
+
 interface UseScreenCaptureOptions {
   interval?: number
   quality?: number
@@ -75,6 +121,8 @@ export function useScreenCapture(options: UseScreenCaptureOptions = {}) {
   const [isSourcePaused, setIsSourcePaused] = useState(false)
   // 画面ごとの状態（UIで「画面2が切れた」等を出すため）
   const [screens, setScreens] = useState<ScreenInfo[]>([])
+  // 開始・追加のユーザー操作が失敗した理由（次の試行開始時と閉じる操作で消える）
+  const [startError, setStartError] = useState<CaptureStartError | null>(null)
 
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
   const isCapturingRef = useRef(false)
@@ -144,6 +192,8 @@ export function useScreenCapture(options: UseScreenCaptureOptions = {}) {
     setScreens([])
     console.log("Screen capture stopped.")
   }, [releaseAll])
+
+  const dismissStartError = useCallback(() => setStartError(null), [])
 
   // 1画面ぶんの共有が不意に終了した。
   // 他の画面が残っていれば解析は継続し、切れた画面だけ「中断」として保持する。
@@ -481,6 +531,7 @@ export function useScreenCapture(options: UseScreenCaptureOptions = {}) {
       console.warn(`Already tracking ${MAX_SCREENS} screens; ignoring addScreen`)
       return false
     }
+    setStartError(null)
     try {
       const stream = await requestDisplayStream()
       // 空いている最小のラベルを割り当てる（画面1が切れて再共有した場合は1に戻る）
@@ -498,7 +549,12 @@ export function useScreenCapture(options: UseScreenCaptureOptions = {}) {
         console.log("User cancelled adding a screen")
       } else {
         console.warn("Failed to add a screen; continuing with current screens:", error)
-        onErrorRef.current?.(error as Error)
+        const code = toStartErrorCode(error)
+        setStartError({
+          code,
+          phase: "add",
+          message: code === "unknown" ? (error instanceof Error ? error.message : String(error)) : undefined,
+        })
       }
       return false
     }
@@ -529,33 +585,15 @@ export function useScreenCapture(options: UseScreenCaptureOptions = {}) {
 
   // ---- ブラウザサポート・開始 ----------------------------------------------
 
-  const checkBrowserSupport = useCallback(() => {
-    // HTTPS必須チェック
-    if (location.protocol !== "https:" && location.hostname !== "localhost") {
-      return {
-        supported: false,
-        reason: "HTTPS接続が必要です。HTTPSでアクセスしてください。",
-      }
-    }
-
+  // 開始できない環境ならその理由コードを返す（表示文言は UI 側の i18n）
+  const checkBrowserSupport = useCallback((): CaptureStartErrorCode | null => {
+    // HTTPS必須チェック（localhost は例外）
+    if (location.protocol !== "https:" && location.hostname !== "localhost") return "insecure_context"
     // getDisplayMedia API サポートチェック
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
-      return {
-        supported: false,
-        reason:
-          "このブラウザは画面共有をサポートしていません。Chrome 72+、Firefox 66+、Safari 13+、Edge 79+ をお使いください。",
-      }
-    }
-
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) return "unsupported"
     // Secure Context チェック
-    if (!window.isSecureContext) {
-      return {
-        supported: false,
-        reason: "セキュアコンテキストが必要です。HTTPSでアクセスするか、localhostを使用してください。",
-      }
-    }
-
-    return { supported: true, reason: "" }
+    if (!window.isSecureContext) return "insecure_context"
+    return null
   }, [])
 
   // ユーザーアクションから直接呼び出される関数
@@ -570,17 +608,17 @@ export function useScreenCapture(options: UseScreenCaptureOptions = {}) {
     // 中断表示は「実際に共有を取り直せたとき」に消す。
     // ここで消すと、共有ピッカーをキャンセルしただけで再開導線が消えてしまう
     intentionalStopRef.current = false
+    setStartError(null)
     console.log("=== Screen Capture Start Requested ===")
     console.log("User agent:", navigator.userAgent)
     console.log("Location:", location.href)
     console.log("Is secure context:", window.isSecureContext)
 
     // ブラウザサポートチェック
-    const supportCheck = checkBrowserSupport()
-    if (!supportCheck.supported) {
-      const error = new Error(supportCheck.reason)
-      onErrorRef.current?.(error)
-      alert(supportCheck.reason)
+    const unsupportedCode = checkBrowserSupport()
+    if (unsupportedCode) {
+      console.warn("Screen capture is not available in this environment:", unsupportedCode)
+      setStartError({ code: unsupportedCode, phase: "start" })
       return false
     }
 
@@ -616,65 +654,18 @@ export function useScreenCapture(options: UseScreenCaptureOptions = {}) {
         stack: error instanceof Error ? error.stack : undefined,
       })
 
-      onErrorRef.current?.(error as Error)
-
-      if (error instanceof DOMException) {
-        switch (error.name) {
-          case "NotAllowedError":
-            alert(
-              "画面共有が拒否されました。\n\n" +
-                "📋 対処法:\n" +
-                "1. ブラウザの画面共有許可ダイアログで「許可」をクリック\n" +
-                "2. macOSの場合: システム設定 > プライバシーとセキュリティ > 画面収録 でブラウザを許可\n" +
-                "3. ページを再読み込みして再試行\n\n" +
-                "💡 ヒント: ダイアログが表示されない場合は、ブラウザの設定で画面共有がブロックされている可能性があります。",
-            )
-            break
-          case "NotFoundError":
-            alert("共有可能な画面が見つかりませんでした。")
-            break
-          case "NotSupportedError":
-            alert(
-              "このブラウザでは画面共有がサポートされていません。\n\n" +
-                "対応ブラウザ:\n" +
-                "• Chrome 72+\n" +
-                "• Firefox 66+\n" +
-                "• Safari 13+\n" +
-                "• Edge 79+",
-            )
-            break
-          case "SecurityError":
-            alert(
-              "セキュリティエラーが発生しました。\n\n" +
-                "HTTPS接続でアクセスしてください。\n" +
-                "localhostの場合はHTTPでも動作します。",
-            )
-            break
-          case "AbortError":
-            console.log("User cancelled screen sharing")
-            // ユーザーがキャンセルした場合はアラートを表示しない
-            break
-          case "InvalidStateError":
-            alert("画面共有の状態が無効です。\n\n" + "ブラウザを再読み込みして再試行してください。")
-            break
-          case "TypeError":
-            alert("画面共有の設定に問題があります。\n\n" + "ブラウザを更新して再試行してください。")
-            break
-          default:
-            alert(
-              `画面共有エラー: ${error.message}\n\n` +
-                "ブラウザを再読み込みして再試行してください。\n\n" +
-                "問題が続く場合は、別のブラウザをお試しください。",
-            )
-        }
+      if (error instanceof DOMException && error.name === "AbortError") {
+        // ユーザーが共有ピッカーをキャンセルした（正常系。案内は出さない）
+        console.log("User cancelled screen sharing")
       } else {
-        alert(
-          "画面共有の開始に失敗しました。\n\n" +
-            "1. ブラウザを再読み込み\n" +
-            "2. HTTPSでアクセス\n" +
-            "3. 対応ブラウザを使用\n\n" +
-            "してから再試行してください。",
-        )
+        // 開始前の失敗は onError（キャプチャ中エラー用。「次回キャプチャで再試行」と
+        // 案内される）には流さず、startError として UI にインライン表示する
+        const code = toStartErrorCode(error)
+        setStartError({
+          code,
+          phase: "start",
+          message: code === "unknown" ? (error instanceof Error ? error.message : String(error)) : undefined,
+        })
       }
 
       setIsTracking(false)
@@ -690,11 +681,13 @@ export function useScreenCapture(options: UseScreenCaptureOptions = {}) {
     isSourcePaused,
     lastCaptureTime,
     screens,
+    startError,
     startAutoCapture,
     addScreen,
     removeScreen,
     stopCapture,
     dismissInterruption,
     dismissScreen,
+    dismissStartError,
   }
 }

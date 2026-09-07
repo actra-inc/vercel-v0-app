@@ -194,11 +194,18 @@ export function last7DaysRange(now: Date, timeZone: string): WeekRange {
   }
 }
 
-export function formatSeconds(seconds: number): string {
+export function formatSeconds(seconds: number, lang: "ja" | "en" = "ja"): string {
   const s = Math.round(seconds)
+  // 分単位に丸めてから時・分へ分解する（秒の剰余を丸めると「60分」が出得る）
+  const totalMinutes = Math.round(s / 60)
+  const h = Math.floor(totalMinutes / 60)
+  const m = totalMinutes % 60
+  if (lang === "en") {
+    if (s < 60) return `${s}s`
+    if (h === 0) return `${m}m`
+    return m > 0 ? `${h}h ${m}m` : `${h}h`
+  }
   if (s < 60) return `${s}秒`
-  const h = Math.floor(s / 3600)
-  const m = Math.round((s % 3600) / 60)
   if (h === 0) return `${m}分`
   return m > 0 ? `${h}時間${m}分` : `${h}時間`
 }

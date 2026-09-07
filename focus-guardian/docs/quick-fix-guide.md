@@ -26,8 +26,7 @@ https://your-vercel-url.vercel.app/debug
 #### Step 3: 環境変数を確認
 Vercel Dashboard → Settings → Environment Variables
 \`\`\`bash
-NEXTAUTH_URL=https://your-actual-vercel-url.vercel.app
-NEXTAUTH_SECRET=your-random-secret-32-chars-minimum
+# NEXTAUTH_* は使用しません（認証は Supabase Auth）
 NEXT_PUBLIC_SUPABASE_URL=https://obcpnxwrjzfxlvbcwvcx.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 \`\`\`

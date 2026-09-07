@@ -9,6 +9,7 @@ import {
   sendWeeklyEmail,
   sendWeeklySlack,
   isValidSlackWebhookUrl,
+  normalizeReportLanguage,
 } from "@/lib/weekly-report"
 
 // 実行時間の上限（秒）。vercel.json の functions グロブは App Router の出力パスに
@@ -20,7 +21,7 @@ export const maxDuration = 30
 // 設定どおりのチャネルへ即時配信する。service role は使わない
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000
 
-export async function POST() {
+export async function POST(request: Request) {
   const { user, supabase } = await getAuthenticatedUser()
   if (!user) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 })
@@ -39,9 +40,22 @@ export async function POST() {
     channel?: string
     slackWebhookUrl?: string
     timezone?: string
+    language?: string
   }
   const channel = wr.channel === "slack" || wr.channel === "both" ? wr.channel : "email"
   const tz = safeTimeZone(wr.timezone)
+
+  // 本文の言語: リクエストで指定された今のUI言語を優先し、無ければ保存値（既定は日本語）
+  let requestedLanguage: unknown
+  try {
+    requestedLanguage = (await request.json())?.language
+  } catch {
+    requestedLanguage = undefined
+  }
+  const lang =
+    requestedLanguage === "ja" || requestedLanguage === "en"
+      ? requestedLanguage
+      : normalizeReportLanguage(wr.language)
 
   const now = new Date()
   const range = last7DaysRange(now, tz)
@@ -49,7 +63,7 @@ export async function POST() {
 
   let digest
   try {
-    digest = await buildWeeklyDigest(supabase, user.id, settings ?? {}, range, prevRange)
+    digest = await buildWeeklyDigest(supabase, user.id, settings ?? {}, range, prevRange, lang)
   } catch (e) {
     console.error("Weekly digest build failed:", e instanceof Error ? e.message : e)
     return NextResponse.json({ error: "digest_failed" }, { status: 500 })

@@ -30,7 +30,6 @@ interface ScreenSession {
 interface TimeTrackerProps {
   onTimeEntryChange: (entry: TimeEntry | null) => void
   onCurrentTaskChange: (task: string) => void
-  timeEntries: any[]
   screenSessions?: ScreenSession[]
   togglApiToken?: string
   togglWorkspaceId?: string
@@ -52,7 +51,6 @@ type TaskSource = "calendar" | "toggl"
 export function TimeTracker({
   onTimeEntryChange,
   onCurrentTaskChange,
-  timeEntries,
   screenSessions = [],
   togglApiToken = "",
   togglWorkspaceId = "",
