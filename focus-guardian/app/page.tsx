@@ -77,7 +77,7 @@ function clearLocalCategories(userId: string) {
 }
 
 const Page = () => {
-  const { t } = useTranslation()
+  const { t, language } = useTranslation()
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [authChecked, setAuthChecked] = useState(false)
   const isLoggedInRef = useRef(false)
@@ -138,11 +138,13 @@ const Page = () => {
 
   // カテゴリの読み込み・移行（ユーザーごとに1回）
   useEffect(() => {
-    if (!user?.id || !userSettings) return
+    // 初回ロード完了まで待つ（設定取得に失敗して userSettings が null のままでも、
+    // 端末保存からは復元できるようにする）
+    if (!user?.id || loading) return
     if (categoriesSyncedForRef.current === user.id) return
     categoriesSyncedForRef.current = user.id
 
-    const fromDb = Array.isArray(userSettings.activity_categories)
+    const fromDb = Array.isArray(userSettings?.activity_categories)
       ? normalizeCategories(userSettings.activity_categories)
       : null
     if (fromDb && fromDb.length > 0) {
@@ -161,7 +163,7 @@ const Page = () => {
           writeLocalCategories(user.id, local)
         })
     }
-  }, [user?.id, userSettings, updateSettings])
+  }, [user?.id, loading, userSettings, updateSettings])
 
   const handleCategoriesChange = useCallback(
     async (newCategories: ActivityCategory[]) => {
@@ -548,7 +550,7 @@ const Page = () => {
       body: JSON.stringify({
         workLogs: logsForToday,
         apiKey,
-        date: new Date().toLocaleDateString("ja-JP"),
+        date: new Date().toLocaleDateString(language === "ja" ? "ja-JP" : "en-US"),
         // 利用者のタイムゾーンで日報の時刻を整形させる
         timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         // model は意図的に送らない（レポート系はサーバー既定の Gemma で枠を分離）
@@ -576,7 +578,7 @@ const Page = () => {
       // ここでthrowしないとレポートが無言で消える（呼び出し元のcatchが表示を出す）
       throw new Error("Report save failed (network error)")
     }
-  }, [workLogs, userSettings, addWorkLog, t])
+  }, [workLogs, userSettings, addWorkLog, t, language])
 
   const reportsCount = useMemo(() => workLogs.filter((log: any) => !!log.report_type).length, [workLogs])
   const canGenerate = useMemo(() => workLogs.filter((log: any) => !log.report_type).length >= 3, [workLogs])

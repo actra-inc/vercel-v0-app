@@ -26,9 +26,17 @@ interface WorkSummaryReportProps {
   reportData: ReportData
 }
 
+// href/src に渡す前にスキームを限定する（javascript: 等が混ざるとクリックで実行される）。
+// セッション中に作った blob: は自前の object URL なので許可する
+const isSafeScreenshotUrl = (url: unknown): url is string =>
+  typeof url === "string" && /^(https?:\/\/|data:image\/|blob:)/i.test(url.trim())
+
 export function WorkSummaryReport({ timestamp, reportData }: WorkSummaryReportProps) {
   const { t, language } = useTranslation()
   const dateLocale = language === "ja" ? "ja-JP" : "en-US"
+  const screenshotUrls = Array.isArray(reportData.source_screenshots)
+    ? reportData.source_screenshots.filter(isSafeScreenshotUrl)
+    : []
   // AI生成レポートはフィールドが欠けている場合があるため防御的に扱う
   const timeDistribution = reportData.time_distribution ?? {
     productive_time: 0,
@@ -61,7 +69,7 @@ export function WorkSummaryReport({ timestamp, reportData }: WorkSummaryReportPr
       </CardHeader>
       <CardContent className="space-y-6 pt-6">
         {/* 解析元スクリーンショット */}
-        {Array.isArray(reportData.source_screenshots) && reportData.source_screenshots.length > 0 && (
+        {screenshotUrls.length > 0 && (
           <div className="p-4 bg-white rounded-lg border border-orange-100 shadow-sm">
             <h4 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
               <FileText className="h-4 w-4 text-orange-600" />
@@ -70,7 +78,7 @@ export function WorkSummaryReport({ timestamp, reportData }: WorkSummaryReportPr
             {/* 過去に保存された blob: URL はリロード後に必ず死ぬため、
                 読み込みに失敗した画像はリンクごと非表示にする */}
             <div className="grid grid-cols-3 gap-2">
-              {reportData.source_screenshots.map((url, index) => (
+              {screenshotUrls.map((url, index) => (
                 <a key={index} href={url} target="_blank" rel="noopener noreferrer">
                   <img
                     src={url}

@@ -335,6 +335,16 @@ export const en: Record<TranslationKey, string> = {
   lp_loginFailedCookie: 'Clear your browser cookies and try again. If it persists, check the configuration.',
   lp_codeOnRoot: 'The authorization code arrived at the top page, but a session could not be created.',
 
+  // ErrorBoundary
+  eb_title: 'Something went wrong',
+  eb_desc: 'An error occurred while loading this component.',
+  eb_showDetails: 'Show error details',
+  eb_reload: 'Reload the page',
+  eb_troubleshootTitle: 'Troubleshooting:',
+  eb_step1: 'Clear your browser cache',
+  eb_step2: 'Try a different browser',
+  eb_step3: 'If it persists, check the browser console for errors',
+
   // WorkSummaryReport
   wsr_title: 'Summary report (auto-generated)',
   wsr_overview: 'Overview',

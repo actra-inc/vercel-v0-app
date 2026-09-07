@@ -333,6 +333,16 @@ export const ja = {
   lp_loginFailedCookie: 'ブラウザのCookieを削除して再度お試しください。解決しない場合は設定をご確認ください。',
   lp_codeOnRoot: '認証コードがトップページに届きましたが、セッションを作成できませんでした。',
 
+  // ErrorBoundary
+  eb_title: 'エラーが発生しました',
+  eb_desc: 'コンポーネントの読み込み中にエラーが発生しました。',
+  eb_showDetails: 'エラー詳細を表示',
+  eb_reload: 'ページをリロード',
+  eb_troubleshootTitle: 'トラブルシューティング:',
+  eb_step1: 'ブラウザのキャッシュをクリアしてください',
+  eb_step2: '別のブラウザで試してください',
+  eb_step3: '問題が続く場合は、ブラウザのコンソールでエラーを確認してください',
+
   // WorkSummaryReport
   wsr_title: 'まとめレポート（自動生成）',
   wsr_overview: '概要',

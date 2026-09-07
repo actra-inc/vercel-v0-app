@@ -84,7 +84,7 @@ export function TimeTracker({
   const togglIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const isRunningRef = useRef(isRunning)
 
-  const { t } = useTranslation()
+  const { t, language } = useTranslation()
   const { events, loading: calendarLoading, error: calendarError, needsReauth, fetchTodayEvents, formatEventTime, isEventNow } = useGoogleCalendar()
 
   // isRunning の最新値を ref で追跡（ポーリングコールバック内で使用）
@@ -555,7 +555,7 @@ export function TimeTracker({
                     {t('tt_togglAutoSync')}
                     {togglLastFetched && (
                       <span className="ml-2 text-orange-500 font-normal">
-                        {t('tt_lastFetched')} {togglLastFetched.toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" })}
+                        {t('tt_lastFetched')} {togglLastFetched.toLocaleTimeString(language === "ja" ? "ja-JP" : "en-US", { hour: "2-digit", minute: "2-digit" })}
                       </span>
                     )}
                   </span>
