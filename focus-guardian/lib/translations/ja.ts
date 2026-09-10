@@ -536,6 +536,7 @@ export const ja = {
   ga_title: 'Gemini API 設定',
   ga_apiKeyLabel: 'API キー',
   ga_getKeyLink: 'でAPIキーを取得できます',
+  ga_billingPrivacyNote: 'Google Gemini API の無料枠を使用している場合、Google の利用規約に基づき、送信した画像・テキストが AI の学習・サービス改善に使用される可能性があります。機密情報を扱う場合は、Google AI Studio で請求先アカウント（課金）を有効化した上でAPIキーをご使用ください。有効化後は使わなければ費用は発生しません。',
   ga_modelPlaceholder: 'モデルを選択',
   ga_savingButton: '保存中...',
   ga_saveButton: '保存',

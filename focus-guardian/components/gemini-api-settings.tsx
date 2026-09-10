@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { Key, Save, Loader2, CheckCircle2, AlertCircle, Gauge } from "lucide-react"
+import { Key, Save, Loader2, CheckCircle2, AlertCircle, Gauge, ShieldAlert } from "lucide-react"
 import type { TranslationKey } from "@/lib/translations/ja"
 
 // 画面解析に使えるモデルの選択肢。
@@ -139,6 +139,22 @@ export function GeminiApiSettings({
             </a>
             {t('ga_getKeyLink')}
           </p>
+          {/* 無料枠のデータ学習リスク警告 */}
+          <div className="flex gap-2 rounded-lg border border-yellow-300 bg-yellow-50 p-3 text-xs text-yellow-800">
+            <ShieldAlert className="h-4 w-4 shrink-0 text-yellow-600 mt-0.5" />
+            <p>
+              {t('ga_billingPrivacyNote')}
+              {" "}
+              <a
+                href="https://aistudio.google.com/app/billing"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline font-medium"
+              >
+                Google AI Studio → Billing
+              </a>
+            </p>
+          </div>
         </div>
 
         {/* 解析モデルの選択 */}

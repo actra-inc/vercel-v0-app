@@ -539,6 +539,7 @@ export const en: Record<TranslationKey, string> = {
   ga_title: 'Gemini API Settings',
   ga_apiKeyLabel: 'API Key',
   ga_getKeyLink: 'to get your API key',
+  ga_billingPrivacyNote: "If you use the Gemini API free tier, Google may use your submitted images and text to train and improve their AI models, per their Terms of Service. If you handle sensitive information, please enable billing on your Google AI Studio account before using the API key. You won't be charged unless you actively use the API.",
   ga_modelPlaceholder: 'Select model',
   ga_savingButton: 'Saving...',
   ga_saveButton: 'Save',

@@ -47,7 +47,7 @@ export default function PrivacyEnPage() {
                 <li>Complying with applicable laws and regulations</li>
               </ul>
               <p className="mt-2">
-                Google API user data will <strong>never be used to develop, train, or improve generalized AI or machine learning models.</strong>{" "}
+                User data obtained through Google OAuth APIs (e.g. Calendar) will <strong>never be used by FlowNudge to develop, train, or improve generalized AI or machine learning models.</strong>{" "}
                 Such data will not be sold, shared, or transferred to any third party for any purpose.
               </p>
             </div>
@@ -175,6 +175,20 @@ export default function PrivacyEnPage() {
               API for analysis. The analysis result is displayed on screen only and is never stored on
               our servers. The Gemini/Gemma API key is stored in your browser only.
             </p>
+            <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800">
+              <p className="font-semibold mb-1">⚠️ Important: Google Gemini API Data Handling</p>
+              <p>
+                Screenshots and text sent through the <strong>free tier of the Gemini API</strong> may
+                be used by Google to train and improve their AI models, per their Terms of Service.
+                Human reviewers may also read the content.
+              </p>
+              <p className="mt-2">
+                If you handle sensitive, personal, or confidential business information, please{" "}
+                <strong>enable billing on your Google AI Studio account before using the API key</strong>.
+                With the paid tier, your input data is not used for AI training.
+                You won't be charged unless you actively use the API.
+              </p>
+            </div>
 
             <h3 className="text-base font-semibold text-gray-800 mt-6 mb-2">
               1-5. Work Log Data

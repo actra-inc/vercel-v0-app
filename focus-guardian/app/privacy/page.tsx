@@ -47,7 +47,7 @@ export default function PrivacyPage() {
                 <li>適用される法令の遵守</li>
               </ul>
               <p className="mt-2">
-                Google API から取得したユーザーデータを、<strong>汎用的な AI モデルまたは機械学習モデルの開発・学習・改善を目的として使用することは一切ありません。</strong>
+                本サービス（FlowNudge）が Google OAuth API を通じて取得したユーザーデータ（カレンダー情報等）を、<strong>汎用的な AI モデルまたは機械学習モデルの開発・学習・改善を目的として使用することは一切ありません。</strong>
                 また、当該データを第三者に販売・共有・転用することはありません。
               </p>
             </div>
@@ -174,6 +174,21 @@ export default function PrivacyPage() {
               解析結果（作業内容の分類・集中度などのテキストデータ）は、作業ログとしてユーザーのアカウント（Supabase）に保存されます。
               レポート生成時には、保存済みの作業ログのテキストを Google の生成 AI API（Gemma）に送信します。
             </p>
+            <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800">
+              <p className="font-semibold mb-1">⚠️ Google Gemini API のデータ取り扱いについて（重要）</p>
+              <p>
+                送信されたスクリーンショット・テキストは本サービスのサーバーには保存されませんが、
+                <strong>Google Gemini API の無料枠を使用している場合</strong>、
+                Google の利用規約に基づき、入力データが Google による AI の学習・サービス改善に使用される可能性があります。
+                また、人間のレビュアーが内容を閲覧することがあります。
+              </p>
+              <p className="mt-2">
+                機密情報・個人情報・業務上の秘密情報を扱う場合は、
+                Google AI Studio で<strong>請求先アカウント（課金）を有効化した上で API キーをご使用ください</strong>。
+                有料枠では入力データは AI 学習に使用されません。
+                有効化後に使わなければ費用は発生しません。
+              </p>
+            </div>
 
             <h3 className="text-base font-semibold text-gray-800 mt-6 mb-2">
               1-5. 作業ログデータ
