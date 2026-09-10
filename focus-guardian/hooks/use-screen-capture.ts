@@ -80,28 +80,15 @@ interface UseScreenCaptureOptions {
   onInterrupted?: () => void
 }
 
-// フレーム取得系のPromiseが永遠に解決しないケース（バックグラウンドタブで
-// video の loadedmetadata が発火しない、muted track で grabFrame が pending のまま等）で
-// isCapturingRef が true に固着して解析が永久停止するのを防ぐためのタイムアウト
-const FRAME_TIMEOUT_MS = 15 * 1000
-
 // 合成画像の長辺の上限（大きすぎる画像は解析APIのペイロードを無駄に膨らませる）
 const COMPOSITE_MAX_EDGE = 1600
-
-function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)
-    promise.then(
-      (v) => { clearTimeout(timer); resolve(v) },
-      (e) => { clearTimeout(timer); reject(e) },
-    )
-  })
-}
 
 interface StreamEntry {
   id: string
   label: number
   stream: MediaStream
+  // ストリームを常時消費し続けることで Chrome がトラックを終了させるのを防ぐ
+  video: HTMLVideoElement
 }
 
 let screenIdCounter = 0
@@ -175,7 +162,10 @@ export function useScreenCapture(options: UseScreenCaptureOptions = {}) {
   }
 
   const releaseAll = useCallback(() => {
-    streamsRef.current.forEach((e) => e.stream.getTracks().forEach((t) => t.stop()))
+    streamsRef.current.forEach((e) => {
+      e.stream.getTracks().forEach((t) => t.stop())
+      e.video.srcObject = null
+    })
     streamsRef.current = []
     setMediaStream(null)
     clearIntervalTimer()
@@ -206,6 +196,7 @@ export function useScreenCapture(options: UseScreenCaptureOptions = {}) {
       if (!entry) return // 解放済み（二重発火）
       console.warn(`Screen sharing ended unexpectedly (screen ${entry.label})`)
       entry.stream.getTracks().forEach((t) => t.stop())
+      entry.video.srcObject = null
       streamsRef.current = streamsRef.current.filter((e) => e.id !== id)
       updateScreen(id, { interrupted: true, paused: false })
       syncDerivedState()
@@ -243,7 +234,10 @@ export function useScreenCapture(options: UseScreenCaptureOptions = {}) {
   // アンマウント時（タブ切り替え等）にストリームとインターバルを確実に解放する
   useEffect(() => {
     return () => {
-      streamsRef.current.forEach((e) => e.stream.getTracks().forEach((t) => t.stop()))
+      streamsRef.current.forEach((e) => {
+        e.stream.getTracks().forEach((t) => t.stop())
+        e.video.srcObject = null
+      })
       streamsRef.current = []
       if (intervalRef.current) {
         clearInterval(intervalRef.current)
@@ -255,61 +249,24 @@ export function useScreenCapture(options: UseScreenCaptureOptions = {}) {
   // ---- フレーム取得 --------------------------------------------------------
 
   // 1ストリームぶんのフレームをcanvasとして取得する（従来のcaptureFrameの取得部分）
+  // ストリームに紐付いた常時再生中の video 要素から1フレームを取得する。
+  // ImageCapture.grabFrame() は Chrome の display capture ストリームで
+  // トラックを意図せず終了させるバグが報告されているため使用しない。
+  // 常時再生 video による方式はフレームが常に利用可能で同期的に取得できる
   const grabFrameCanvas = useCallback(
-    async (stream: MediaStream): Promise<HTMLCanvasElement | null> => {
-      const videoTrack = stream.getVideoTracks()[0]
-      if (!videoTrack) return null
-
-      if (window.ImageCapture && typeof ImageCapture.prototype.grabFrame === "function") {
-        try {
-          const imageCapture = new ImageCapture(videoTrack)
-          const imageBitmap = (await withTimeout(
-            imageCapture.grabFrame(),
-            FRAME_TIMEOUT_MS,
-            "grabFrame",
-          )) as ImageBitmap
-          const canvas = document.createElement("canvas")
-          canvas.width = imageBitmap.width
-          canvas.height = imageBitmap.height
-          const ctx = canvas.getContext("2d")
-          if (ctx) {
-            ctx.drawImage(imageBitmap, 0, 0)
-            imageBitmap.close()
-            return canvas
-          }
-          imageBitmap.close()
-        } catch (e) {
-          console.warn("ImageCapture.grabFrame() failed, falling back to video element.", e)
-        }
+    (entry: StreamEntry): HTMLCanvasElement | null => {
+      const video = entry.video
+      if (video.videoWidth === 0 || video.videoHeight === 0) {
+        console.warn("[capture] video not ready yet (no dimensions), skipping frame")
+        return null
       }
-
-      const video = document.createElement("video")
-      video.srcObject = stream
-      video.muted = true
-
-      // onloadedmetadata / onerror のどちらも発火しないとこの Promise は
-      // 永遠に未解決になり、isCapturingRef が固着する。タイムアウトで必ず決着させる
-      await withTimeout(
-        new Promise<void>((resolve, reject) => {
-          video.onloadedmetadata = () => {
-            video
-              .play()
-              .then(() => setTimeout(resolve, 100))
-              .catch(reject)
-          }
-          video.onerror = () => reject(new Error("video element error"))
-        }),
-        FRAME_TIMEOUT_MS,
-        "video metadata",
-      )
-
       const canvas = document.createElement("canvas")
       canvas.width = video.videoWidth
       canvas.height = video.videoHeight
       const ctx = canvas.getContext("2d")
-      if (ctx) ctx.drawImage(video, 0, 0)
-      video.srcObject = null
-      return ctx ? canvas : null
+      if (!ctx) return null
+      ctx.drawImage(video, 0, 0)
+      return canvas
     },
     [],
   )
@@ -403,7 +360,7 @@ export function useScreenCapture(options: UseScreenCaptureOptions = {}) {
       let lastError: Error | null = null
       for (const e of live) {
         try {
-          const canvas = await grabFrameCanvas(e.stream)
+          const canvas = grabFrameCanvas(e)
           if (canvas && canvas.width > 0 && canvas.height > 0) {
             frames.push({ canvas, label: e.label })
           }
@@ -433,6 +390,7 @@ export function useScreenCapture(options: UseScreenCaptureOptions = {}) {
       isCapturingRef.current = false
     }
   }, [grabFrameCanvas, canvasToBlob, composeFrames, handleScreenEnded])
+  // grabFrameCanvas は deps なしの useCallback なので実質定数
 
   // インターバルからは常に最新のcaptureTickを呼ぶ（クロージャの固定を避ける）
   const tickRef = useRef(captureTick)
@@ -499,7 +457,13 @@ export function useScreenCapture(options: UseScreenCaptureOptions = {}) {
 
   const registerStream = useCallback(
     (stream: MediaStream, label: number): StreamEntry => {
-      const entry: StreamEntry = { id: nextScreenId(), label, stream }
+      // ストリームを常時再生する video 要素を作成する。
+      // これにより Chrome がアイドルと判断してトラックを終了させることを防ぐ
+      const videoEl = document.createElement("video")
+      videoEl.srcObject = stream
+      videoEl.muted = true
+      videoEl.play().catch((e) => console.warn("[capture] persistent video.play() failed:", e))
+      const entry: StreamEntry = { id: nextScreenId(), label, stream, video: videoEl }
       streamsRef.current = [...streamsRef.current, entry]
       attachStreamListeners(entry)
       const videoTrack = stream.getVideoTracks()[0]
@@ -567,6 +531,7 @@ export function useScreenCapture(options: UseScreenCaptureOptions = {}) {
       if (!entry) return
       // track.stop() では 'ended' は発火しないため中断ハンドラは走らない
       entry.stream.getTracks().forEach((t) => t.stop())
+      entry.video.srcObject = null
       streamsRef.current = streamsRef.current.filter((e) => e.id !== id)
       setScreens((prev) => {
         const next = prev.filter((s) => s.id !== id)
