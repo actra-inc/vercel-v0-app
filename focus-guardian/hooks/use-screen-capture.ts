@@ -192,11 +192,17 @@ export function useScreenCapture(options: UseScreenCaptureOptions = {}) {
   // 全滅した場合は従来どおり全体を中断状態にする。
   // どちらも onInterrupted で通知し、ユーザーが気付けるようにする
   const handleScreenEnded = useCallback(
-    (id: string) => {
+    (id: string, source: "event" | "proactive") => {
       if (intentionalStopRef.current) return
       const entry = streamsRef.current.find((e) => e.id === id)
       if (!entry) return // 解放済み（二重発火）
-      console.warn(`Screen sharing ended unexpectedly (screen ${entry.label})`)
+      const track = entry.stream.getVideoTracks()[0]
+      console.warn(
+        `[capture] Screen ended (screen ${entry.label}, source=${source})`,
+        `track.readyState=${track?.readyState}`,
+        `track.muted=${track?.muted}`,
+        `stream.active=${entry.stream.active}`,
+      )
       entry.stream.getTracks().forEach((t) => t.stop())
       entry.video.pause()
       entry.video.parentElement?.removeChild(entry.video)
@@ -262,6 +268,14 @@ export function useScreenCapture(options: UseScreenCaptureOptions = {}) {
   const grabFrameCanvas = useCallback(
     (entry: StreamEntry): HTMLCanvasElement | null => {
       const video = entry.video
+      const track = entry.stream.getVideoTracks()[0]
+      console.log(
+        `[capture] grabFrame screen ${entry.label}:`,
+        `video readyState=${video.readyState}`,
+        `videoWidth=${video.videoWidth}`,
+        `track.readyState=${track?.readyState}`,
+        `stream.active=${entry.stream.active}`,
+      )
       if (video.videoWidth === 0 || video.videoHeight === 0) {
         console.warn("[capture] video not ready yet (no dimensions), skipping frame")
         return null
@@ -340,10 +354,6 @@ export function useScreenCapture(options: UseScreenCaptureOptions = {}) {
     if (isCapturingRef.current) {
       console.log("Capture already in progress, skipping.")
       return
-    }
-    // 消えたストリームを先に整理する
-    for (const entry of [...streamsRef.current]) {
-      if (!entry.stream.active) handleScreenEnded(entry.id)
     }
     const entries = [...streamsRef.current].sort((a, b) => a.label - b.label)
     if (entries.length === 0) return
@@ -430,8 +440,8 @@ export function useScreenCapture(options: UseScreenCaptureOptions = {}) {
       // 共有停止・共有面の消失（ディスプレイを外した等）のどちらでも発火する。
       // 意図的な停止かどうかは intentionalStopRef で見分ける
       videoTrack.addEventListener("ended", () => {
-        console.log(`Screen sharing track ended (screen ${entry.label})`)
-        handleScreenEnded(entry.id)
+        console.warn(`[capture] track 'ended' event fired (screen ${entry.label}, readyState=${videoTrack.readyState}, muted=${videoTrack.muted})`)
+        handleScreenEnded(entry.id, "event")
       })
       // 一時的に映像が供給されない状態（ディスプレイのスリープ等）。
       // トラックは生きているため、復帰時に自動で解析が続く
