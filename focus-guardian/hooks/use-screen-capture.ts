@@ -164,6 +164,8 @@ export function useScreenCapture(options: UseScreenCaptureOptions = {}) {
   const releaseAll = useCallback(() => {
     streamsRef.current.forEach((e) => {
       e.stream.getTracks().forEach((t) => t.stop())
+      e.video.pause()
+      e.video.parentElement?.removeChild(e.video)
       e.video.srcObject = null
     })
     streamsRef.current = []
@@ -196,6 +198,8 @@ export function useScreenCapture(options: UseScreenCaptureOptions = {}) {
       if (!entry) return // 解放済み（二重発火）
       console.warn(`Screen sharing ended unexpectedly (screen ${entry.label})`)
       entry.stream.getTracks().forEach((t) => t.stop())
+      entry.video.pause()
+      entry.video.parentElement?.removeChild(entry.video)
       entry.video.srcObject = null
       streamsRef.current = streamsRef.current.filter((e) => e.id !== id)
       updateScreen(id, { interrupted: true, paused: false })
@@ -236,6 +240,8 @@ export function useScreenCapture(options: UseScreenCaptureOptions = {}) {
     return () => {
       streamsRef.current.forEach((e) => {
         e.stream.getTracks().forEach((t) => t.stop())
+        e.video.pause()
+        e.video.parentElement?.removeChild(e.video)
         e.video.srcObject = null
       })
       streamsRef.current = []
@@ -458,10 +464,15 @@ export function useScreenCapture(options: UseScreenCaptureOptions = {}) {
   const registerStream = useCallback(
     (stream: MediaStream, label: number): StreamEntry => {
       // ストリームを常時再生する video 要素を作成する。
-      // これにより Chrome がアイドルと判断してトラックを終了させることを防ぐ
+      // DOM に追加しないと Chrome がバックグラウンドでスロットリングし、
+      // トラックを終了させることがある。1px の不可視要素として body に付与する
       const videoEl = document.createElement("video")
       videoEl.srcObject = stream
       videoEl.muted = true
+      videoEl.playsInline = true
+      videoEl.style.cssText =
+        "position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;pointer-events:none;z-index:-9999"
+      document.body.appendChild(videoEl)
       videoEl.play().catch((e) => console.warn("[capture] persistent video.play() failed:", e))
       const entry: StreamEntry = { id: nextScreenId(), label, stream, video: videoEl }
       streamsRef.current = [...streamsRef.current, entry]
@@ -531,6 +542,8 @@ export function useScreenCapture(options: UseScreenCaptureOptions = {}) {
       if (!entry) return
       // track.stop() では 'ended' は発火しないため中断ハンドラは走らない
       entry.stream.getTracks().forEach((t) => t.stop())
+      entry.video.pause()
+      entry.video.parentElement?.removeChild(entry.video)
       entry.video.srcObject = null
       streamsRef.current = streamsRef.current.filter((e) => e.id !== id)
       setScreens((prev) => {
