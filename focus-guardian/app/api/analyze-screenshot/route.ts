@@ -154,6 +154,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "imageData is required" }, { status: 400 })
     }
 
+    // Base64換算で10MB超（バイナリ換算≒7.5MB）は異常なペイロードとして拒否する
+    if (imageData.length > 10 * 1024 * 1024) {
+      return NextResponse.json({ error: "imageData too large" }, { status: 413 })
+    }
+
     if (!apiKey) {
       return NextResponse.json({ error: "API key is required" }, { status: 400 })
     }
