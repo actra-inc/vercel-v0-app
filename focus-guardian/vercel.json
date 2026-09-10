@@ -9,14 +9,6 @@
       "source": "/(.*)",
       "headers": [
         {
-          "key": "Permissions-Policy",
-          "value": "display-capture=(self)"
-        },
-        {
-          "key": "Feature-Policy",
-          "value": "display-capture 'self'"
-        },
-        {
           "key": "X-Content-Type-Options",
           "value": "nosniff"
         },
