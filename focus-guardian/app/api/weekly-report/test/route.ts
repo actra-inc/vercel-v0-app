@@ -29,7 +29,7 @@ export async function POST(request: Request) {
 
   const { data: settings, error } = await supabase
     .from("user_settings")
-    .select("capture_interval, gemini_api_key, weekly_report")
+    .select("capture_interval, weekly_report")
     .eq("user_id", user.id)
     .maybeSingle()
   if (error) {

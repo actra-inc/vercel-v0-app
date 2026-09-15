@@ -5,8 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Loader2, AlertCircle, X, Settings, Key, Link, FolderOpen, Info } from "lucide-react"
-import { GeminiApiSettings } from "@/components/gemini-api-settings"
+import { Loader2, AlertCircle, X, Settings, Cpu, Link, FolderOpen, Info } from "lucide-react"
+import { LocalAiSettings } from "@/components/local-ai-settings"
 import { TogglSettings, type TogglSaveResult } from "@/components/toggl-settings"
 import { ProjectManager } from "@/components/project-manager"
 import { AppSettings } from "@/components/app-settings"
@@ -17,15 +17,11 @@ import { VersionInfo } from "@/components/version-info"
 import { useTranslation } from "@/lib/i18n"
 
 interface SettingsPanelProps {
-  apiKey: string
-  model: string
   togglApiToken: string
   togglWorkspaceId: string
   /** Toggl資格情報がDBではなくこの端末にだけ保存されている状態か */
   togglCredentialsLocalOnly?: boolean
   captureInterval: number
-  onApiKeyChange: (apiKey: string) => Promise<void>
-  onModelChange: (model: string) => void
   onTogglCredentialsChange: (token: string, workspaceId: string) => void | Promise<TogglSaveResult | void>
   onCaptureIntervalChange: (interval: number) => void
   nudgePreferences?: NudgePreferences
@@ -45,14 +41,10 @@ interface SettingsPanelProps {
 }
 
 export function SettingsPanel({
-  apiKey,
-  model,
   togglApiToken,
   togglWorkspaceId,
   togglCredentialsLocalOnly = false,
   captureInterval,
-  onApiKeyChange,
-  onModelChange,
   onTogglCredentialsChange,
   onCaptureIntervalChange,
   nudgePreferences,
@@ -62,7 +54,7 @@ export function SettingsPanel({
   weeklyReport,
   onWeeklyReportChange,
   onClose,
-  initialTab = "gemini",
+  initialTab = "local",
   projects = [],
   onProjectsChange = () => {},
   addProject,
@@ -140,9 +132,9 @@ export function SettingsPanel({
         <CardContent className="pt-6">
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="grid w-full grid-cols-5">
-              <TabsTrigger value="gemini" className="flex items-center gap-2">
-                <Key className="h-4 w-4" />
-                {t('sp_tabGemini')}
+              <TabsTrigger value="local" className="flex items-center gap-2">
+                <Cpu className="h-4 w-4" />
+                {t('sp_tabLocalAi')}
               </TabsTrigger>
               <TabsTrigger value="toggl" className="flex items-center gap-2">
                 <Link className="h-4 w-4" />
@@ -162,14 +154,8 @@ export function SettingsPanel({
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="gemini" className="mt-6">
-              <GeminiApiSettings
-                apiKey={apiKey}
-                model={model}
-                onApiKeyChange={onApiKeyChange}
-                onModelChange={onModelChange}
-                captureInterval={captureInterval}
-              />
+            <TabsContent value="local" className="mt-6">
+              <LocalAiSettings />
               {/* 「これは仕事です」フィードバックから作られた判定ルールの管理 */}
               {onAnalysisRulesChange && (
                 <AnalysisRulesSettings rules={analysisRules} onChange={onAnalysisRulesChange} />

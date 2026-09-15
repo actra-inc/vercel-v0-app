@@ -134,7 +134,6 @@ export function useSupabaseData() {
         } else {
           // 行が確実に存在しない（error=null かつ data=null）場合のみ既定値を作成する
           const defaultSettings = {
-            gemini_model: "gemini-3.5-flash-lite",
             capture_interval: DEFAULT_CAPTURE_INTERVAL_SECONDS,
             auto_sync_toggl: false,
             // 端末に退避された値があれば初期作成時に取り込む

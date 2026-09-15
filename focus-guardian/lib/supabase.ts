@@ -100,13 +100,11 @@ export interface WeeklyReportSettings {
 export interface UserSettings {
   id: string
   user_id: string
-  gemini_api_key?: string
-  gemini_model: string
   toggl_api_token?: string
   toggl_workspace_id?: string
   capture_interval: number
   auto_sync_toggl: boolean
-  /** 判定ルール（最大20件・各200文字。analyze-screenshot のプロンプトへ挿入される） */
+  /** 判定ルール（最大20件・各200文字。端末内 AI の解析プロンプトへ挿入される） */
   analysis_rules?: AnalysisRule[]
   /** 休憩・無操作リマインドの設定 */
   nudge_preferences?: NudgePreferences
@@ -278,7 +276,7 @@ export const updateUserSettings = async (
   userId: string,
   settings: Partial<UserSettings>,
 ): Promise<{ data: any; error: SettingsWriteError | null }> => {
-  // 注意: settings には gemini_api_key / toggl_api_token が含まれるため
+  // 注意: settings には toggl_api_token が含まれるため
   // 値そのものはログに出さない（ブラウザコンソールへの平文露出を防ぐ）
   console.log("💾 updateUserSettings called with keys:", { userId, keys: Object.keys(settings) })
 

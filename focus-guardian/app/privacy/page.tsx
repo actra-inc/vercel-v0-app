@@ -16,7 +16,7 @@ export default function PrivacyPage() {
             ← FlowNudge トップへ
           </Link>
           <h1 className="mt-4 text-3xl font-bold text-gray-900">プライバシーポリシー</h1>
-          <p className="mt-2 text-sm text-gray-500">最終更新日：2026年5月28日</p>
+          <p className="mt-2 text-sm text-gray-500">最終更新日：2026年9月15日</p>
         </div>
 
         <div className="space-y-8 text-gray-700 leading-relaxed">
@@ -148,12 +148,12 @@ export default function PrivacyPage() {
                   <tr>
                     <td className="border border-gray-200 px-4 py-2">Toggl API トークン</td>
                     <td className="border border-gray-200 px-4 py-2">Toggl API 認証</td>
-                    <td className="border border-gray-200 px-4 py-2">ブラウザ（ローカルストレージ）のみ</td>
+                    <td className="border border-gray-200 px-4 py-2">ユーザーのアカウント（Supabase・本人のみアクセス可）</td>
                   </tr>
                   <tr className="bg-gray-50">
                     <td className="border border-gray-200 px-4 py-2">ワークスペース ID</td>
                     <td className="border border-gray-200 px-4 py-2">Toggl API 認証</td>
-                    <td className="border border-gray-200 px-4 py-2">ブラウザ（ローカルストレージ）のみ</td>
+                    <td className="border border-gray-200 px-4 py-2">ユーザーのアカウント（Supabase・本人のみアクセス可）</td>
                   </tr>
                   <tr>
                     <td className="border border-gray-200 px-4 py-2">現在の作業記録（タスク名・開始時刻）</td>
@@ -169,10 +169,12 @@ export default function PrivacyPage() {
             </h3>
             <p>
               脱線検知機能を使用した際、ユーザーの開始操作によって取得した画面のスクリーンショット（ブラウザ内で縮小したもの）と、
-              ユーザーが設定した「現在の予定作業」を、ユーザー自身の API キーを用いて Google Gemini API に送信して解析します。
-              スクリーンショット画像そのものは当社のサーバー・データベースには保存されません。
-              解析結果（作業内容の分類・集中度などのテキストデータ）は、作業ログとしてユーザーのアカウント（Supabase）に保存されます。
-              レポート生成時には、保存済みの作業ログのテキストを Google の生成 AI API（Gemma）に送信します。
+              ユーザーが設定した「現在の予定作業」は、<strong>お使いの Chrome に内蔵された AI モデル（Gemini Nano）によって端末内で解析されます。</strong>
+              スクリーンショット画像および画面に表示されていた内容は、当社のサーバーにも、Google を含む外部の AI サービスにも送信されません
+              （Chrome の仕様上、内蔵モデルの利用時にデータが Google や第三者へ送られることはありません）。解析後、画像は端末内で破棄されます。
+              当社が保存するのは、解析結果のテキスト（活動名・分類・集中度スコア・使用アプリ名・40文字程度の短い要約）のみで、
+              作業ログとしてユーザーのアカウント（Supabase）に保存されます。まとめレポート・日報の生成も、保存済みの作業ログを素材として端末内で行います。
+              週次レポートの配信（任意）では、当社のサーバーが作業ログの集計値（合計時間・平均集中度・作業種類の内訳）のみを本文に載せます。
             </p>
 
             <h3 className="text-base font-semibold text-gray-800 mt-6 mb-2">
@@ -192,7 +194,8 @@ export default function PrivacyPage() {
               <li>Google カレンダーの過去・未来のイベント（取得するのは当日分のみ）</li>
               <li>Google の連絡先・メール・ドライブ等の他サービスデータ</li>
               <li>Toggl Track の詳細な作業履歴（表示のみで保存しない）</li>
-              <li>スクリーンショット画像そのもの（解析後に破棄され、保存されるのは解析結果のテキストのみ）</li>
+              <li>スクリーンショット画像そのもの（端末内で解析した後に破棄され、当社のサーバーにも外部の AI サービスにも送信されません）</li>
+              <li>画面に表示されていた文章・データの生データ（端末の外へ出ません。保存されるのは解析結果の短いテキストのみ）</li>
               <li>クレジットカード情報・銀行口座情報等の決済情報</li>
             </ul>
           </section>
@@ -266,8 +269,8 @@ export default function PrivacyPage() {
                     <td className="border border-gray-200 px-4 py-2">ユーザーによる個別削除時・アカウント削除時</td>
                   </tr>
                   <tr>
-                    <td className="border border-gray-200 px-4 py-2">画面解析テキスト</td>
-                    <td className="border border-gray-200 px-4 py-2">保存しない（API送信のみ）</td>
+                    <td className="border border-gray-200 px-4 py-2">画面の画像・解析用データ</td>
+                    <td className="border border-gray-200 px-4 py-2">保存しない（端末内で処理し、外部へ送信しない）</td>
                     <td className="border border-gray-200 px-4 py-2">—</td>
                   </tr>
                 </tbody>
@@ -314,7 +317,7 @@ export default function PrivacyPage() {
                 <strong>セッション Cookie：</strong>ログイン状態の維持（最大30日間）
               </li>
               <li>
-                <strong>ローカルストレージ：</strong>Toggl API トークン・ワークスペース ID・Gemini API キー・ユーザー設定の保存
+                <strong>ローカルストレージ：</strong>表示言語・作業種類カテゴリの退避コピー等のユーザー設定の保存（Toggl の資格情報は、データベースへ保存できない場合に限り一時的に退避します）
               </li>
             </ul>
             <p className="mt-3">
@@ -332,7 +335,8 @@ export default function PrivacyPage() {
               <li>通信の HTTPS 暗号化</li>
               <li>Supabase による行レベルセキュリティ（RLS）の適用</li>
               <li>セッション Cookie の HttpOnly・SameSite 属性設定</li>
-              <li>センシティブな認証情報のサーバー非保存（ブラウザ側ローカルストレージのみ）</li>
+              <li>画面の画像・解析用データを端末の外へ送信しない設計（ブラウザ内蔵 AI による処理）</li>
+              <li>Toggl の資格情報は、ユーザー本人のみがアクセスできる行レベルセキュリティ配下のデータベースに保存</li>
             </ul>
           </section>
 

@@ -27,6 +27,7 @@ import { ActivityBreakdown, DEFAULT_CATEGORIES, type ActivityCategory } from "@/
 import { VersionBadge } from "@/components/version-badge"
 import { useTranslation } from "@/lib/i18n"
 import { DEFAULT_CAPTURE_INTERVAL_SECONDS, normalizeNudgePreferences } from "@/lib/config"
+import { generateDailyReportLocal, generateSummaryReportLocal } from "@/lib/local-reports"
 
 // ---- 作業種類カテゴリの端末退避（DBが正。ここは移行元とフォールバック） ----
 const LEGACY_CATEGORIES_KEY = "activity_categories"
@@ -89,9 +90,9 @@ const Page = () => {
   // 他タブ表示中も解析が続いていることをヘッダーで示すためのフラグ
   const [isScreenTracking, setIsScreenTracking] = useState(false)
   // 設定画面を開くときに、どのタブを選択した状態で開くか
-  const [settingsInitialTab, setSettingsInitialTab] = useState("gemini")
+  const [settingsInitialTab, setSettingsInitialTab] = useState("local")
 
-  const openSettings = useCallback((tab: string = "gemini") => {
+  const openSettings = useCallback((tab: string = "local") => {
     setSettingsInitialTab(tab)
     setCurrentTab("settings")
   }, [])
@@ -280,21 +281,6 @@ const Page = () => {
   }, []) // 依存配列を空にして初回のみ実行
 
 
-  const handleApiKeyChange = useCallback(
-    async (apiKey: string) => {
-      try {
-        console.log("🔄 handleApiKeyChange called with key:", apiKey ? "***" : "(empty)")
-        await updateSettings({ gemini_api_key: apiKey })
-        await refreshData()
-        console.log("✅ API key updated successfully")
-      } catch (error) {
-        console.error("❌ Failed to update API key:", error)
-        throw error
-      }
-    },
-    [updateSettings, refreshData],
-  )
-
   // Toggl資格情報の保存先はDB(user_settings)が正。ただしDB側に列が無い等で
   // 保存できない環境では、この端末のlocalStorageへ退避して連携自体は動くようにする
   // （次回ロード時に use-supabase-data 側がDBへの移行を自動で再試行する）
@@ -450,24 +436,14 @@ const Page = () => {
   const handleGenerateReport = useCallback(async () => {
     const regularLogs = workLogs.filter((log: any) => !log.report_type)
     if (regularLogs.length < 3) throw new Error("Need at least 3 logs")
-    const apiKey = userSettings?.gemini_api_key
-    if (!apiKey) throw new Error("API key not set")
 
     const sourceLogs = regularLogs.slice(0, 3)
-    const response = await fetch("/api/generate-summary-report", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      // model は意図的に送らない。レポート生成はサーバー既定の Gemma を使い、
-      // 解析モデル（Gemini）と無料枠のバケットを分離する
-      body: JSON.stringify({
-        workLogs: sourceLogs,
-        apiKey,
-        // 利用者のタイムゾーンでレポート内の時刻を整形させる
-        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-      }),
-    })
-    if (!response.ok) throw new Error(`API error: ${response.status}`)
-    const reportData = await response.json()
+    // 端末内 AI で生成（モデルが使えなければログからの機械的なレポートになる）
+    const reportData = await generateSummaryReportLocal(
+      sourceLogs,
+      language,
+      Intl.DateTimeFormat().resolvedOptions().timeZone,
+    )
 
     const sourceScreenshots = sourceLogs
       .map((log: any) => log.screenshot_url)
@@ -496,7 +472,7 @@ const Page = () => {
       // ここでthrowしないとレポートが無言で消える（呼び出し元のcatchが表示を出す）
       throw new Error("Report save failed (network error)")
     }
-  }, [workLogs, userSettings, addWorkLog, t])
+  }, [workLogs, addWorkLog, t, language])
 
   // 今日（ローカル日付）の通常ログ。日報生成の素材になる
   const todayRegularLogs = useMemo(() => {
@@ -507,8 +483,6 @@ const Page = () => {
   }, [workLogs])
 
   const handleGenerateDailyReport = useCallback(async () => {
-    const apiKey = userSettings?.gemini_api_key
-    if (!apiKey) throw new Error("API key not set")
     // 「今日」はクリック時点で判定し直す（useMemo版は日付をまたぐと
     // 前日のまま固定され、昨日のログが今日の日報になっていた）。
     // メモリ上のworkLogsは直近500件の窓しか無く、30秒間隔だと約4時間で
@@ -551,28 +525,13 @@ const Page = () => {
     }
     if (logsForToday.length === 0) throw new Error("No logs today")
 
-    // サーバー側は最終的に60件へ等間隔サンプリングするため、送信量だけ先に抑える
-    // （30秒間隔のフル稼働日は数千件になり、POSTボディが無駄に数MB膨らむ）
-    const MAX_UPLOAD_LOGS = 300
-    if (logsForToday.length > MAX_UPLOAD_LOGS) {
-      const stride = logsForToday.length / MAX_UPLOAD_LOGS
-      logsForToday = Array.from({ length: MAX_UPLOAD_LOGS }, (_, i) => logsForToday[Math.floor(i * stride)])
-    }
-
-    const response = await fetch("/api/generate-daily-report", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        workLogs: logsForToday,
-        apiKey,
-        date: new Date().toLocaleDateString(language === "ja" ? "ja-JP" : "en-US"),
-        // 利用者のタイムゾーンで日報の時刻を整形させる
-        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        // model は意図的に送らない（レポート系はサーバー既定の Gemma で枠を分離）
-      }),
-    })
-    if (!response.ok) throw new Error(`API error: ${response.status}`)
-    const reportData = await response.json()
+    // 端末内 AI で生成（内部で最大60件へ等間隔サンプリング。モデル不可時は機械的な日報）
+    const reportData = await generateDailyReportLocal(
+      logsForToday,
+      new Date().toLocaleDateString(language === "ja" ? "ja-JP" : "en-US"),
+      language,
+      Intl.DateTimeFormat().resolvedOptions().timeZone,
+    )
 
     const savedReport = await addWorkLog({
       user_id: user?.id || "",
@@ -582,18 +541,20 @@ const Page = () => {
       details: reportData.summary,
       applications: [],
       report_type: "daily",
+      // 日報は summary レポート（ReportData 型）とは別の形（DailyReportData）で report_data に入れる。
+      // 表示側（reports-tab）は report_type で分岐して読むため、型は緩めて保存する
       report_data: {
         ...reportData,
         // 対象日と件数（日報カードの「対象」表示に使う）
         source_range: { from: dayStart.toISOString(), to: dayEnd.toISOString(), count: logsForToday.length },
-      },
+      } as any,
     })
     if (!savedReport) {
       // addWorkLogはネットワーク系エラーでthrowせずnullを返す。
       // ここでthrowしないとレポートが無言で消える（呼び出し元のcatchが表示を出す）
       throw new Error("Report save failed (network error)")
     }
-  }, [workLogs, userSettings, addWorkLog, t, language])
+  }, [workLogs, user, addWorkLog, t, language])
 
   const reportsCount = useMemo(() => workLogs.filter((log: any) => !!log.report_type).length, [workLogs])
   const canGenerate = useMemo(() => workLogs.filter((log: any) => !log.report_type).length >= 3, [workLogs])
@@ -818,7 +779,7 @@ const Page = () => {
                 <p className="text-xs text-gray-500 leading-tight">{user?.email}</p>
               </div>
             </div>
-            <Button variant="outline" size="sm" onClick={() => openSettings("gemini")} className="gap-2">
+            <Button variant="outline" size="sm" onClick={() => openSettings("local")} className="gap-2">
               <Settings className="h-4 w-4" />
               {t('page_settings')}
             </Button>
@@ -874,8 +835,6 @@ const Page = () => {
               <div>
                 <WorkLogPanel
                   currentTask={currentTask}
-                  apiKey={userSettings?.gemini_api_key || ""}
-                  model={userSettings?.gemini_model || "gemini-3.5-flash-lite"}
                   captureInterval={userSettings?.capture_interval || DEFAULT_CAPTURE_INTERVAL_SECONDS}
                   workLogs={workLogs as any}
                   categories={categories}
@@ -917,16 +876,10 @@ const Page = () => {
             <SettingsPanel
               onClose={() => setCurrentTab("logs")}
               initialTab={settingsInitialTab}
-              apiKey={userSettings?.gemini_api_key || ""}
-              model={userSettings?.gemini_model || "gemini-3.5-flash-lite"}
               captureInterval={userSettings?.capture_interval || DEFAULT_CAPTURE_INTERVAL_SECONDS}
               togglApiToken={togglApiToken}
               togglWorkspaceId={togglWorkspaceId}
               togglCredentialsLocalOnly={togglCredentialsLocalOnly}
-              onApiKeyChange={handleApiKeyChange}
-              onModelChange={async (model) => {
-                await updateSettings({ gemini_model: model })
-              }}
               onCaptureIntervalChange={async (interval) => {
                 await updateSettings({ capture_interval: interval })
               }}

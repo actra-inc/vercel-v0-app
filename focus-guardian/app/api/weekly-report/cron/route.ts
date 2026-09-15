@@ -23,7 +23,6 @@ export const maxDuration = 60
 // service role を使ってはならない
 const MAX_USERS_PER_RUN = 50
 // 同時処理数。Resend の既定レート制限（2 req/s）を超えないよう控えめにする。
-// Gemini キーはユーザーごとに別なので、並列にしても1キーの無料枠には集中しない
 const CONCURRENCY = 4
 // これを過ぎたら新しいユーザーに着手しない（着手済みは完了させる）。
 // maxDuration で強制終了されると途中経過すら返せないため、余裕を持たせる
@@ -51,7 +50,7 @@ export async function GET(request: Request) {
   // 配信オンのユーザーだけを列挙する
   const { data: rows, error } = await admin
     .from("user_settings")
-    .select("user_id, capture_interval, gemini_api_key, weekly_report")
+    .select("user_id, capture_interval, weekly_report")
     .eq("weekly_report->>enabled", "true")
     .limit(MAX_USERS_PER_RUN)
 

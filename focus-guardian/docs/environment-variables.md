@@ -1,6 +1,6 @@
 # 🔐 環境変数設定ガイド
 
-コードが実際に参照する環境変数の一覧です（2026-09-08 更新）。
+コードが実際に参照する環境変数の一覧です（2026-09-15 更新・ローカル動作版）。
 Vercel Dashboard → Settings → Environment Variables で設定します。
 
 ## 必須（アプリの基本動作）
@@ -11,8 +11,9 @@ NEXT_PUBLIC_SUPABASE_URL=https://xxxxx.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 ```
 
-Gemini / Toggl の API キーはユーザーごとにアプリの設定画面から登録し、
-Supabase の `user_settings` に保存されます（環境変数では設定しません）。
+画面解析・レポート生成は Chrome 内蔵 AI（Prompt API / Gemini Nano）で端末内で行うため、
+**LLM の API キーは一切不要**です（環境変数にも `user_settings` にも持ちません）。
+Toggl の API トークンはユーザーごとにアプリの設定画面から登録し、Supabase の `user_settings` に保存されます。
 
 ## 週次レポート配信（設定 > その他 > 週次レポート配信 を使う場合）
 

@@ -8,11 +8,10 @@ import {
 } from "@/lib/log-stats"
 
 // 週次レポートの生成と配信（cron・テスト送信の共通処理）。
-// メール・Slack本文には集計値とAI生成コメントのみを載せる
-// （ログの生テキストやスクリーンショットURLは平文経路のため含めない）
-
-const REPORT_MODEL = "gemma-4-26b-a4b-it" // 既存レポート系と同じ（解析モデルと無料枠を分離）
-const AI_TIMEOUT_MS = 10_000
+// メール・Slack本文には集計値のみを載せる
+// （ログの生テキストやスクリーンショットURLは平文経路のため含めない）。
+// ローカル動作版ではサーバーから外部 LLM を呼ばないため、AI コメントは生成しない
+// （aiComment は互換のため型に残し、常に null）
 
 export type ReportLanguage = "ja" | "en"
 
@@ -29,7 +28,6 @@ export interface WeeklyDigest {
 
 interface DigestUserSettings {
   capture_interval?: number | null
-  gemini_api_key?: string | null
 }
 
 // 本文の文言。UI言語は端末側（localStorage）にしか無いため、
@@ -127,66 +125,7 @@ export async function buildWeeklyDigest(
   const stats = computeWeeklyStats(logs, captureInterval)
   const prevStats = computeWeeklyStats(prevLogs, captureInterval)
 
-  let aiComment: string | null = null
-  if (settings.gemini_api_key && stats.logCount > 0) {
-    aiComment = await generateAiComment(settings.gemini_api_key, stats, prevStats, lang)
-  }
-
-  return { range, stats, prevStats, aiComment, lang }
-}
-
-function buildAiPrompt(stats: WeeklyStats, prevStats: WeeklyStats, lang: ReportLanguage): string {
-  const t = TEXT[lang]
-  const cats = stats.categorySeconds
-    .map((c) => `${displayName(c.name, lang)}(${formatSeconds(c.seconds, lang)})`)
-    .join(t.listSep)
-  const dists = stats.topDistractions.map((d) => displayName(d.activity, lang)).join(t.listSep)
-  if (lang === "en") {
-    return `You are a work-log analysis assistant. Based on the weekly summary below, write a positive and specific reflection in English, 3 to 4 sentences. Do not list numbers or add headings; return only the body text.
-
-This week: total ${formatSeconds(stats.totalSeconds, lang)} / ${stats.logCount} analyses / average focus ${stats.avgFocus ?? "n/a"} / productive ${stats.productivePct ?? "n/a"}% / ${stats.distractedCount} distractions
-Last week: total ${formatSeconds(prevStats.totalSeconds, lang)} / average focus ${prevStats.avgFocus ?? "n/a"} / productive ${prevStats.productivePct ?? "n/a"}%
-Main work types: ${cats || "none"}
-Main distractions: ${dists || "none"}`
-  }
-  return `あなたは作業ログ分析アシスタントです。以下の1週間の集計から、前向きで具体的な振り返りコメントを日本語で3〜4文書いてください。数値の羅列や見出しは不要で、本文のみを返してください。
-
-今週: 合計${formatSeconds(stats.totalSeconds)} / 解析${stats.logCount}件 / 平均集中度${stats.avgFocus ?? "不明"} / 生産的${stats.productivePct ?? "不明"}% / 脱線${stats.distractedCount}回
-先週: 合計${formatSeconds(prevStats.totalSeconds)} / 平均集中度${prevStats.avgFocus ?? "不明"} / 生産的${prevStats.productivePct ?? "不明"}%
-主な作業種類: ${cats || "なし"}
-主な脱線先: ${dists || "なし"}`
-}
-
-// Gemma で3〜4文の振り返りコメントを作る。失敗しても配信は止めない
-async function generateAiComment(
-  apiKey: string,
-  stats: WeeklyStats,
-  prevStats: WeeklyStats,
-  lang: ReportLanguage,
-): Promise<string | null> {
-  try {
-    const prompt = buildAiPrompt(stats, prevStats, lang)
-
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${REPORT_MODEL}:generateContent`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
-        signal: AbortSignal.timeout(AI_TIMEOUT_MS),
-      },
-    )
-    if (!res.ok) {
-      console.warn(`Weekly AI comment generation failed: HTTP ${res.status}`)
-      return null
-    }
-    const data = await res.json()
-    const text: unknown = data?.candidates?.[0]?.content?.parts?.[0]?.text
-    return typeof text === "string" && text.trim() ? text.trim().slice(0, 1000) : null
-  } catch (e) {
-    console.warn("Weekly AI comment generation failed:", e instanceof Error ? e.message : e)
-    return null
-  }
+  return { range, stats, prevStats, aiComment: null, lang }
 }
 
 // ---- 整形 -----------------------------------------------------------------

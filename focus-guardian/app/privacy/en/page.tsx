@@ -16,7 +16,7 @@ export default function PrivacyEnPage() {
             ← Back to FlowNudge
           </Link>
           <h1 className="mt-4 text-3xl font-bold text-gray-900">Privacy Policy</h1>
-          <p className="mt-2 text-sm text-gray-500">Last updated: May 28, 2026</p>
+          <p className="mt-2 text-sm text-gray-500">Last updated: September 15, 2026</p>
         </div>
 
         <div className="space-y-8 text-gray-700 leading-relaxed">
@@ -150,12 +150,12 @@ export default function PrivacyEnPage() {
                   <tr>
                     <td className="border border-gray-200 px-4 py-2">Toggl API token</td>
                     <td className="border border-gray-200 px-4 py-2">Toggl API authentication</td>
-                    <td className="border border-gray-200 px-4 py-2">Browser (local storage) only</td>
+                    <td className="border border-gray-200 px-4 py-2">Your account (Supabase, accessible only to you)</td>
                   </tr>
                   <tr className="bg-gray-50">
                     <td className="border border-gray-200 px-4 py-2">Workspace ID</td>
                     <td className="border border-gray-200 px-4 py-2">Toggl API authentication</td>
-                    <td className="border border-gray-200 px-4 py-2">Browser (local storage) only</td>
+                    <td className="border border-gray-200 px-4 py-2">Your account (Supabase, accessible only to you)</td>
                   </tr>
                   <tr>
                     <td className="border border-gray-200 px-4 py-2">Current time entry (task name, start time)</td>
@@ -170,10 +170,17 @@ export default function PrivacyEnPage() {
               1-4. Screen Analysis Data (when distraction detection is used)
             </h3>
             <p>
-              When you use the distraction-detection feature, text extracted from your screen—triggered
-              by your own action—along with your configured "current task" is sent to the Google Gemma
-              API for analysis. The analysis result is displayed on screen only and is never stored on
-              our servers. The Gemini/Gemma API key is stored in your browser only.
+              When you use the distraction-detection feature, a screenshot captured after your own start
+              action (downscaled in your browser) and your configured "current task" are{" "}
+              <strong>analyzed on your device by the AI model built into your Chrome browser (Gemini Nano).</strong>{" "}
+              The screenshot and the content shown on your screen are never sent to our servers or to any
+              external AI service, including Google (per Chrome, no data is sent to Google or any third party
+              when the built-in model is used). The image is discarded on your device after analysis. We store
+              only the resulting text (activity name, category, focus score, application names, and a short
+              summary of roughly 40 characters) as a work log in your account (Supabase). Summary reports and
+              daily reports are also generated on your device from your stored work logs. The optional weekly
+              report delivery includes only aggregate figures (total time, average focus, breakdown by work type)
+              computed on our server.
             </p>
 
             <h3 className="text-base font-semibold text-gray-800 mt-6 mb-2">
@@ -193,7 +200,8 @@ export default function PrivacyEnPage() {
               <li>Google Calendar events from past or future dates (only today's events are fetched)</li>
               <li>Data from other Google services such as Contacts, Gmail, or Drive</li>
               <li>Detailed Toggl Track work history (displayed only, never stored)</li>
-              <li>Raw text used for screen analysis</li>
+              <li>Screenshot images themselves (analyzed on your device, then discarded; never sent to our servers or to any external AI service)</li>
+              <li>The raw text or data shown on your screen (it never leaves your device; only short analysis results are stored)</li>
               <li>Payment information such as credit card or bank account details</li>
             </ul>
           </section>
@@ -270,8 +278,8 @@ export default function PrivacyEnPage() {
                     <td className="border border-gray-200 px-4 py-2">User deletes individual logs or account</td>
                   </tr>
                   <tr>
-                    <td className="border border-gray-200 px-4 py-2">Screen analysis text</td>
-                    <td className="border border-gray-200 px-4 py-2">Not stored (API request only)</td>
+                    <td className="border border-gray-200 px-4 py-2">Screen images and analysis data</td>
+                    <td className="border border-gray-200 px-4 py-2">Not stored (processed on your device, never uploaded)</td>
                     <td className="border border-gray-200 px-4 py-2">—</td>
                   </tr>
                 </tbody>
@@ -321,8 +329,9 @@ export default function PrivacyEnPage() {
                 <strong>Session cookie:</strong> Maintaining your logged-in state (up to 30 days)
               </li>
               <li>
-                <strong>Local storage:</strong> Storing your Toggl API token, workspace ID, Gemini API
-                key, and user preferences
+                <strong>Local storage:</strong> Storing user preferences such as the display language and a
+                backup copy of your work-type categories (Toggl credentials are kept here temporarily only when
+                they cannot be saved to the database)
               </li>
             </ul>
             <p className="mt-3">
@@ -342,10 +351,8 @@ export default function PrivacyEnPage() {
               <li>HTTPS encryption for all communications</li>
               <li>Row-level security (RLS) enforced by Supabase</li>
               <li>HttpOnly and SameSite attributes on session cookies</li>
-              <li>
-                Sensitive credentials (API tokens, keys) are never stored on the server — only in the
-                user's browser local storage
-              </li>
+              <li>Screen images and analysis data never leave your device (processing by the browser's built-in AI)</li>
+              <li>Toggl credentials are stored in a database protected by row-level security, accessible only to you</li>
             </ul>
           </section>
 
