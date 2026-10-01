@@ -47,7 +47,7 @@ export default function PrivacyEnPage() {
                 <li>Complying with applicable laws and regulations</li>
               </ul>
               <p className="mt-2">
-                Google API user data will <strong>never be used to develop, train, or improve generalized AI or machine learning models.</strong>{" "}
+                User data obtained through Google OAuth APIs (e.g. Calendar) will <strong>never be used by FlowNudge to develop, train, or improve generalized AI or machine learning models.</strong>{" "}
                 Such data will not be sold, shared, or transferred to any third party for any purpose.
               </p>
             </div>

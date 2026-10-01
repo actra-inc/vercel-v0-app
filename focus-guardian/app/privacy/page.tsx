@@ -47,7 +47,7 @@ export default function PrivacyPage() {
                 <li>適用される法令の遵守</li>
               </ul>
               <p className="mt-2">
-                Google API から取得したユーザーデータを、<strong>汎用的な AI モデルまたは機械学習モデルの開発・学習・改善を目的として使用することは一切ありません。</strong>
+                本サービス（FlowNudge）が Google OAuth API を通じて取得したユーザーデータ（カレンダー情報等）を、<strong>汎用的な AI モデルまたは機械学習モデルの開発・学習・改善を目的として使用することは一切ありません。</strong>
                 また、当該データを第三者に販売・共有・転用することはありません。
               </p>
             </div>
