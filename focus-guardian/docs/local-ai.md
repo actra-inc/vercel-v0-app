@@ -49,3 +49,49 @@
 - 推論はページのメインスレッド外（ブラウザ側）で走るが、1 回あたり数秒かかる。差分スキップ（2%）と再入ガードは旧版のまま
 - `distraction_check` は旧版同様 DB に保存されない（`lib/supabase.ts` の insert で除外）。PMF 指標に必要なら列追加が要る
 - `tesseract.js` は未使用のまま package.json に残る（pnpm 不在のためロックファイルを更新できない）
+
+## 動かし方
+
+### A. 端末内 AI だけ試す（ログイン不要・5 分）
+
+1. 依存を入れる（初回のみ。ロックファイルは変更しない）
+
+   ```bash
+   npx -y pnpm@9 install --frozen-lockfile
+   ```
+
+2. 開発サーバーを起動（Supabase はダミー値でよい）
+
+   ```bash
+   NEXT_PUBLIC_SUPABASE_URL=https://placeholder.supabase.co NEXT_PUBLIC_SUPABASE_ANON_KEY=placeholder ./node_modules/.bin/next dev -p 3000
+   ```
+
+3. Chrome で `http://localhost:3000/local-ai-check` を開く
+4. 「モデルをダウンロード」→ 完了後「画面を1回キャプチャして解析」。所要時間・判定・モデルの生出力が出る
+
+`/local-ai-check` は DB に何も保存せず秘密情報も表示しないため、本番・プレビューでも公開してよい（テスターの機種確認に使える）。
+
+### B. アプリ本体を動かす（ログインあり）
+
+1. `focus-guardian/.env.local` を作る（`.gitignore` 済み）。値は Vercel のプロジェクト設定 > Environment Variables と同じもの
+
+   ```bash
+   NEXT_PUBLIC_SUPABASE_URL=https://<project>.supabase.co
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon key>
+   ```
+
+2. Supabase ダッシュボード > Authentication > URL Configuration の Redirect URLs に
+   `http://localhost:3000/**` が入っていることを確認（無いとログイン後に本番 URL へ飛ばされる）
+3. `./node_modules/.bin/next dev -p 3000` → `http://localhost:3000` で Google ログイン
+4. 設定 > 端末内 AI が「利用できます」になっていれば、作業ログタブの「解析開始」が押せる
+
+### C. Vercel プレビュー
+
+`local` ブランチを origin に push すると、Vercel が `sub` と同様にプレビューを自動ビルドする。
+ログインまで通すには、プレビュー URL を Supabase の Redirect URLs に追加する必要がある。
+
+## 旧版（sub）との関係
+
+- `sub` の更新は `git merge origin/sub` で取り込む。衝突しやすいのは翻訳ファイル・プライバシーポリシー・
+  削除済みの `analyze-screenshot` / `gemini-api-settings.tsx`（ローカル版では削除を維持する）
+- Supabase は共用。`user_settings.gemini_api_key` / `gemini_model` 列は旧版が使うため残置
