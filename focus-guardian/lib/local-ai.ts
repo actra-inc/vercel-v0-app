@@ -138,20 +138,46 @@ export interface LocalPromptInput {
   signal?: AbortSignal
 }
 
-/** プロンプトを実行して生テキストを返す */
+const isAbort = (e: unknown) =>
+  e instanceof DOMException && (e.name === "AbortError" || e.name === "TimeoutError")
+
+async function promptOnce(input: LocalPromptInput, useSchema: boolean): Promise<string> {
+  const base = await getBaseSession(input.lang)
+  const session = await base.clone({ signal: input.signal })
+  try {
+    const content: LanguageModelMessageContent[] = []
+    if (input.image) content.push({ type: "image", value: input.image })
+    content.push({ type: "text", value: input.text })
+    const options: LanguageModelPromptOptions = { signal: input.signal }
+    if (useSchema && input.schema) options.responseConstraint = input.schema
+    return await session.prompt([{ role: "user", content }], options)
+  } finally {
+    session.destroy()
+  }
+}
+
+/**
+ * プロンプトを実行して生テキストを返す。
+ * Gemini Nano は「The request is invalid」「kErrorUnknown」でまれに失敗する
+ * （2026-10-01 の実測。特に複雑な JSON Schema を responseConstraint に付けたとき）。
+ * 失敗したら、ベースセッションを作り直し・スキーマ無しで1回だけ再試行する。
+ * 中断（タイムアウト・Abort）は再試行しない
+ */
 export async function runLocalPrompt(input: LocalPromptInput): Promise<string> {
   return enqueue(async () => {
-    const base = await getBaseSession(input.lang)
-    const session = await base.clone({ signal: input.signal })
     try {
-      const content: LanguageModelMessageContent[] = []
-      if (input.image) content.push({ type: "image", value: input.image })
-      content.push({ type: "text", value: input.text })
-      const options: LanguageModelPromptOptions = { signal: input.signal }
-      if (input.schema) options.responseConstraint = input.schema
-      return await session.prompt([{ role: "user", content }], options)
-    } finally {
-      session.destroy()
+      return await promptOnce(input, true)
+    } catch (e) {
+      if (isAbort(e) || input.signal?.aborted) throw e
+      console.warn("On-device prompt failed; retrying once with a fresh session and no schema:", e)
+      const stale = baseSessions.get(input.lang)
+      baseSessions.delete(input.lang)
+      try {
+        stale?.destroy()
+      } catch {
+        /* 既に破棄済み */
+      }
+      return await promptOnce(input, false)
     }
   })
 }

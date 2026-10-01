@@ -13,7 +13,6 @@ import { useTranslation } from "@/lib/i18n"
 import { useLocalAi } from "@/hooks/use-local-ai"
 import { extractJsonObject, runLocalPrompt } from "@/lib/local-ai"
 import {
-  ANALYSIS_SCHEMA,
   DEFAULT_CATEGORY_NAMES,
   buildAnalysisPrompt,
   normalizeAnalysis,
@@ -128,7 +127,7 @@ export default function LocalAiCheckPage() {
           multiScreen: false,
           lang: language,
         }),
-        schema: ANALYSIS_SCHEMA,
+        // 本番（work-log-panel）と同じくスキーマ無しで投げる
         signal: AbortSignal.timeout(120_000),
       })
       const parsed = extractJsonObject(raw)

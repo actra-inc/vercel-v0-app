@@ -22,7 +22,7 @@ import type { AnalysisRule, WorkLog } from "@/lib/supabase"
 import { evaluateNudgeTick, initialNudgeState, snoozeBreak, type NudgeState } from "@/lib/nudge-logic"
 import { useLocalAi } from "@/hooks/use-local-ai"
 import { extractJsonObject, runLocalPrompt } from "@/lib/local-ai"
-import { ANALYSIS_SCHEMA, buildAnalysisPrompt, normalizeAnalysis } from "@/lib/analysis-prompt"
+import { buildAnalysisPrompt, normalizeAnalysis } from "@/lib/analysis-prompt"
 import { generateSummaryReportLocal } from "@/lib/local-reports"
 import { Textarea } from "@/components/ui/textarea"
 import {
@@ -481,7 +481,8 @@ export function WorkLogPanel({
             lang: language,
             image: resized,
             text: prompt,
-            schema: ANALYSIS_SCHEMA,
+            // JSON Schema は付けない（Gemini Nano では複雑なスキーマ指定がまれに失敗し、
+            // 付けない方が速い。出力は extractJsonObject → normalizeAnalysis で検証する）
             // ハング時に isAnalyzing が固着しないようタイムアウトを設ける
             signal: AbortSignal.timeout(90 * 1000),
           })
