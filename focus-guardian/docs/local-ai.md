@@ -10,7 +10,7 @@
 |---|---|---|
 | 画面解析 | 縮小 JPEG を `/api/analyze-screenshot` 経由でユーザーの Gemini API キーで Google へ送信 | `lib/local-ai.ts` → `LanguageModel.prompt([image, text])` をブラウザ内で実行 |
 | まとめレポート・日報 | `/api/generate-*-report` で Gemma（無料枠）へ | `lib/local-reports.ts` で端末内生成。失敗時はログからの機械的レポート |
-| 週次レポートの AI コメント | cron が `user_settings.gemini_api_key` で Gemma を呼ぶ | 廃止（集計値のみ配信。`aiComment` は常に `null`） |
+| 週次レポートの AI コメント | cron が `user_settings.gemini_api_key` で Gemma を呼ぶ | 廃止（`aiComment` は常に `null`。本文の内容は下の「端末外に出るデータ」を参照） |
 | API キー | 設定画面で入力し `user_settings.gemini_api_key` に保存 | 不要。UI・型・SELECT から撤去（DB 列は旧版との共用のため残置） |
 | モデル選択 | `gemini_model` を設定画面で選択 | 不要 |
 | 設定タブ | 「Gemini API」 | 「端末内 AI」（`components/local-ai-settings.tsx`）: 利用可否・要件・モデルダウンロード |
@@ -23,7 +23,7 @@
 - 出ない: 画面の画像、画面上の文字・内容、解析プロンプト
 - 出る（Supabase・本人のみアクセス可）: 解析結果のテキスト（activity / category / work_category / details 40字 / applications / focus_score）、
   予定作業名、ユーザー設定、Toggl 資格情報
-- 週次配信（任意）: 集計値のみ（Resend / Slack Webhook 経由）
+- 週次配信（任意。利用者が設定でオンにした場合のみ）: 合計作業時間・平均集中度・生産的ログの割合・脱線回数・主な脱線先の活動名（上位 3 件。`lib/log-stats.ts` の `topDistractions`）・作業種類ごとの時間を、登録メールアドレス宛（Resend 経由）または利用者が登録した Slack Incoming Webhook へ送る。画像や作業ログの要約文（details）は載せない
 
 ## 動作要件（Chrome の仕様。`developer.chrome.com/docs/ai/prompt-api`）
 
