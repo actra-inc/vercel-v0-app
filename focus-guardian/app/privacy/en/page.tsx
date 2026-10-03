@@ -16,7 +16,7 @@ export default function PrivacyEnPage() {
             ← Back to FlowNudge
           </Link>
           <h1 className="mt-4 text-3xl font-bold text-gray-900">Privacy Policy</h1>
-          <p className="mt-2 text-sm text-gray-500">Last updated: September 15, 2026</p>
+          <p className="mt-2 text-sm text-gray-500">Last updated: October 3, 2026</p>
         </div>
 
         <div className="space-y-8 text-gray-700 leading-relaxed">
@@ -175,12 +175,16 @@ export default function PrivacyEnPage() {
               <strong>analyzed on your device by the AI model built into your Chrome browser (Gemini Nano).</strong>{" "}
               The screenshot and the content shown on your screen are never sent to our servers or to any
               external AI service, including Google (per Chrome, no data is sent to Google or any third party
-              when the built-in model is used). The image is discarded on your device after analysis. We store
+              when the built-in model is used). The image is never saved anywhere; it is only held temporarily in
+              your browser's memory to display the work log list and disappears when you close the page. We store
               only the resulting text (activity name, category, focus score, application names, and a short
               summary of roughly 40 characters) as a work log in your account (Supabase). Summary reports and
-              daily reports are also generated on your device from your stored work logs. The optional weekly
-              report delivery includes only aggregate figures (total time, average focus, breakdown by work type)
-              computed on our server.
+              daily reports are also generated on your device from your stored work logs. If you turn on the
+              optional weekly report, our server compiles a summary from your work logs (total work time, average
+              focus, share of productive logs, number of distractions, the activity names of your top three
+              distractions, and time by work type) and sends it to your registered email address (via Resend) or
+              to the Slack Incoming Webhook you registered. It never includes images or the summary text of your
+              work logs.
             </p>
 
             <h3 className="text-base font-semibold text-gray-800 mt-6 mb-2">
@@ -237,9 +241,16 @@ export default function PrivacyEnPage() {
                 from a court or government authority.
               </li>
               <li>
-                <strong>Service infrastructure providers:</strong> The Service uses Supabase
-                (authentication and database) and Vercel (hosting) as infrastructure. Appropriate data
-                processing agreements are in place with these providers.
+                <strong>Service providers:</strong> The Service uses the following providers:
+                <ul className="mt-1 ml-5 list-disc space-y-1">
+                  <li>Supabase (authentication and database)</li>
+                  <li>Vercel (hosting, and Vercel Web Analytics for usage analytics)</li>
+                  <li>Resend (weekly report email delivery; only when enabled, it receives the recipient email
+                  address and the weekly report body)</li>
+                </ul>
+                If you enable weekly report delivery to Slack, the report body is sent to the Incoming Webhook of
+                the Slack workspace you registered. Screen images and screen analysis data are never sent to any
+                of these providers.
               </li>
             </ul>
           </section>
@@ -275,7 +286,7 @@ export default function PrivacyEnPage() {
                   <tr className="bg-gray-50">
                     <td className="border border-gray-200 px-4 py-2">Work logs</td>
                     <td className="border border-gray-200 px-4 py-2">While account is active</td>
-                    <td className="border border-gray-200 px-4 py-2">User deletes individual logs or account</td>
+                    <td className="border border-gray-200 px-4 py-2">User deletes individual logs, clears all logs, or deletes the account</td>
                   </tr>
                   <tr>
                     <td className="border border-gray-200 px-4 py-2">Screen images and analysis data</td>
@@ -302,12 +313,13 @@ export default function PrivacyEnPage() {
                 >
                   Google Account Permissions page
                 </a>{" "}
-                to revoke the Service's access. All Google-related data held by the Company will be
-                promptly deleted.
+                to revoke the Service's access. After revocation, the Service stops fetching your Google Calendar
+                events. To delete the account information we have stored (name, email address, etc.), use the
+                account deletion process below.
               </li>
               <li>
-                <strong>Delete work logs:</strong> You can delete individual logs directly within the
-                Service.
+                <strong>Delete work logs:</strong> You can delete individual logs, or delete all logs at once
+                with "Clear all", directly within the Service.
               </li>
               <li>
                 <strong>Delete your account:</strong> Contact us at the address below to request full
@@ -332,6 +344,10 @@ export default function PrivacyEnPage() {
                 <strong>Local storage:</strong> Storing user preferences such as the display language and a
                 backup copy of your work-type categories (Toggl credentials are kept here temporarily only when
                 they cannot be saved to the database)
+              </li>
+              <li>
+                <strong>Analytics:</strong> We use Vercel Web Analytics to measure page views in aggregate to
+                improve the Service. It does not use cookies and does not collect personally identifying information.
               </li>
             </ul>
             <p className="mt-3">

@@ -56,7 +56,59 @@ export const SUMMARY_REPORT_SCHEMA: Record<string, unknown> = {
   ],
 }
 
-export function generateFallbackSummaryReport(logs: SummarySourceLog[]): SummaryReportData {
+export type ReportLang = "ja" | "en"
+
+// AI を使わずに作るレポートの文言。UI 言語に合わせて出し分ける
+// （lib/weekly-report.ts と同じく、表示文言をこのファイル内に日英で持つ）
+const SUMMARY_TEXT = {
+  ja: {
+    summary: (total: number, p: number, d: number, n: number, acts: string, focus: number) =>
+      `直近${total}件の作業ログを分析しました。生産的な活動が${p}%、脱線が${d}%、中立が${n}%でした。` +
+      `主な活動: ${acts}。平均集中度スコアは${focus}/100です。`,
+    productivityHigh: (p: number) => `作業の${p}%が生産的に分類されました。高い集中力を維持できています。`,
+    productivityMid: (p: number) => `作業の${p}%が生産的でした。さらに集中力を高める余地があります。`,
+    productivityLow: (p: number) => `生産的な時間が${p}%にとどまりました。作業環境の見直しを検討してください。`,
+    focusHigh: "集中度スコアは高水準を維持しています。この調子を続けましょう。",
+    focusMid: "集中度スコアにやや波があります。定期的な休憩を取ることで改善できます。",
+    focusLow: "集中度スコアが低めです。作業場所の整理やノイズ対策を試してみてください。",
+    noDistraction: "記録期間中、脱線は検知されませんでした。",
+    distractions: (n: number, reasons: string) => `${n}回の脱線が検知されました。主な理由: ${reasons}`,
+    findingCounts: (total: number, p: number, d: number, n: number) =>
+      `${total}件の作業ログを分析（生産的:${p}件、脱線:${d}件、中立:${n}件）`,
+    findingFocus: (focus: number) => `平均集中度スコア: ${focus}/100`,
+    findingActivities: (acts: string) => `主な活動: ${acts}`,
+    findingFallback: "活動記録あり",
+    recDistracted: "脱線が多めです。タスクを細分化して短時間集中を繰り返すPomodoro法を試してみてください。",
+    recFocus: "集中度向上のため、通知をオフにして作業専用の環境を作ることをお勧めします。",
+    recKeep: "現在のペースを維持して作業を続けましょう。定期的な休憩も忘れずに。",
+    listSep: "、",
+  },
+  en: {
+    summary: (total: number, p: number, d: number, n: number, acts: string, focus: number) =>
+      `Analyzed your last ${total} work logs: ${p}% productive, ${d}% distracted, ${n}% neutral. ` +
+      `Main activities: ${acts}. Average focus score: ${focus}/100.`,
+    productivityHigh: (p: number) => `${p}% of your work was classified as productive. You are keeping strong focus.`,
+    productivityMid: (p: number) => `${p}% of your work was productive. There is room to focus further.`,
+    productivityLow: (p: number) => `Only ${p}% of your time was productive. Consider adjusting your work environment.`,
+    focusHigh: "Your focus score is staying high. Keep it up.",
+    focusMid: "Your focus score fluctuates a little. Regular breaks can help.",
+    focusLow: "Your focus score is on the low side. Try tidying your workspace or reducing noise.",
+    noDistraction: "No distractions were detected during this period.",
+    distractions: (n: number, reasons: string) => `${n} distraction(s) detected. Main reasons: ${reasons}`,
+    findingCounts: (total: number, p: number, d: number, n: number) =>
+      `Analyzed ${total} work logs (productive: ${p}, distracted: ${d}, neutral: ${n})`,
+    findingFocus: (focus: number) => `Average focus score: ${focus}/100`,
+    findingActivities: (acts: string) => `Main activities: ${acts}`,
+    findingFallback: "Activity recorded",
+    recDistracted: "You were distracted fairly often. Try the Pomodoro technique: split tasks and focus in short bursts.",
+    recFocus: "To improve focus, turn off notifications and set up a dedicated work environment.",
+    recKeep: "Keep up your current pace, and remember to take regular breaks.",
+    listSep: ", ",
+  },
+} as const
+
+export function generateFallbackSummaryReport(logs: SummarySourceLog[], lang: ReportLang = "ja"): SummaryReportData {
+  const T = SUMMARY_TEXT[lang]
   const total = logs.length
   const productive = logs.filter((l) => l.category === "productive").length
   const distracted = logs.filter((l) => l.category === "distracted").length
@@ -75,43 +127,32 @@ export function generateFallbackSummaryReport(logs: SummarySourceLog[]): Summary
 
   const activities = [...new Set(logs.map((l) => l.activity).filter(Boolean))]
 
-  const summary =
-    `直近${total}件の作業ログを分析しました。` +
-    `生産的な活動が${productivePct}%、脱線が${distractedPct}%、中立が${neutralPct}%でした。` +
-    `主な活動: ${activities.slice(0, 3).join("、")}。` +
-    `平均集中度スコアは${avgFocus}/100です。`
+  const summary = T.summary(total, productivePct, distractedPct, neutralPct, activities.slice(0, 3).join(T.listSep), avgFocus)
 
   const productivityAnalysis =
     productivePct >= 70
-      ? `作業の${productivePct}%が生産的に分類されました。高い集中力を維持できています。`
+      ? T.productivityHigh(productivePct)
       : productivePct >= 40
-        ? `作業の${productivePct}%が生産的でした。さらに集中力を高める余地があります。`
-        : `生産的な時間が${productivePct}%にとどまりました。作業環境の見直しを検討してください。`
+        ? T.productivityMid(productivePct)
+        : T.productivityLow(productivePct)
 
-  const focusTrend =
-    avgFocus >= 70
-      ? "集中度スコアは高水準を維持しています。この調子を続けましょう。"
-      : avgFocus >= 50
-        ? "集中度スコアにやや波があります。定期的な休憩を取ることで改善できます。"
-        : "集中度スコアが低めです。作業場所の整理やノイズ対策を試してみてください。"
+  const focusTrend = avgFocus >= 70 ? T.focusHigh : avgFocus >= 50 ? T.focusMid : T.focusLow
 
   const distractionSummary =
     distractionReasons.length === 0
-      ? "記録期間中、脱線は検知されませんでした。"
-      : `${distractionReasons.length}回の脱線が検知されました。主な理由: ${distractionReasons.slice(0, 2).join("、")}`
+      ? T.noDistraction
+      : T.distractions(distractionReasons.length, distractionReasons.slice(0, 2).join(T.listSep))
 
   const keyFindings = [
-    `${total}件の作業ログを分析（生産的:${productive}件、脱線:${distracted}件、中立:${neutral}件）`,
-    `平均集中度スコア: ${avgFocus}/100`,
-    activities.length > 0 ? `主な活動: ${activities.slice(0, 2).join("、")}` : "活動記録あり",
+    T.findingCounts(total, productive, distracted, neutral),
+    T.findingFocus(avgFocus),
+    activities.length > 0 ? T.findingActivities(activities.slice(0, 2).join(T.listSep)) : T.findingFallback,
   ]
 
   const recommendations: string[] = []
-  if (distractedPct > 30)
-    recommendations.push("脱線が多めです。タスクを細分化して短時間集中を繰り返すPomodoro法を試してみてください。")
-  if (avgFocus < 60) recommendations.push("集中度向上のため、通知をオフにして作業専用の環境を作ることをお勧めします。")
-  if (recommendations.length === 0)
-    recommendations.push("現在のペースを維持して作業を続けましょう。定期的な休憩も忘れずに。")
+  if (distractedPct > 30) recommendations.push(T.recDistracted)
+  if (avgFocus < 60) recommendations.push(T.recFocus)
+  if (recommendations.length === 0) recommendations.push(T.recKeep)
 
   return {
     summary,
@@ -127,8 +168,8 @@ export function generateFallbackSummaryReport(logs: SummarySourceLog[]): Summary
 
 // モデルの応答は形式が保証されないため、保存前に必須フィールドを補完する
 // （欠損したまま DB に保存されるとレポート表示側がクラッシュする）
-export function normalizeSummaryReport(raw: any, logs: SummarySourceLog[]): SummaryReportData {
-  const fallback = generateFallbackSummaryReport(logs)
+export function normalizeSummaryReport(raw: any, logs: SummarySourceLog[], lang: ReportLang = "ja"): SummaryReportData {
+  const fallback = generateFallbackSummaryReport(logs, lang)
   const num = (v: any, def: number) => {
     const n = Number(v)
     return Number.isFinite(n) ? Math.min(100, Math.max(0, n)) : def
@@ -156,7 +197,7 @@ export function normalizeSummaryReport(raw: any, logs: SummarySourceLog[]): Summ
   }
 }
 
-export function buildSummaryReportPrompt(logs: SummarySourceLog[], timeZone: string, lang: "ja" | "en"): string {
+export function buildSummaryReportPrompt(logs: SummarySourceLog[], timeZone: string, lang: ReportLang): string {
   const block = (log: SummarySourceLog, i: number) =>
     `【作業ログ${i + 1}】
 - 時刻: ${new Date(log.timestamp).toLocaleString("ja-JP", { timeZone })}
@@ -259,29 +300,61 @@ export function sampleDailyLogs<T extends { timestamp: string }>(logs: T[]): { l
 export const formatLogTime = (iso: string, timeZone: string) =>
   new Date(iso).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit", timeZone })
 
+const DAILY_TEXT = {
+  ja: {
+    title: "日報",
+    summary: "サマリー",
+    timeline: "タイムライン",
+    achievements: "本日の成果",
+    tools: "使用ツール",
+    blockers: "詰まった点・課題",
+    tomorrow: "明日の予定",
+    defaultActivity: "作業",
+    fallbackSummary: (count: number, acts: string, distracted: number) =>
+      `本日は${count}件の作業記録がありました。主な作業: ${acts}。` +
+      (distracted > 0 ? `脱線の記録が${distracted}件ありました。` : "集中して作業できました。"),
+    listSep: "、",
+  },
+  en: {
+    title: "Daily report",
+    summary: "Summary",
+    timeline: "Timeline",
+    achievements: "Today's achievements",
+    tools: "Tools used",
+    blockers: "Blockers and issues",
+    tomorrow: "Plan for tomorrow",
+    defaultActivity: "Work",
+    fallbackSummary: (count: number, acts: string, distracted: number) =>
+      `You recorded ${count} work logs today. Main work: ${acts}. ` +
+      (distracted > 0 ? `${distracted} distraction(s) were recorded.` : "You stayed focused."),
+    listSep: ", ",
+  },
+} as const
+
 // 構造化データから提出用 Markdown を決定的に組み立てる
 // （AI に Markdown まで書かせると構造とズレるため、こちらで生成する）
-export function buildDailyMarkdown(report: Omit<DailyReportData, "markdown">): string {
-  const lines: string[] = [`# 日報 ${report.date}`, ""]
-  if (report.summary) lines.push("## サマリー", report.summary, "")
+export function buildDailyMarkdown(report: Omit<DailyReportData, "markdown">, lang: ReportLang = "ja"): string {
+  const T = DAILY_TEXT[lang]
+  const lines: string[] = [`# ${T.title} ${report.date}`, ""]
+  if (report.summary) lines.push(`## ${T.summary}`, report.summary, "")
   if (report.timeline.length > 0) {
-    lines.push("## タイムライン")
+    lines.push(`## ${T.timeline}`)
     report.timeline.forEach((item) => lines.push(`- ${item.time} ${item.activity}${item.detail ? ` — ${item.detail}` : ""}`))
     lines.push("")
   }
   if (report.achievements.length > 0) {
-    lines.push("## 本日の成果")
+    lines.push(`## ${T.achievements}`)
     report.achievements.forEach((a) => lines.push(`- ${a}`))
     lines.push("")
   }
-  if (report.tools_used.length > 0) lines.push("## 使用ツール", report.tools_used.join(", "), "")
+  if (report.tools_used.length > 0) lines.push(`## ${T.tools}`, report.tools_used.join(", "), "")
   if (report.blockers.length > 0) {
-    lines.push("## 詰まった点・課題")
+    lines.push(`## ${T.blockers}`)
     report.blockers.forEach((b) => lines.push(`- ${b}`))
     lines.push("")
   }
   if (report.tomorrow.length > 0) {
-    lines.push("## 明日の予定")
+    lines.push(`## ${T.tomorrow}`)
     report.tomorrow.forEach((item) => lines.push(`- ${item}`))
     lines.push("")
   }
@@ -294,24 +367,27 @@ export function generateFallbackDailyReport(
   date: string,
   totalCount: number = logs.length,
   timeZone = "Asia/Tokyo",
+  lang: ReportLang = "ja",
 ): DailyReportData {
+  const T = DAILY_TEXT[lang]
   const sorted = [...logs].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
   const timeline: TimelineItem[] = sorted.map((log) => ({
     time: formatLogTime(log.timestamp, timeZone),
-    activity: log.activity || "作業",
+    activity: log.activity || T.defaultActivity,
     detail: (log.details || "").slice(0, 80),
   }))
   const tools = [...new Set(sorted.flatMap((l) => l.applications || []))].filter(Boolean)
   const productiveActivities = [...new Set(sorted.filter((l) => l.category === "productive").map((l) => l.activity))]
   const distracted = sorted.filter((l) => l.category === "distracted").length
 
-  const summary =
-    `本日は${totalCount}件の作業記録がありました。` +
-    `主な作業: ${productiveActivities.slice(0, 3).join("、") || sorted[0]?.activity || "-"}。` +
-    (distracted > 0 ? `脱線の記録が${distracted}件ありました。` : "集中して作業できました。")
+  const summary = T.fallbackSummary(
+    totalCount,
+    productiveActivities.slice(0, 3).join(T.listSep) || sorted[0]?.activity || "-",
+    distracted,
+  )
 
   const base = { date, summary, timeline, achievements: productiveActivities.slice(0, 5), tools_used: tools, blockers: [], tomorrow: [] }
-  return { ...base, markdown: buildDailyMarkdown(base) }
+  return { ...base, markdown: buildDailyMarkdown(base, lang) }
 }
 
 export function normalizeDailyReport(
@@ -320,8 +396,9 @@ export function normalizeDailyReport(
   date: string,
   totalCount: number = logs.length,
   timeZone = "Asia/Tokyo",
+  lang: ReportLang = "ja",
 ): DailyReportData {
-  const fallback = generateFallbackDailyReport(logs, date, totalCount, timeZone)
+  const fallback = generateFallbackDailyReport(logs, date, totalCount, timeZone, lang)
   const str = (v: any, def: string) => (typeof v === "string" && v.trim() ? v : def)
   const strArray = (v: any, def: string[]) => {
     if (!Array.isArray(v)) return def
@@ -346,10 +423,10 @@ export function normalizeDailyReport(
     blockers: strArray(raw?.blockers, fallback.blockers),
     tomorrow: strArray(raw?.tomorrow, fallback.tomorrow),
   }
-  return { ...base, markdown: buildDailyMarkdown(base) }
+  return { ...base, markdown: buildDailyMarkdown(base, lang) }
 }
 
-export function buildDailyReportPrompt(logs: DailySourceLog[], reportDate: string, timeZone: string, lang: "ja" | "en"): string {
+export function buildDailyReportPrompt(logs: DailySourceLog[], reportDate: string, timeZone: string, lang: ReportLang): string {
   const logLines = logs
     .map((log) => {
       const time = formatLogTime(log.timestamp, timeZone)

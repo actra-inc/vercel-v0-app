@@ -66,7 +66,6 @@ export const en: Record<TranslationKey, string> = {
 
   // WorkLogPanel
   wlp_screenInfoError: 'Could not retrieve screen information',
-  wlp_working: 'Working',
   wlp_unknown: 'Unknown',
   wlp_unknownActivity: 'Unknown activity',
   wlp_noDetails: 'No details',
@@ -670,6 +669,8 @@ export const en: Record<TranslationKey, string> = {
   wlp_localAiReadyDesc: 'Your screen is analyzed inside this browser and never sent off your device. Click Start Analysis to begin.',
   wlp_errLocalAi: 'On-device AI failed ({msg}). Will retry on the next capture',
   wlp_workingOnTask: 'Working on "{task}"',
+  wlp_reasonLowAlignment: 'Low match with your planned task',
+  wlp_reasonUnknown: 'Could not determine',
   sp_tabToggl: 'Toggl Integration',
   sp_tabProjects: 'Projects',
   sp_tabOther: 'Other',

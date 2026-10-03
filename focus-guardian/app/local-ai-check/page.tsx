@@ -128,7 +128,7 @@ export default function LocalAiCheckPage() {
           lang: language,
         }),
         // 本番（work-log-panel）と同じくスキーマ無しで投げる
-        signal: AbortSignal.timeout(120_000),
+        timeoutMs: 120_000,
       })
       const parsed = extractJsonObject(raw)
       if (parsed) {
@@ -137,6 +137,8 @@ export default function LocalAiCheckPage() {
           categories: DEFAULT_CATEGORY_NAMES,
           fallbackDetails: "-",
           fallbackActivity: "-",
+          reasonLowAlignment: t('wlp_reasonLowAlignment'),
+          reasonUnknown: t('wlp_reasonUnknown'),
         })
       } else {
         error = t('lc_parseFailed')

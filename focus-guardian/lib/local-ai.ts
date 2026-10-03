@@ -66,7 +66,9 @@ export async function refreshLocalAiAvailability(lang: "ja" | "en"): Promise<Loc
   }
   try {
     const a = await lm.availability(coreOptions(lang))
-    setState({ availability: a, lastError: null })
+    // 直前の失敗理由は「使える」と確認できたときだけ消す
+    // （create 失敗の直後に再確認すると、理由が表示される前に上書きされていた）
+    setState(a === "available" ? { availability: a, lastError: null } : { availability: a })
     return a
   } catch (e) {
     setState({ availability: "unavailable", lastError: e instanceof Error ? e.message : String(e) })
@@ -135,20 +137,26 @@ export interface LocalPromptInput {
   image?: LanguageModelImageValue
   /** 出力を拘束する JSON Schema */
   schema?: Record<string, unknown>
+  /**
+   * タイムアウト（ミリ秒）。順番待ちの時間は含めず、この推論の実行が始まった時点から数える
+   * （先行する推論が長引いても、待っているだけの推論が実行前に打ち切られないようにする）
+   */
+  timeoutMs?: number
+  /** 呼び出し側から中断したいとき（任意） */
   signal?: AbortSignal
 }
 
 const isAbort = (e: unknown) =>
   e instanceof DOMException && (e.name === "AbortError" || e.name === "TimeoutError")
 
-async function promptOnce(input: LocalPromptInput, useSchema: boolean): Promise<string> {
+async function promptOnce(input: LocalPromptInput, useSchema: boolean, signal?: AbortSignal): Promise<string> {
   const base = await getBaseSession(input.lang)
-  const session = await base.clone({ signal: input.signal })
+  const session = await base.clone({ signal })
   try {
     const content: LanguageModelMessageContent[] = []
     if (input.image) content.push({ type: "image", value: input.image })
     content.push({ type: "text", value: input.text })
-    const options: LanguageModelPromptOptions = { signal: input.signal }
+    const options: LanguageModelPromptOptions = { signal }
     if (useSchema && input.schema) options.responseConstraint = input.schema
     return await session.prompt([{ role: "user", content }], options)
   } finally {
@@ -165,10 +173,15 @@ async function promptOnce(input: LocalPromptInput, useSchema: boolean): Promise<
  */
 export async function runLocalPrompt(input: LocalPromptInput): Promise<string> {
   return enqueue(async () => {
+    // タイムアウトは実行開始時点から数える（順番待ちの時間を含めない）
+    const signals = [input.signal, input.timeoutMs ? AbortSignal.timeout(input.timeoutMs) : undefined].filter(
+      (s): s is AbortSignal => !!s,
+    )
+    const signal = signals.length > 1 ? AbortSignal.any(signals) : signals[0]
     try {
-      return await promptOnce(input, true)
+      return await promptOnce(input, true, signal)
     } catch (e) {
-      if (isAbort(e) || input.signal?.aborted) throw e
+      if (isAbort(e) || signal?.aborted) throw e
       console.warn("On-device prompt failed; retrying once with a fresh session and no schema:", e)
       const stale = baseSessions.get(input.lang)
       baseSessions.delete(input.lang)
@@ -177,7 +190,7 @@ export async function runLocalPrompt(input: LocalPromptInput): Promise<string> {
       } catch {
         /* 既に破棄済み */
       }
-      return await promptOnce(input, false)
+      return await promptOnce(input, false, signal)
     }
   })
 }

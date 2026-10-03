@@ -16,7 +16,7 @@ export default function PrivacyPage() {
             ← FlowNudge トップへ
           </Link>
           <h1 className="mt-4 text-3xl font-bold text-gray-900">プライバシーポリシー</h1>
-          <p className="mt-2 text-sm text-gray-500">最終更新日：2026年9月15日</p>
+          <p className="mt-2 text-sm text-gray-500">最終更新日：2026年10月3日</p>
         </div>
 
         <div className="space-y-8 text-gray-700 leading-relaxed">
@@ -171,10 +171,10 @@ export default function PrivacyPage() {
               脱線検知機能を使用した際、ユーザーの開始操作によって取得した画面のスクリーンショット（ブラウザ内で縮小したもの）と、
               ユーザーが設定した「現在の予定作業」は、<strong>お使いの Chrome に内蔵された AI モデル（Gemini Nano）によって端末内で解析されます。</strong>
               スクリーンショット画像および画面に表示されていた内容は、当社のサーバーにも、Google を含む外部の AI サービスにも送信されません
-              （Chrome の仕様上、内蔵モデルの利用時にデータが Google や第三者へ送られることはありません）。解析後、画像は端末内で破棄されます。
+              （Chrome の仕様上、内蔵モデルの利用時にデータが Google や第三者へ送られることはありません）。画像はどこにも保存されず、作業ログ一覧の表示用にブラウザのメモリ上で一時的に保持されるだけで、ページを閉じると消えます。
               当社が保存するのは、解析結果のテキスト（活動名・分類・集中度スコア・使用アプリ名・40文字程度の短い要約）のみで、
               作業ログとしてユーザーのアカウント（Supabase）に保存されます。まとめレポート・日報の生成も、保存済みの作業ログを素材として端末内で行います。
-              週次レポートの配信（任意）では、当社のサーバーが作業ログの集計値（合計時間・平均集中度・作業種類の内訳）のみを本文に載せます。
+              週次レポートの配信（任意。ユーザーが設定でオンにした場合のみ）では、当社のサーバーが作業ログから集計した内容（合計作業時間・平均集中度・生産的ログの割合・脱線回数・主な脱線先の活動名（上位3件）・作業種類ごとの時間）を本文に載せ、ユーザーの登録メールアドレス宛のメール（Resend 経由）、またはユーザーが登録した Slack の Incoming Webhook へ送信します。画像や作業ログの要約文は載せません。
             </p>
 
             <h3 className="text-base font-semibold text-gray-800 mt-6 mb-2">
@@ -229,8 +229,14 @@ export default function PrivacyPage() {
                 <strong>法令に基づく場合：</strong>裁判所・行政機関等から法令に基づく開示命令を受けた場合
               </li>
               <li>
-                <strong>サービス提供に必要な委託先：</strong>本サービスのインフラとして Supabase（認証・データベース）および
-                Vercel（ホスティング）を利用しています。これらのサービスプロバイダーとは適切なデータ処理契約を締結しています。
+                <strong>サービス提供に必要な委託先：</strong>本サービスの提供のため、以下の事業者を利用しています。
+                <ul className="mt-1 ml-5 list-disc space-y-1">
+                  <li>Supabase（認証・データベース）</li>
+                  <li>Vercel（ホスティング、およびアクセス解析の Vercel Web Analytics）</li>
+                  <li>Resend（週次レポートのメール配信。配信を有効にした場合のみ、宛先メールアドレスと週次レポート本文を渡します）</li>
+                </ul>
+                週次レポートの Slack 配信を有効にした場合は、ユーザー自身が登録した Slack ワークスペースの Incoming Webhook へ本文を送信します。
+                画面の画像や画面解析用のデータは、いずれの事業者にも送信しません。
               </li>
             </ul>
           </section>
@@ -266,7 +272,7 @@ export default function PrivacyPage() {
                   <tr className="bg-gray-50">
                     <td className="border border-gray-200 px-4 py-2">作業ログ</td>
                     <td className="border border-gray-200 px-4 py-2">アカウント存続中</td>
-                    <td className="border border-gray-200 px-4 py-2">ユーザーによる個別削除時・アカウント削除時</td>
+                    <td className="border border-gray-200 px-4 py-2">ユーザーによる個別削除・全件削除時、アカウント削除時</td>
                   </tr>
                   <tr>
                     <td className="border border-gray-200 px-4 py-2">画面の画像・解析用データ</td>
@@ -293,10 +299,10 @@ export default function PrivacyPage() {
                 >
                   Google アカウントのアクセス許可管理ページ
                 </a>
-                から本サービスの連携を解除できます。解除後、当社が保有する Google 関連データは速やかに削除されます。
+                から本サービスの連携を解除できます。解除後は Google カレンダーの予定を取得しなくなります。当社に保存済みのアカウント情報（氏名・メールアドレス等）の削除は、下記のアカウント削除の手続きで行います。
               </li>
               <li>
-                <strong>作業ログの削除：</strong>本サービスの画面上から個別のログを削除できます。
+                <strong>作業ログの削除：</strong>本サービスの画面上から、個別のログの削除、または「全てクリア」による全件削除ができます。
               </li>
               <li>
                 <strong>アカウントの削除：</strong>アカウント削除を希望する場合は、下記のお問い合わせ先までご連絡ください。
@@ -318,6 +324,10 @@ export default function PrivacyPage() {
               </li>
               <li>
                 <strong>ローカルストレージ：</strong>表示言語・作業種類カテゴリの退避コピー等のユーザー設定の保存（Toggl の資格情報は、データベースへ保存できない場合に限り一時的に退避します）
+              </li>
+              <li>
+                <strong>アクセス解析：</strong>サービス改善のため Vercel Web Analytics を利用し、ページの閲覧状況を集計しています。
+                Cookie は使用せず、個人を特定する情報は収集しません。
               </li>
             </ul>
             <p className="mt-3">

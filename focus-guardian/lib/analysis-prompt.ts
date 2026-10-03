@@ -63,7 +63,7 @@ export function buildAnalysisPrompt(opts: AnalysisPromptOptions): string {
 {
   "activity": "画面で行われている主な活動（20文字以内。例：「コード編集」「資料作成」「ブラウザ閲覧」）",
   "category": "productive/distracted/neutral のいずれか",
-  "work_category": "作業種類（次のいずれかから最も近いものを選択: ${categoriesList}）",
+  "work_category": "作業種類（次のいずれかから最も近いものを1つ選び、一覧の表記をそのまま書く。翻訳しない: ${categoriesList}）",
   "confidence": 0.0〜1.0の数値,
   "apps": ["画面に表示されているアプリ・サービス名（例：Chrome、VS Code、Slack、YouTube）"],
   "distraction_check": {
@@ -99,6 +99,9 @@ export interface NormalizeContext {
   /** details が空だったときの既定文（i18n 済みの文字列を渡す） */
   fallbackDetails: string
   fallbackActivity: string
+  /** 判定理由が返らなかったときの文言（i18n 済み）: 一致度が低くて脱線扱いにした場合 / 判定できなかった場合 */
+  reasonLowAlignment: string
+  reasonUnknown: string
 }
 
 /** モデルの生 JSON を、DB に保存できる形へ正規化する（旧サーバールートと同じ規則） */
@@ -121,7 +124,7 @@ export function normalizeAnalysis(analysis: any, ctx: NormalizeContext): Analysi
       }
     : {
         is_distracted: forceDistracted,
-        reason: forceDistracted ? "予定作業との一致度が低い" : "判定不可",
+        reason: forceDistracted ? ctx.reasonLowAlignment : ctx.reasonUnknown,
         task_alignment: taskAlignment,
       }
 

@@ -16,7 +16,7 @@ export default function TermsEnPage() {
             ← Back to FlowNudge
           </Link>
           <h1 className="mt-4 text-3xl font-bold text-gray-900">Terms of Service</h1>
-          <p className="mt-2 text-sm text-gray-500">Last updated: May 28, 2026</p>
+          <p className="mt-2 text-sm text-gray-500">Last updated: October 3, 2026</p>
         </div>
 
         <div className="space-y-8 text-gray-700 leading-relaxed">
@@ -38,7 +38,7 @@ export default function TermsEnPage() {
               <li>Authentication and login via Google account</li>
               <li>Fetching and displaying today's events from Google Calendar</li>
               <li>Fetching and displaying tracked time via Toggl Track integration</li>
-              <li>Detecting off-task behavior through screen text analysis and sending notifications</li>
+              <li>Detecting off-task behavior through on-device screen analysis (browser built-in AI) and sending notifications</li>
               <li>Recording and managing work logs</li>
             </ul>
           </section>
@@ -141,17 +141,19 @@ export default function TermsEnPage() {
             <h2 className="text-xl font-semibold text-gray-900 mb-3">Article 6 (Screen Analysis Feature)</h2>
             <ol className="list-decimal list-inside space-y-2">
               <li>
-                The distraction-detection feature sends text extracted from the User's screen—initiated
-                by the User's own action—to an AI model (Google Gemma API) for analysis.
+                The distraction-detection feature analyzes a screenshot captured through the User's own action,
+                together with the User's configured "current task", on the User's device using the AI model built
+                into the User's browser (Google Chrome).
               </li>
               <li>
-                The only data transmitted is the User's configured "current task" and the text extracted
-                from the screen. Analysis results are used solely to provide the Service's features and
-                are never shared with third parties.
+                Screenshots and screen content are never sent to the Company's servers or to any external AI
+                service. The Company stores only the resulting text (activity name, category, focus score,
+                application names, and a short summary), uses it solely to provide the Service's features, and
+                never shares it with third parties.
               </li>
               <li>
-                The Gemini/Gemma API key used for screen analysis is obtained and configured by the User
-                themselves and is never stored on the Company's servers.
+                This feature requires an environment that supports the browser's built-in AI (desktop Google
+                Chrome and sufficient device capability). The feature is unavailable in unsupported environments.
               </li>
             </ol>
           </section>

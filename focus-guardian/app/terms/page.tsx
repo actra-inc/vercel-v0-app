@@ -16,7 +16,7 @@ export default function TermsPage() {
             ← FlowNudge トップへ
           </Link>
           <h1 className="mt-4 text-3xl font-bold text-gray-900">利用規約</h1>
-          <p className="mt-2 text-sm text-gray-500">最終更新日：2026年5月28日</p>
+          <p className="mt-2 text-sm text-gray-500">最終更新日：2026年10月3日</p>
         </div>
 
         <div className="space-y-8 text-gray-700 leading-relaxed">
@@ -37,7 +37,7 @@ export default function TermsPage() {
               <li>Google アカウントを用いた認証・ログイン機能</li>
               <li>Google カレンダーと連携した当日の予定取得・表示機能</li>
               <li>Toggl Track と連携した作業時間の取得・表示機能</li>
-              <li>画面テキスト解析による作業脱線検知・通知機能</li>
+              <li>画面の端末内解析（ブラウザ内蔵 AI）による作業脱線検知・通知機能</li>
               <li>作業ログの記録・管理機能</li>
             </ul>
           </section>
@@ -118,14 +118,17 @@ export default function TermsPage() {
             <h2 className="text-xl font-semibold text-gray-900 mb-3">第6条（画面解析機能）</h2>
             <ol className="list-decimal list-inside space-y-2">
               <li>
-                本サービスの脱線検知機能は、ユーザーの操作により画面から抽出されたテキスト情報を AI モデル（Google Gemma API）に送信して解析します。
+                本サービスの脱線検知機能は、ユーザーの操作により取得した画面のスクリーンショットと「現在の予定作業」を、
+                ユーザーのブラウザ（Google Chrome）に内蔵された AI モデルによって端末内で解析します。
               </li>
               <li>
-                送信されるデータはユーザー自身が設定した「現在の予定作業」と、画面から抽出されたテキストのみです。
-                解析結果は本サービスの機能提供のみに使用し、第三者に提供することはありません。
+                スクリーンショットおよび画面の内容は、当社のサーバーにも外部の AI サービスにも送信されません。
+                当社が保存するのは解析結果のテキスト（活動名・分類・集中度スコア・使用アプリ名・短い要約）のみで、
+                本サービスの機能提供のみに使用し、第三者に提供することはありません。
               </li>
               <li>
-                画面解析に使用する Gemini/Gemma API キーはユーザー自身が取得・設定するものであり、当社のサーバーには保存されません。
+                本機能の利用には、ブラウザ内蔵 AI に対応した環境（パソコン版 Google Chrome および一定以上の端末性能）が必要です。
+                非対応の環境では本機能を利用できません。
               </li>
             </ol>
           </section>

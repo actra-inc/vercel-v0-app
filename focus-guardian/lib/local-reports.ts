@@ -51,15 +51,15 @@ export async function generateSummaryReportLocal(
       lang,
       text: buildSummaryReportPrompt(recent, tz, lang),
       schema: SUMMARY_REPORT_SCHEMA,
-      signal: AbortSignal.timeout(REPORT_TIMEOUT_MS),
+      timeoutMs: REPORT_TIMEOUT_MS,
     })
     const raw = extractJsonObject(text)
-    if (raw) return normalizeSummaryReport(raw, recent)
+    if (raw) return normalizeSummaryReport(raw, recent, lang)
     console.warn("Local summary report: could not parse model output; using fallback")
   } catch (e) {
     console.warn("Local summary report failed; using fallback:", e instanceof Error ? e.message : e)
   }
-  return generateFallbackSummaryReport(recent)
+  return generateFallbackSummaryReport(recent, lang)
 }
 
 /** 1日分の日報。logs は当日ぶん全件（内部で最大60件に間引く） */
@@ -78,13 +78,13 @@ export async function generateDailyReportLocal(
       lang,
       text: buildDailyReportPrompt(sampled, reportDate, tz, lang),
       schema: DAILY_REPORT_SCHEMA,
-      signal: AbortSignal.timeout(REPORT_TIMEOUT_MS),
+      timeoutMs: REPORT_TIMEOUT_MS,
     })
     const raw = extractJsonObject(text)
-    if (raw) return normalizeDailyReport(raw, sampled, reportDate, totalCount, tz)
+    if (raw) return normalizeDailyReport(raw, sampled, reportDate, totalCount, tz, lang)
     console.warn("Local daily report: could not parse model output; using fallback")
   } catch (e) {
     console.warn("Local daily report failed; using fallback:", e instanceof Error ? e.message : e)
   }
-  return generateFallbackDailyReport(sampled, reportDate, totalCount, tz)
+  return generateFallbackDailyReport(sampled, reportDate, totalCount, tz, lang)
 }

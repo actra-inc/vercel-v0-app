@@ -467,7 +467,8 @@ export function WorkLogPanel({
           .map((r) => r.text.trim())
           .slice(0, MAX_ANALYSIS_RULES)
         const prompt = buildAnalysisPrompt({
-          currentTask: currentTask || t('wlp_working'),
+          // 空のときは空のまま渡す（プロンプト側で「未設定」と書き、判定を緩めるルールを効かせる）
+          currentTask,
           categories: categoryNames,
           userRules: enabledRules,
           multiScreen: isComposite,
@@ -483,8 +484,8 @@ export function WorkLogPanel({
             text: prompt,
             // JSON Schema は付けない（Gemini Nano では複雑なスキーマ指定がまれに失敗し、
             // 付けない方が速い。出力は extractJsonObject → normalizeAnalysis で検証する）
-            // ハング時に isAnalyzing が固着しないようタイムアウトを設ける
-            signal: AbortSignal.timeout(90 * 1000),
+            // ハング時に isAnalyzing が固着しないようタイムアウトを設ける（実行開始から数える）
+            timeoutMs: 90 * 1000,
           })
         } catch (e) {
           const msg = e instanceof Error ? e.message : String(e)
@@ -505,6 +506,8 @@ export function WorkLogPanel({
           categories: categoryNames,
           fallbackDetails: currentTask ? t('wlp_workingOnTask', { task: currentTask }) : t('wlp_noDetails'),
           fallbackActivity: t('wlp_unknownActivity'),
+          reasonLowAlignment: t('wlp_reasonLowAlignment'),
+          reasonUnknown: t('wlp_reasonUnknown'),
         })
         console.log("[v0] Analysis result:", result)
 
@@ -992,8 +995,8 @@ export function WorkLogPanel({
             ))}
 
           {/* 映像の供給だけが一時的に止まっている状態。トラックは生きているので
-              復帰すれば自動で解析が続く（真っ黒な画像を解析して無料枠を
-              消費しないよう、この間はキャプチャを見送る） */}
+              復帰すれば自動で解析が続く（真っ黒な画像を解析して端末内 AI の
+              処理とログを無駄に増やさないよう、この間はキャプチャを見送る） */}
           {isTracking && isSourcePaused && (
             <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
               <div className="font-medium">{t('wlp_sourcePausedTitle')}</div>

@@ -64,7 +64,6 @@ export const ja = {
 
   // WorkLogPanel
   wlp_screenInfoError: '画面情報を取得できませんでした',
-  wlp_working: '作業中',
   wlp_unknown: '不明',
   wlp_unknownActivity: '不明な活動',
   wlp_noDetails: '詳細なし',
@@ -667,6 +666,8 @@ export const ja = {
   wlp_localAiReadyDesc: '画面は端末の外へ送らず、このブラウザ内で解析します。解析開始ボタンをクリックしてください。',
   wlp_errLocalAi: '端末内 AI の実行に失敗しました（{msg}）。次回キャプチャで再試行します',
   wlp_workingOnTask: '「{task}」の作業中',
+  wlp_reasonLowAlignment: '予定作業との一致度が低い',
+  wlp_reasonUnknown: '判定できませんでした',
   sp_tabToggl: 'Toggl連携',
   sp_tabProjects: 'プロジェクト',
   sp_tabOther: 'その他',
