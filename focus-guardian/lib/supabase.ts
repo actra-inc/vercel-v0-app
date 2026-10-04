@@ -527,22 +527,28 @@ export const getWorkLogs = async (userId: string, limit = 500) => {
   return { data, error }
 }
 
+// screenshot_url / report_data.source_screenshots を DB insert/update 用のオブジェクトから
+// 常に取り除く（許可リスト方式＝画像URLは一切許可しない）。
+// 「画像・画面内容を端末の外に出さない」はこのブランチの最重要の不変条件（CLAUDE.md）で、
+// Supabase は旧クラウド版と共用のため、ここが唯一かつ最後の防波堤になる。
+// このブランチの画像URLは canvas.toBlob → URL.createObjectURL の blob: のみで、
+// セッションを跨いで永続化する理由がない（表示用の blob: URL は呼び出し側が
+// hooks/use-supabase-data.ts の addWorkLog でローカル値をマージして維持する）。
+// 以前は blob: だけを弾く拒否リストだったため、data:image/... のような画像バイト列
+// そのものが素通りし得た（M-2）
+function stripImageUrlFields<T extends { screenshot_url?: unknown; report_data?: any }>(obj: T): T {
+  const safe: any = { ...obj }
+  delete safe.screenshot_url
+  if (safe.report_data && typeof safe.report_data === "object") {
+    const { source_screenshots: _ss, ...restReportData } = safe.report_data
+    safe.report_data = restReportData
+  }
+  return safe
+}
+
 export const createWorkLog = async (log: Omit<WorkLog, "id" | "created_at">) => {
-  const { distraction_check: _dc, ...insertLog } = log as any
-  // blob: URL はセッション限りで無効になるため DB には保存しない
-  // （セッション中の表示は呼び出し側でローカル値をマージして維持する）
-  if (typeof insertLog.screenshot_url === "string" && insertLog.screenshot_url.startsWith("blob:")) {
-    delete insertLog.screenshot_url
-  }
-  // report_data.source_screenshots 内の blob: URL も同様にDBへ入れない
-  // （リロード後・他端末では必ず壊れ画像になる。セッション中の表示は
-  //   addWorkLog のローカルマージで維持される）
-  if (Array.isArray(insertLog.report_data?.source_screenshots)) {
-    const persistable = insertLog.report_data.source_screenshots.filter(
-      (u: unknown) => typeof u === "string" && !u.startsWith("blob:"),
-    )
-    insertLog.report_data = { ...insertLog.report_data, source_screenshots: persistable }
-  }
+  const { distraction_check: _dc, ...rest } = log as any
+  const insertLog = stripImageUrlFields(rest)
   const { data, error } = await supabase.from("work_logs").insert(insertLog).select().single()
 
   if (data) {
@@ -595,9 +601,13 @@ export const getWorkLogsInRange = async (
 // 作業ログの部分更新（誤判定フィードバックによる再分類などに使う）。
 // 必ず所有者条件を付ける（RLSが効いていない環境でも他人の行を書き換えられない多重防御）
 export const updateWorkLog = async (id: string, userId: string, updates: Partial<WorkLog>) => {
+  // 現状の唯一の呼び出し元（hooks/use-supabase-data.ts の DB_SAFE_FIELDS）は
+  // screenshot_url / report_data を渡さないが、将来の呼び出し元が増えても
+  // 不変条件が崩れないよう、insert と同じ許可リストをここにも効かせる（多重防御）
+  const safeUpdates = stripImageUrlFields(updates)
   const { data, error } = await supabase
     .from("work_logs")
-    .update(updates)
+    .update(safeUpdates)
     .eq("id", id)
     .eq("user_id", userId)
     .select()

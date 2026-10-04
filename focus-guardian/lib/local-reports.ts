@@ -2,7 +2,7 @@
 // モデルが使えない・応答が壊れている場合は、ログからの機械的なレポートに落とす
 // （旧サーバールートと同じ二段構え）。
 
-import { extractJsonObject, runLocalPrompt } from "@/lib/local-ai"
+import { extractJsonObject, getLocalAiState, runLocalPrompt } from "@/lib/local-ai"
 import {
   DAILY_REPORT_SCHEMA,
   SUMMARY_REPORT_SCHEMA,
@@ -20,6 +20,14 @@ import {
 } from "@/lib/report-builders"
 
 const REPORT_TIMEOUT_MS = 90_000
+
+// レポート生成はユーザー操作（ボタン）から直接呼ばれるため、モデル未ダウンロードの
+// 端末では絶対にここから数GBのダウンロードを始めない（H-2）。ダウンロードを開始して
+// よいのは components/local-ai-settings.tsx の明示ボタンだけ。
+// モデルが使える状態でなければ runLocalPrompt を呼ばず、機械的フォールバックへ直行する
+function isModelReady(): boolean {
+  return getLocalAiState().availability === "available"
+}
 
 function resolveTimeZone(tz?: string): string {
   if (tz) {
@@ -46,18 +54,22 @@ export async function generateSummaryReportLocal(
     .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
   if (recent.length < 3) throw new Error("At least 3 work logs are required")
 
-  try {
-    const text = await runLocalPrompt({
-      lang,
-      text: buildSummaryReportPrompt(recent, tz, lang),
-      schema: SUMMARY_REPORT_SCHEMA,
-      timeoutMs: REPORT_TIMEOUT_MS,
-    })
-    const raw = extractJsonObject(text)
-    if (raw) return normalizeSummaryReport(raw, recent, lang)
-    console.warn("Local summary report: could not parse model output; using fallback")
-  } catch (e) {
-    console.warn("Local summary report failed; using fallback:", e instanceof Error ? e.message : e)
+  if (isModelReady()) {
+    try {
+      const text = await runLocalPrompt({
+        lang,
+        text: buildSummaryReportPrompt(recent, tz, lang),
+        schema: SUMMARY_REPORT_SCHEMA,
+        timeoutMs: REPORT_TIMEOUT_MS,
+      })
+      const raw = extractJsonObject(text)
+      if (raw) return normalizeSummaryReport(raw, recent, lang)
+      console.warn("Local summary report: could not parse model output; using fallback")
+    } catch (e) {
+      console.warn("Local summary report failed; using fallback:", e instanceof Error ? e.message : e)
+    }
+  } else {
+    console.warn("Local summary report: model not available; using fallback without starting a download")
   }
   return generateFallbackSummaryReport(recent, lang)
 }
@@ -73,18 +85,22 @@ export async function generateDailyReportLocal(
   if (logs.length === 0) throw new Error("At least 1 work log is required")
   const { logs: sampled, totalCount } = sampleDailyLogs(logs)
 
-  try {
-    const text = await runLocalPrompt({
-      lang,
-      text: buildDailyReportPrompt(sampled, reportDate, tz, lang),
-      schema: DAILY_REPORT_SCHEMA,
-      timeoutMs: REPORT_TIMEOUT_MS,
-    })
-    const raw = extractJsonObject(text)
-    if (raw) return normalizeDailyReport(raw, sampled, reportDate, totalCount, tz, lang)
-    console.warn("Local daily report: could not parse model output; using fallback")
-  } catch (e) {
-    console.warn("Local daily report failed; using fallback:", e instanceof Error ? e.message : e)
+  if (isModelReady()) {
+    try {
+      const text = await runLocalPrompt({
+        lang,
+        text: buildDailyReportPrompt(sampled, reportDate, tz, lang),
+        schema: DAILY_REPORT_SCHEMA,
+        timeoutMs: REPORT_TIMEOUT_MS,
+      })
+      const raw = extractJsonObject(text)
+      if (raw) return normalizeDailyReport(raw, sampled, reportDate, totalCount, tz, lang)
+      console.warn("Local daily report: could not parse model output; using fallback")
+    } catch (e) {
+      console.warn("Local daily report failed; using fallback:", e instanceof Error ? e.message : e)
+    }
+  } else {
+    console.warn("Local daily report: model not available; using fallback without starting a download")
   }
   return generateFallbackDailyReport(sampled, reportDate, totalCount, tz, lang)
 }

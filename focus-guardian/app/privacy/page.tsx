@@ -267,7 +267,7 @@ export default function PrivacyPage() {
                   <tr>
                     <td className="border border-gray-200 px-4 py-2">Toggl API トークン</td>
                     <td className="border border-gray-200 px-4 py-2">ユーザーが削除するまで</td>
-                    <td className="border border-gray-200 px-4 py-2">ユーザーによるブラウザ削除時</td>
+                    <td className="border border-gray-200 px-4 py-2">設定画面でのクリア時・アカウント削除時</td>
                   </tr>
                   <tr className="bg-gray-50">
                     <td className="border border-gray-200 px-4 py-2">作業ログ</td>

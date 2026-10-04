@@ -126,8 +126,10 @@ export default function TermsEnPage() {
                 to retrieve current time-tracking records.
               </li>
               <li>
-                The Toggl Track API token is stored in the User's browser (local storage) and is never
-                sent to or stored on the Company's servers.
+                The Toggl Track API token and workspace ID are stored in the Company's database (Supabase),
+                protected by row-level security (RLS) so that only the User can access them. Only in
+                environments where this database storage is unavailable do we temporarily keep a copy in the
+                User's browser local storage so that the integration keeps working.
               </li>
               <li>
                 Toggl Track integration is optional. The core features of the Service remain available

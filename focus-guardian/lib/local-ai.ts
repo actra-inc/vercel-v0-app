@@ -81,9 +81,12 @@ export async function refreshLocalAiAvailability(lang: "ja" | "en"): Promise<Loc
 const baseSessions = new Map<string, LanguageModelSession>()
 let creating: Promise<LanguageModelSession> | null = null
 
-async function getBaseSession(lang: "ja" | "en"): Promise<LanguageModelSession> {
+async function getBaseSession(lang: "ja" | "en", signal?: AbortSignal): Promise<LanguageModelSession> {
   const existing = baseSessions.get(lang)
   if (existing) return existing
+  // 既に別の呼び出しが作成中なら相乗りする。その場合この呼び出し自身のsignalは
+  // 作成中のlm.create()には伝わらない（先行呼び出しのsignalで既に始まっているため）が、
+  // creating自体はfinallyで必ずnullに戻るので、次の呼び出しは正常にやり直せる
   if (creating) return creating
   const lm = api()
   if (!lm) throw new Error("Prompt API is not available in this browser")
@@ -92,6 +95,10 @@ async function getBaseSession(lang: "ja" | "en"): Promise<LanguageModelSession> 
     try {
       const session = await lm.create({
         ...coreOptions(lang),
+        // タイムアウト・呼び出し元のAbortをダウンロード待ちにも効かせる
+        // （H-2: これが無いとtimeoutMsは「create完了後」からしか数えられず、
+        //   モデル未ダウンロード環境でレポート生成が無期限に止まる）
+        signal,
         monitor(m) {
           m.addEventListener("downloadprogress", (e) => {
             // e.loaded は 0〜1 の割合（total は 1）。ダウンロード不要な環境では即 1 が来る
@@ -150,7 +157,7 @@ const isAbort = (e: unknown) =>
   e instanceof DOMException && (e.name === "AbortError" || e.name === "TimeoutError")
 
 async function promptOnce(input: LocalPromptInput, useSchema: boolean, signal?: AbortSignal): Promise<string> {
-  const base = await getBaseSession(input.lang)
+  const base = await getBaseSession(input.lang, signal)
   const session = await base.clone({ signal })
   try {
     const content: LanguageModelMessageContent[] = []

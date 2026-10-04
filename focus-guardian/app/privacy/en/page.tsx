@@ -281,7 +281,7 @@ export default function PrivacyEnPage() {
                   <tr>
                     <td className="border border-gray-200 px-4 py-2">Toggl API token</td>
                     <td className="border border-gray-200 px-4 py-2">Until user deletes it</td>
-                    <td className="border border-gray-200 px-4 py-2">User clears browser local storage</td>
+                    <td className="border border-gray-200 px-4 py-2">User clears it in Settings, or account deletion</td>
                   </tr>
                   <tr className="bg-gray-50">
                     <td className="border border-gray-200 px-4 py-2">Work logs</td>
