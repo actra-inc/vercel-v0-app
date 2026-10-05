@@ -503,3 +503,67 @@ test("normalizeAnalysis: 脱線ではない回に「娯楽」「業務以外のS
   const research = normalizeAnalysis({ work_category: "リサーチ", distraction_check: { is_distracted: false, task_alignment: 0.9 } }, baseCtx())
   assert.equal(research.work_category, "リサーチ")
 })
+
+// ---- 予定作業そのものが買い物・動画などのとき（2026-10-06 実画面テスト：予定「go back home, shopping」で Amazon が 7 回とも脱線） ----
+
+test("detectLeisureSite: 予定作業が同じ種類の活動・同じサイト名を指すときは脱線と確定しない", () => {
+  const amazon = { apps: ["Amazon"], activity: "商品閲覧" }
+  assert.equal(detectLeisureSite(amazon, "go back home, shopping"), null)
+  assert.equal(detectLeisureSite(amazon, "日用品の買い物"), null)
+  assert.equal(detectLeisureSite(amazon, "Amazonで備品を探す"), null)
+  assert.equal(detectLeisureSite({ apps: ["YouTube"] }, "研修動画の視聴"), null)
+  assert.equal(detectLeisureSite({ apps: ["Instagram"] }, "SNS 投稿の作成"), null)
+})
+
+test("detectLeisureSite: 種類が違う予定作業や仕事の予定作業では、従来どおり脱線と確定する", () => {
+  assert.equal(detectLeisureSite({ apps: ["Amazon"] }, "ac)flownudgeのシステム調整"), "Amazon")
+  assert.equal(detectLeisureSite({ apps: ["YouTube"] }, "go back home, shopping"), "YouTube")
+  assert.equal(detectLeisureSite({ apps: ["YouTube"] }, "メール配信の設定"), "YouTube")
+  assert.equal(detectLeisureSite({ apps: ["Amazon"] }, ""), "Amazon")
+})
+
+test("normalizeAnalysis: 予定作業が買い物なら、Amazon でもモデルの判断（脱線ではない）を残す", () => {
+  const r = normalizeAnalysis(
+    { activity: "商品閲覧", apps: ["Amazon"], distraction_check: { is_distracted: false, task_alignment: 0.9, reason: "予定どおりの買い物" } },
+    baseCtx({ currentTask: "go back home, shopping", reasonLeisureSite: "REASON_LEISURE" }),
+  )
+  assert.equal(r.distraction_check.is_distracted, false)
+  assert.equal(r.focus_score, 90)
+})
+
+test("buildAnalysisPrompt: 予定作業そのものが買い物などなら優先順位 2 を適用しない但し書きが入る", () => {
+  const p = buildAnalysisPrompt({ currentTask: "x", categories: DEFAULT_CATEGORY_NAMES, userRules: [], lang: "ja" } as any)
+  assert.match(p, /予定作業そのものがその種類の活動（例：予定作業が「買い物」で画面がショッピングサイト）なら2は適用せず/)
+})
+
+test("normalizeAnalysis: 予定作業が買い物なら、モデルが Amazon を脱線と答えても脱線にせず、矛盾する理由は残さない。2 段目も行わない", () => {
+  const r = normalizeAnalysis(
+    { activity: "商品閲覧", apps: ["楽天モバイル"], distraction_check: { is_distracted: true, task_alignment: 0.2, reason: "買い物サイトのため" } },
+    baseCtx({ currentTask: "go back home, shopping" }),
+  )
+  assert.equal(r.distraction_check.is_distracted, false)
+  assert.equal(r.distraction_check.reason, "")
+  assert.ok(r.focus_score >= 80)
+  assert.equal(needsTaskMatchCheck(r, "go back home, shopping"), false)
+})
+
+test("normalizeAnalysis: ユーザー定義ルールがあるときは、予定作業が買い物でもモデルの判断に従う", () => {
+  const r = normalizeAnalysis(
+    { activity: "商品閲覧", apps: ["Amazon"], distraction_check: { is_distracted: true, task_alignment: 0.2, reason: "R" } },
+    baseCtx({ currentTask: "shopping", hasUserRules: true }),
+  )
+  assert.equal(r.distraction_check.is_distracted, true)
+})
+
+test("normalizeAnalysis: 脱線ではないのに category が distracted なら戻す（予定どおりの買い物は productive、他は neutral）", () => {
+  const planned = normalizeAnalysis(
+    { activity: "商品閲覧", apps: ["Amazon"], category: "distracted", distraction_check: { is_distracted: true, task_alignment: 0.2 } },
+    baseCtx({ currentTask: "shopping" }),
+  )
+  assert.equal(planned.category, "productive")
+  const other = normalizeAnalysis(
+    { activity: "資料閲覧", apps: ["Chrome"], category: "distracted", distraction_check: { is_distracted: false, task_alignment: 0.6 } },
+    baseCtx(),
+  )
+  assert.equal(other.category, "neutral")
+})

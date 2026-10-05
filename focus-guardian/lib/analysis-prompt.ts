@@ -74,6 +74,7 @@ export function buildAnalysisPrompt(opts: AnalysisPromptOptions): string {
 2. 1に当てはまらない場合、以下は予定作業に関わらず distracted 扱いとする:
    ショッピングサイト(Amazon/楽天/Yahoo!ショッピング等)、SNS(Twitter/X/Instagram/TikTok/Facebook等)、
    動画サービス(YouTube/Netflix/Hulu等)、ゲーム、まとめサイト、掲示板(5ch等)
+   ただし、予定作業そのものがその種類の活動（例：予定作業が「買い物」で画面がショッピングサイト）なら2は適用せず、4で判定する。
 3. 画面に FlowNudge（この集中支援アプリ。作業ログ・画面解析の状況・レポート・設定画面など）が表示されているときは、
    activity と details に「${opts.lang === "en" ? "FlowNudge screen" : "FlowNudge の画面"}」と書き、それ自体は脱線扱いにしない（is_distracted: false）。
 4. 1〜3のいずれにも当てはまらない場合は、画面の作業が予定作業そのもの（または予定作業に直接必要な作業）かを確かめる。
@@ -181,46 +182,76 @@ function toRatio(raw: unknown, fallback: number): number {
 // 予定作業に関わらず脱線とみなすサイト（プロンプトの優先順位 2 と同じ範囲）。
 // モデルが挙げたアプリ名・活動名だけを見る（要約文は「YouTube の解説を参考に実装」のように
 // 仕事中にも名前が出やすいので見ない）。誤検知を避けるため、業務でも使う名前は除外条件を付ける
-// [表示名, 該当パターン, 除外パターン（当てはまれば業務利用とみなす）]
-const LEISURE_SITE_PATTERNS: Array<[string, RegExp, RegExp?]> = [
-  ["YouTube", /youtube/i, /studio|\bapi\b|data\s*api/i],
-  ["Netflix", /netflix/i],
-  ["Hulu", /hulu/i],
-  ["Prime Video", /prime\s*video|プライム\s*ビデオ/i],
-  ["ABEMA", /abema/i],
-  ["TikTok", /tiktok/i],
-  ["Instagram", /instagram|インスタグラム/i],
-  ["Facebook", /facebook|フェイスブック/i],
-  ["X (Twitter)", /twitter|ツイッター|(?<![\w.-])x\.com\b/i],
-  ["ニコニコ", /niconico|ニコニコ/i],
-  ["Twitch", /twitch/i],
-  ["5ch", /(?<![\w.])5ch\b|５ちゃんねる|2ちゃんねる|2ch\.net/i],
-  ["まとめサイト", /まとめサイト/],
-  ["Amazon", /amazon|アマゾン/i, /\baws\b|web\s*services|seller\s*central|セラーセントラル|amazon\s*business|amazon\s*ビジネス|請求書|invoice|\bapi\b/i],
-  ["楽天", /楽天|rakuten/i, /銀行|証券|カード|bank|rms|api/i],
-  ["Yahoo!ショッピング", /yahoo!?\s*ショッピング|ヤフーショッピング|yahoo\s*shopping/i],
-  ["メルカリ", /メルカリ|mercari/i],
-  ["ZOZOTOWN", /zozotown/i],
+// [表示名, 種類, 該当パターン, 除外パターン（当てはまれば業務利用とみなす）]
+type LeisureKind = "video" | "sns" | "shopping" | "forum"
+const LEISURE_SITE_PATTERNS: Array<[string, LeisureKind, RegExp, RegExp?]> = [
+  ["YouTube", "video", /youtube/i, /studio|\bapi\b|data\s*api/i],
+  ["Netflix", "video", /netflix/i],
+  ["Hulu", "video", /hulu/i],
+  ["Prime Video", "video", /prime\s*video|プライム\s*ビデオ/i],
+  ["ABEMA", "video", /abema/i],
+  ["TikTok", "sns", /tiktok/i],
+  ["Instagram", "sns", /instagram|インスタグラム/i],
+  ["Facebook", "sns", /facebook|フェイスブック/i],
+  ["X (Twitter)", "sns", /twitter|ツイッター|(?<![\w.-])x\.com\b/i],
+  ["ニコニコ", "video", /niconico|ニコニコ/i],
+  ["Twitch", "video", /twitch/i],
+  ["5ch", "forum", /(?<![\w.])5ch\b|５ちゃんねる|2ちゃんねる|2ch\.net/i],
+  ["まとめサイト", "forum", /まとめサイト/],
+  ["Amazon", "shopping", /amazon|アマゾン/i, /\baws\b|web\s*services|seller\s*central|セラーセントラル|amazon\s*business|amazon\s*ビジネス|請求書|invoice|\bapi\b/i],
+  ["楽天", "shopping", /楽天|rakuten/i, /銀行|証券|カード|bank|rms|api/i],
+  ["Yahoo!ショッピング", "shopping", /yahoo!?\s*ショッピング|ヤフーショッピング|yahoo\s*shopping/i],
+  ["メルカリ", "shopping", /メルカリ|mercari/i],
+  ["ZOZOTOWN", "shopping", /zozotown/i],
 ]
 
 // activity にサイト名が出ても、閲覧・視聴・買い物を表す語と一緒のときだけ判定に使う
 // （「YouTube Data API の実装」「Amazon の請求書ダウンロード」のような業務の文脈を脱線にしないため）
 const LEISURE_ACTIVITY_VERB = /視聴|閲覧|見て|検索|購入|買い物|ショッピング|商品|動画|タイムライン|投稿|watch|brows|view|shop|scroll|feed/i
 
+// 予定作業そのものがその種類の活動を指すときは、サイトを見ていても脱線と確定しない
+// （2026-10-06 実画面テスト：予定作業「go back home, shopping」で Amazon を 7 回とも脱線と判定し警告音が鳴った）
+const TASK_KIND_PATTERNS: Record<LeisureKind, RegExp> = {
+  shopping: /買い物|買物|ショッピング|購入|通販|shopping|\bshop\b|\bbuy|purchase/i,
+  video: /動画|映像|映画|視聴|video|movie/i,
+  sns: /\bsns\b|ソーシャル|social|投稿|広報|ツイート|tweet/i,
+  forum: /掲示板|まとめ|forum/i,
+}
+
+function taskCoversLeisure(currentTask: string, name: string, kind: LeisureKind): boolean {
+  const task = currentTask.trim()
+  if (!task) return false
+  if (TASK_KIND_PATTERNS[kind].test(task)) return true
+  const site = LEISURE_SITE_PATTERNS.find(([n]) => n === name)
+  return !!site && site[2].test(task)
+}
+
 /**
  * モデルの出力（apps と activity）に、予定作業に関わらず脱線のサイトが含まれていれば、その名前を返す。
+ * ただし予定作業がそのサイト名や同じ種類の活動（買い物・動画・SNS 等）を指すときは返さない。
  * 判定は要素ごと（除外パターンも要素ごと。「AWS Console」と「Amazon.co.jp」が並ぶ画面で買い物を見逃さない）。
  * FlowNudge 自身の画面（過去の作業ログに「YouTube 視聴」等が並ぶ）では判定しない
  */
-export function detectLeisureSite(analysis: any): string | null {
+export function detectLeisureSite(analysis: any, currentTask = ""): string | null {
+  const site = findLeisureSite(analysis)
+  return site && !taskCoversLeisure(currentTask, site.name, site.kind) ? site.name : null
+}
+
+/** 予定作業が、画面に出ている娯楽系サイトそのもの・同じ種類の活動を指しているか（例：予定「買い物」で Amazon） */
+export function isPlannedLeisure(analysis: any, currentTask: string): boolean {
+  const site = findLeisureSite(analysis)
+  return !!site && taskCoversLeisure(currentTask, site.name, site.kind)
+}
+
+function findLeisureSite(analysis: any): { name: string; kind: LeisureKind } | null {
   const apps: string[] = Array.isArray(analysis?.apps) ? analysis.apps.filter((a: unknown): a is string => typeof a === "string") : []
   const activity = typeof analysis?.activity === "string" ? analysis.activity : ""
   if ([...apps, activity].some((t) => /flownudge/i.test(t))) return null
   const candidates = [...apps]
   if (LEISURE_ACTIVITY_VERB.test(activity)) candidates.push(activity)
   for (const text of candidates) {
-    for (const [name, re, exclude] of LEISURE_SITE_PATTERNS) {
-      if (re.test(text) && !exclude?.test(text)) return name
+    for (const [name, kind, re, exclude] of LEISURE_SITE_PATTERNS) {
+      if (re.test(text) && !exclude?.test(text)) return { name, kind }
     }
   }
   return null
@@ -259,8 +290,12 @@ export function normalizeAnalysis(analysis: any, ctx: NormalizeContext): Analysi
   // アプリ名・活動名からコード側でも確定させる。2026-10-06 の実モデル確認で、Amazon の画面を
   // 「予定作業に関連」と誤答した例があったため。ユーザー定義ルールがあるときはルールを優先して適用しない
   // （「YouTube の講義動画は仕事」等のルールを潰さないため）
-  const leisureSite = ctx.hasUserRules ? null : detectLeisureSite(analysis)
+  const leisureSite = ctx.hasUserRules ? null : detectLeisureSite(analysis, ctx.currentTask)
   if (leisureSite) isDistracted = true
+  // 逆に、予定作業そのものが買い物・動画などで画面がそのサイトなら、モデルが脱線と答えても脱線にしない
+  // （プロンプトの但し書きだけでは Nano が守らず、予定「go back home, shopping」で楽天を脱線と答えた。2026-10-06）
+  const plannedLeisure = !ctx.hasUserRules && isPlannedLeisure(analysis, ctx.currentTask)
+  if (plannedLeisure) isDistracted = false
 
   const rawReason =
     typeof analysis?.distraction_check?.reason === "string" ? analysis.distraction_check.reason.trim() : ""
@@ -270,14 +305,20 @@ export function normalizeAnalysis(analysis: any, ctx: NormalizeContext): Analysi
   // ただし、モデルが「脱線ではない」と真偽値で明示して理由を書かなかっただけなら空のままにする
   // （判定できているのに「判定できませんでした」と表示されて紛らわしかった）
   // モデルが脱線と答えていない回（モデルの理由は「関連」等で矛盾する）と、理由が空の回はサイト用の理由にする
-  const reason = leisureSite && (modelIsDistracted !== true || !rawReason)
+  const reason = plannedLeisure && modelIsDistracted === true
+    ? "" // モデルの理由（「買い物サイトのため脱線」等）は結論と矛盾するので残さない
+    : leisureSite && (modelIsDistracted !== true || !rawReason)
     ? ctx.reasonLeisureSite ?? ctx.reasonLowAlignment
     : rawReason || (isDistracted ? ctx.reasonLowAlignment : modelSaidBoolean ? "" : ctx.reasonUnknown)
 
   const hasDistractionCheckObject =
     analysis?.distraction_check && typeof analysis.distraction_check === "object" && !Array.isArray(analysis.distraction_check)
   // サイトで脱線を確定した回は、集中度（task_alignment×100）も低く揃える
-  const finalAlignment = leisureSite ? Math.min(taskAlignment, 0.2) : taskAlignment
+  const finalAlignment = leisureSite
+    ? Math.min(taskAlignment, 0.2)
+    : plannedLeisure
+      ? Math.max(taskAlignment, 0.8)
+      : taskAlignment
   const workCategory =
     !isDistracted && DISTRACTION_CATEGORY_NAMES.includes(validCategory)
       ? resolveFallbackWorkCategory(ctx.categories)
@@ -295,8 +336,16 @@ export function normalizeAnalysis(analysis: any, ctx: NormalizeContext): Analysi
     | "productive"
     | "distracted"
     | "neutral"
-  // is_distracted と category が食い違わないよう、distracted と判定したら category も distracted にする
-  const category = isDistracted ? "distracted" : normalizedCategory
+  // is_distracted と category が食い違わないよう、distracted と判定したら category も distracted にする。
+  // 逆に脱線ではないのに distracted のままだと「生産的ログの割合」がずれるので戻す
+  // （予定作業どおりの買い物は productive、それ以外は neutral。2026-10-06 実モデル確認で食い違いが出た）
+  const category = isDistracted
+    ? "distracted"
+    : plannedLeisure
+      ? "productive"
+      : normalizedCategory === "distracted"
+        ? "neutral"
+        : normalizedCategory
 
   // applications は TEXT[] 列のため、文字列のみに整形する。プロンプトの指示（最大5件）に合わせ、
   // 前後空白を除いて重複を落とし、5件までにする
@@ -357,7 +406,9 @@ export interface TaskMatchInput {
  * ルールは buildTaskMatchPrompt に渡して、2 段目の判断の中で優先させる
  */
 export function needsTaskMatchCheck(result: AnalysisResult, currentTask: string): boolean {
-  return !!currentTask.trim() && !result.distraction_check.is_distracted
+  if (!currentTask.trim() || result.distraction_check.is_distracted) return false
+  // 予定作業どおりの買い物・動画など（1 段目でコード側が確定した回）は、2 段目で覆さない
+  return !isPlannedLeisure({ apps: result.applications, activity: result.activity }, currentTask)
 }
 
 export function buildTaskMatchPrompt(input: TaskMatchInput): string {
