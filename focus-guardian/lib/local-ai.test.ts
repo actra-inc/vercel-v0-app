@@ -184,3 +184,67 @@ test("prewarmLocalAi: create が失敗しても例外が外に出ず false を�
   assert.equal(calls(), 1)
   assert.equal(await runLocalPrompt({ lang: "ja", text: "hi", timeoutMs: 2_000 }), '{"ok":true}')
 })
+
+// ---- 作成中のセッションへの相乗り（2026-10-06 レビュー指摘） ----
+
+test("getBaseSession: prewarm の create が固まっても、相乗りした推論は自分の timeoutMs で打ち切られ、次の推論は作り直せる", { timeout: 5_000 }, async () => {
+  const { prewarmLocalAi, runLocalPrompt, disposeLocalAi } = await import("./local-ai.ts")
+  disposeLocalAi()
+  let createCalls = 0
+  ;(globalThis as any).LanguageModel = {
+    async availability() { return "available" },
+    create() {
+      createCalls++
+      // 1 回目（prewarm・signal 無し）は永久に終わらない
+      if (createCalls === 1) return new Promise(() => {})
+      return Promise.resolve(makeFakeSession(async () => "ok"))
+    },
+    async params() { return null },
+  }
+  void prewarmLocalAi("ja")
+  await new Promise((r) => setTimeout(r, 10))
+  await assert.rejects(runLocalPrompt({ lang: "ja", text: "hi", timeoutMs: 200 }))
+  assert.equal(await runLocalPrompt({ lang: "ja", text: "hi", timeoutMs: 2_000 }), "ok")
+})
+
+test("getBaseSession: ja の作成中に en の推論が来ても、ja のセッションに相乗りせず en を作る", { timeout: 5_000 }, async () => {
+  const { prewarmLocalAi, runLocalPrompt, disposeLocalAi } = await import("./local-ai.ts")
+  disposeLocalAi()
+  const langs: string[] = []
+  let releaseJa: () => void = () => {}
+  ;(globalThis as any).LanguageModel = {
+    async availability() { return "available" },
+    create(opts: any) {
+      const lang = opts?.expectedOutputs?.[0]?.languages?.[0] ?? opts?.expectedInputs?.[0]?.languages?.[0] ?? "?"
+      langs.push(lang)
+      const session = makeFakeSession(async () => `session-${langs.length}`)
+      if (langs.length === 1) return new Promise((r) => { releaseJa = () => r(session) })
+      return Promise.resolve(session)
+    },
+    async params() { return null },
+  }
+  void prewarmLocalAi("ja")
+  await new Promise((r) => setTimeout(r, 10))
+  const en = runLocalPrompt({ lang: "en", text: "hi", timeoutMs: 2_000 })
+  await new Promise((r) => setTimeout(r, 10))
+  releaseJa()
+  assert.equal(await en, "session-2", "en は自前のセッション（2 回目の create）で動く")
+  assert.equal(langs.length, 2)
+})
+
+test("getBaseSession: create が同期的に例外を投げても、作成中の記録が残らず次の呼び出しで作り直せる", { timeout: 5_000 }, async () => {
+  const { runLocalPrompt, disposeLocalAi } = await import("./local-ai.ts")
+  disposeLocalAi()
+  let createCalls = 0
+  ;(globalThis as any).LanguageModel = {
+    async availability() { return "available" },
+    create() {
+      createCalls++
+      if (createCalls <= 2) throw new Error("sync failure") // 1 回目と再試行の 1 回
+      return Promise.resolve(makeFakeSession(async () => "ok"))
+    },
+    async params() { return null },
+  }
+  await assert.rejects(runLocalPrompt({ lang: "ja", text: "hi", timeoutMs: 1_000 }))
+  assert.equal(await runLocalPrompt({ lang: "ja", text: "hi", timeoutMs: 1_000 }), "ok")
+})

@@ -79,19 +79,42 @@ export async function refreshLocalAiAvailability(lang: "ja" | "en"): Promise<Loc
 // 言語ごとにベースセッションを1つ保持し、推論ごとに clone して使い捨てる
 // （同じセッションに prompt を積むと文脈が溜まり、入力枠を食いつぶす）
 const baseSessions = new Map<string, LanguageModelSession>()
-let creating: Promise<LanguageModelSession> | null = null
+// 作成中のセッションも言語ごとに持つ（共有だと、ja の作成中に en の推論が ja のセッションに相乗りしていた）
+const creating = new Map<string, Promise<LanguageModelSession>>()
+
+/** 相乗りした側にも自分の signal（タイムアウト・中断）を効かせる。元の Promise 自体は止めない */
+function raceAbort<T>(p: Promise<T>, signal?: AbortSignal): Promise<T> {
+  if (!signal) return p
+  if (signal.aborted) return Promise.reject(signal.reason ?? new DOMException("Aborted", "AbortError"))
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => reject(signal.reason ?? new DOMException("Aborted", "AbortError"))
+    signal.addEventListener("abort", onAbort, { once: true })
+    p.then(
+      (v) => { signal.removeEventListener("abort", onAbort); resolve(v) },
+      (e) => { signal.removeEventListener("abort", onAbort); reject(e) },
+    )
+  })
+}
 
 async function getBaseSession(lang: "ja" | "en", signal?: AbortSignal): Promise<LanguageModelSession> {
   const existing = baseSessions.get(lang)
   if (existing) return existing
-  // 既に別の呼び出しが作成中なら相乗りする。その場合この呼び出し自身のsignalは
-  // 作成中のlm.create()には伝わらない（先行呼び出しのsignalで既に始まっているため）が、
-  // creating自体はfinallyで必ずnullに戻るので、次の呼び出しは正常にやり直せる
-  if (creating) return creating
+  // 既に同じ言語で作成中なら相乗りする。作成中の lm.create() には先行呼び出しの signal しか
+  // 伝わらないため、相乗りする側は raceAbort で自分のタイムアウトを効かせる
+  // （事前作成 prewarm は signal 無しで作るので、create が固まると最初の推論が無期限に待ち、
+  //   解析ループの再入ガードが外れずキャプチャが全部捨てられる恐れがあった）
+  const pending = creating.get(lang)
+  if (pending) {
+    return raceAbort(pending, signal).catch((e) => {
+      // 相乗り先が固まったままタイムアウトした場合は、それを捨てて次の呼び出しで作り直せるようにする
+      if (signal?.aborted && creating.get(lang) === pending) creating.delete(lang)
+      throw e
+    })
+  }
   const lm = api()
   if (!lm) throw new Error("Prompt API is not available in this browser")
 
-  creating = (async () => {
+  const p = (async () => {
     try {
       const session = await lm.create({
         ...coreOptions(lang),
@@ -115,11 +138,16 @@ async function getBaseSession(lang: "ja" | "en", signal?: AbortSignal): Promise<
       // 失敗理由を可否に反映し直す（容量不足などで unavailable に落ちていることがある）
       void refreshLocalAiAvailability(lang)
       throw e
-    } finally {
-      creating = null
     }
   })()
-  return creating
+  creating.set(lang, p)
+  // 後片付けは登録の後に付ける（async 関数内の finally だと、create が同期的に失敗したときに
+  // 登録より先に走り、失敗済みの Promise が残り続けて以後の呼び出しが全部失敗する）。
+  // 固まって捨てられた後に遅れて終わった場合は、新しい作成中の記録を消さない
+  p.finally(() => {
+    if (creating.get(lang) === p) creating.delete(lang)
+  }).catch(() => undefined)
+  return p
 }
 
 /** モデルのダウンロードを開始する（ユーザー操作から呼ぶ）。完了で resolve */
@@ -299,4 +327,5 @@ export function disposeLocalAi() {
     }
   })
   baseSessions.clear()
+  creating.clear()
 }
