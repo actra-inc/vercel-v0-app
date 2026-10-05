@@ -21,7 +21,7 @@ import { DEFAULT_NUDGE_PREFERENCES, MAX_ANALYSIS_RULES, MAX_ANALYSIS_RULE_LENGTH
 import type { AnalysisRule, WorkLog } from "@/lib/supabase"
 import { evaluateNudgeTick, initialNudgeState, snoozeBreak, type NudgeState } from "@/lib/nudge-logic"
 import { useLocalAi } from "@/hooks/use-local-ai"
-import { extractJsonObject, runLocalPrompt } from "@/lib/local-ai"
+import { extractJsonObject, prewarmLocalAi, runLocalPrompt } from "@/lib/local-ai"
 import { buildAnalysisPrompt, normalizeAnalysis } from "@/lib/analysis-prompt"
 import { generateSummaryReportLocal } from "@/lib/local-reports"
 import { verifyTaskMatchLocal } from "@/lib/local-analysis"
@@ -792,6 +792,11 @@ export function WorkLogPanel({
       stopCapture()
     } else {
       console.log("▶️ Starting screen capture...")
+      // 端末内 AI のセッションを、画面共有の選択ダイアログが出ている間に先に作っておく
+      // （最初の判定だけ 40 秒以上かかるのを避ける）。「利用できます」になった時点ではなく
+      // ここで呼ぶのは、解析を始めない利用者のためにセッションを抱え続けないため。
+      // await しない: ダイアログの表示（ユーザー操作からの直接呼び出しが必要）を遅らせない
+      void prewarmLocalAi(language)
       await startAutoCapture()
     }
   }
@@ -800,6 +805,7 @@ export function WorkLogPanel({
   // このクリックを起点に取り直す（選び直す画面が1回だけ出る）
   const handleResumeTracking = async () => {
     console.log("🔁 Resuming screen capture after interruption...")
+    void prewarmLocalAi(language)
     await startAutoCapture()
   }
 

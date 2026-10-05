@@ -128,6 +128,28 @@ export async function ensureLocalAiReady(lang: "ja" | "en"): Promise<void> {
   await getBaseSession(lang)
 }
 
+/**
+ * ベースセッションを先に作っておく（最初の推論だけ 40 秒以上かかる問題への対策。2026-10-05 実測）。
+ * モデルが「利用できる」と確認できたときだけ動き、ダウンロードが必要な端末では何もしない
+ * （数 GB のダウンロードを始めてよいのは設定画面の明示ボタンだけ）。
+ * 失敗しても例外は外に出さない。戻り値は準備できたかどうか
+ */
+export async function prewarmLocalAi(lang: "ja" | "en"): Promise<boolean> {
+  try {
+    if (baseSessions.has(lang)) return true
+    const lm = api()
+    if (!lm) return false
+    // モジュールの状態ではなく、その場で問い合わせる（古い状態で誤ってダウンロードを始めない）
+    const availability = await lm.availability(coreOptions(lang))
+    if (availability !== "available") return false
+    await getBaseSession(lang)
+    return true
+  } catch (e) {
+    console.warn("On-device AI prewarm failed (will create the session on first use):", e instanceof Error ? e.message : e)
+    return false
+  }
+}
+
 // 推論は一度に1つだけ。画面解析と自動レポート生成が同時に走っても衝突しないよう直列化する
 let queue: Promise<unknown> = Promise.resolve()
 

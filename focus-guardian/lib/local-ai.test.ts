@@ -124,3 +124,63 @@ test("extractJsonObject: 完全な JSON・前置き文つき・JSON 無しの既
   assert.equal(extractJsonObject("no json here"), null)
   assert.equal(extractJsonObject(""), null)
 })
+
+// ---- prewarmLocalAi: 最初の推論だけ遅い問題への対策（2026-10-05） ----
+
+function fakeModel(availability: string, onCreate?: () => void) {
+  let createCalls = 0
+  ;(globalThis as any).LanguageModel = {
+    async availability() {
+      return availability
+    },
+    async create() {
+      createCalls++
+      onCreate?.()
+      return makeFakeSession(async () => '{"ok":true}')
+    },
+    async params() {
+      return null
+    },
+  }
+  return () => createCalls
+}
+
+test("prewarmLocalAi: available ならセッションを 1 回だけ作り、直後の runLocalPrompt は create を追加で呼ばない", async () => {
+  const { prewarmLocalAi, runLocalPrompt, disposeLocalAi } = await import("./local-ai.ts")
+  disposeLocalAi()
+  const calls = fakeModel("available")
+  assert.equal(await prewarmLocalAi("ja"), true)
+  assert.equal(calls(), 1)
+  assert.equal(await prewarmLocalAi("ja"), true)
+  assert.equal(calls(), 1, "2 回目の prewarm は作り直さない")
+  assert.equal(await runLocalPrompt({ lang: "ja", text: "hi", timeoutMs: 2_000 }), '{"ok":true}')
+  assert.equal(calls(), 1, "事前作成済みなら推論で create を呼ばない")
+})
+
+test("prewarmLocalAi: downloadable / unavailable / 非対応では create を呼ばず false を返す", async () => {
+  const { prewarmLocalAi, disposeLocalAi } = await import("./local-ai.ts")
+  for (const a of ["downloadable", "unavailable", "downloading"]) {
+    disposeLocalAi()
+    const calls = fakeModel(a)
+    assert.equal(await prewarmLocalAi("ja"), false, a)
+    assert.equal(calls(), 0, `${a} のときは create を呼ばない`)
+  }
+  disposeLocalAi()
+  ;(globalThis as any).LanguageModel = undefined
+  assert.equal(await prewarmLocalAi("ja"), false)
+})
+
+test("prewarmLocalAi: create が失敗しても例外が外に出ず false を返す。その後の推論は自前で作り直せる", async () => {
+  const { prewarmLocalAi, runLocalPrompt, disposeLocalAi } = await import("./local-ai.ts")
+  disposeLocalAi()
+  let fail = true
+  const calls = fakeModel("available", () => {
+    if (fail) {
+      fail = false
+      throw new Error("not enough space")
+    }
+  })
+  assert.equal(await prewarmLocalAi("ja"), false)
+  assert.equal(calls(), 1)
+  assert.equal(await runLocalPrompt({ lang: "ja", text: "hi", timeoutMs: 2_000 }), '{"ok":true}')
+})
