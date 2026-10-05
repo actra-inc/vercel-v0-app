@@ -539,7 +539,11 @@ export function WorkLogPanel({
           confidence: result.confidence || 0,
           applications: result.applications || [],
           focus_score: result.focus_score || 0,
-          distraction_check: result.distraction_check || null,
+          // 作業ログのカードは planned_task を「予定作業:」として表示し、「これは仕事です」のルール作成にも使う。
+          // 判定結果には入っていないため、判定に使った予定作業をここで入れる（未設定のままだと欄が空になっていた）
+          distraction_check: result.distraction_check
+            ? { ...result.distraction_check, planned_task: currentTask }
+            : null,
           work_category: result.work_category || t('wlp_other'),
         }
 
