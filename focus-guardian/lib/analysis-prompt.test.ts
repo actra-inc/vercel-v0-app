@@ -12,6 +12,7 @@ import {
   buildTaskMatchPrompt,
   parseTaskMatchAnswer,
   applyTaskMismatch,
+  detectLeisureSite,
 } from "./analysis-prompt.ts"
 
 function baseCtx(overrides: Partial<NormalizeContext> = {}): NormalizeContext {
@@ -369,13 +370,10 @@ test("buildTaskMatchPrompt: 迷ったら脱線にしない指示と、実デー�
   assert.match(p, /例2: 予定作業「経理の請求書処理」[\s\S]*→ 明らかに別の業務なので no/)
 })
 
-test("buildTaskMatchPrompt: 1 段目の判断理由があれば入り、空・空白なら欄が出ない", () => {
-  const withReason = buildTaskMatchPrompt({ currentTask: "x", activity: "a", details: "d", applications: [], firstStageReason: "flownudge の設定を確認中" })
-  assert.match(withReason, /1 段目の判断理由: flownudge の設定を確認中/)
-  for (const r of [undefined, "", "   "]) {
-    const p = buildTaskMatchPrompt({ currentTask: "x", activity: "a", details: "d", applications: [], firstStageReason: r })
-    assert.ok(!/1 段目の判断理由/.test(p))
-  }
+// 2026-10-06 実モデル確認：1 段目の誤った理由（「予定作業に関連」）に 2 段目が引きずられたため渡さない
+test("buildTaskMatchPrompt: 1 段目の判断理由は入れない", () => {
+  const p = buildTaskMatchPrompt({ currentTask: "x", activity: "a", details: "d", applications: [] })
+  assert.ok(!/1 段目の判断理由/.test(p))
 })
 
 // ---- FlowNudge 自身の画面が「作業効率モニタリングシステム」と言い換えられる問題（2026-10-05） ----
@@ -390,4 +388,51 @@ test("buildAnalysisPrompt: 冒頭でシステム自身を名乗らず、FlowNudg
 test("buildTaskMatchPrompt: FlowNudge の画面の確認は yes のルールが入る", () => {
   const p = buildTaskMatchPrompt({ currentTask: "x", activity: "a", details: "d", applications: [] })
   assert.match(p, /FlowNudge（この集中支援アプリ）の画面の確認であれば yes/)
+})
+
+// ---- 予定作業に関わらず脱線のサイトをコード側で確定する（2026-10-06 実モデル確認：Amazon を「関連」と誤答） ----
+
+test("detectLeisureSite: apps・activity に動画・SNS・買い物サイトがあれば名前を返す", () => {
+  assert.equal(detectLeisureSite({ apps: ["Chrome", "Amazon"], activity: "商品閲覧" }), "Amazon")
+  assert.equal(detectLeisureSite({ apps: [], activity: "YouTubeで動画視聴" }), "YouTube")
+  assert.equal(detectLeisureSite({ apps: ["楽天市場"] }), "楽天")
+  assert.equal(detectLeisureSite({ apps: ["X (旧Twitter)"] }), "X (Twitter)")
+})
+
+test("detectLeisureSite: 業務でも使う名前（AWS・YouTube Studio・楽天銀行）や details だけの言及では反応しない", () => {
+  assert.equal(detectLeisureSite({ apps: ["Amazon Web Services"], activity: "EC2 設定" }), null)
+  assert.equal(detectLeisureSite({ apps: ["AWS Console (Amazon)"] }), null)
+  assert.equal(detectLeisureSite({ apps: ["YouTube Studio"] }), null)
+  assert.equal(detectLeisureSite({ apps: ["楽天銀行"] }), null)
+  assert.equal(detectLeisureSite({ apps: ["VS Code"], activity: "コード編集", details: "YouTube API の実装" }), null)
+  assert.equal(detectLeisureSite({}), null)
+})
+
+test("normalizeAnalysis: モデルが脱線ではないと答えても、Amazon の画面なら脱線・低い集中度・専用の理由になる", () => {
+  const r = normalizeAnalysis(
+    { activity: "商品閲覧", apps: ["Amazon"], distraction_check: { is_distracted: false, task_alignment: 0.7, reason: "予定作業に関連する可能性" } },
+    baseCtx({ currentTask: "flownudgeのシステム調整", reasonLeisureSite: "REASON_LEISURE" }),
+  )
+  assert.equal(r.distraction_check.is_distracted, true)
+  assert.ok(r.distraction_check.task_alignment <= 0.2)
+  assert.ok(r.focus_score <= 20)
+  assert.equal(r.distraction_check.reason, "REASON_LEISURE")
+})
+
+test("normalizeAnalysis: モデルも脱線と答えていればモデルの理由を残す。予定作業が未設定でも脱線になる", () => {
+  const r = normalizeAnalysis(
+    { activity: "動画視聴", apps: ["YouTube"], distraction_check: { is_distracted: true, task_alignment: 0.1, reason: "動画を視聴" } },
+    baseCtx({ currentTask: "", reasonLeisureSite: "REASON_LEISURE" }),
+  )
+  assert.equal(r.distraction_check.is_distracted, true)
+  assert.equal(r.distraction_check.reason, "動画を視聴")
+})
+
+test("normalizeAnalysis: ユーザー定義ルールがあるときはサイト判定を適用せず、モデルの判断（ルール込み）に従う", () => {
+  const r = normalizeAnalysis(
+    { activity: "講義動画", apps: ["YouTube"], distraction_check: { is_distracted: false, task_alignment: 0.8, reason: "ルールにより業務" } },
+    baseCtx({ hasUserRules: true }),
+  )
+  assert.equal(r.distraction_check.is_distracted, false)
+  assert.equal(r.distraction_check.reason, "ルールにより業務")
 })

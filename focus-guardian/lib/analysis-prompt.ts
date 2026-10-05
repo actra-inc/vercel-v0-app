@@ -116,6 +116,8 @@ export interface NormalizeContext {
   /** 判定理由が返らなかったときの文言（i18n 済み）: 一致度が低くて脱線扱いにした場合 / 判定できなかった場合 */
   reasonLowAlignment: string
   reasonUnknown: string
+  /** 動画・SNS・買い物などのサイトをコード側で脱線と確定したときの理由（省略時は reasonLowAlignment） */
+  reasonLeisureSite?: string
   /** details の最大文字数（省略時 40）。英語 UI では長めにしてよい */
   detailsMaxLength?: number
   /**
@@ -166,6 +168,43 @@ function toRatio(raw: unknown, fallback: number): number {
   return Math.min(1, Math.max(0, ratio))
 }
 
+// 予定作業に関わらず脱線とみなすサイト（プロンプトの優先順位 2 と同じ範囲）。
+// モデルが挙げたアプリ名・活動名だけを見る（要約文は「YouTube の解説を参考に実装」のように
+// 仕事中にも名前が出やすいので見ない）。誤検知を避けるため、業務でも使う名前は除外条件を付ける
+// [表示名, 該当パターン, 除外パターン（当てはまれば業務利用とみなす）]
+const LEISURE_SITE_PATTERNS: Array<[string, RegExp, RegExp?]> = [
+  ["YouTube", /youtube(?!\s*studio)/i],
+  ["Netflix", /netflix/i],
+  ["Hulu", /hulu/i],
+  ["Prime Video", /prime\s*video|プライム\s*ビデオ/i],
+  ["ABEMA", /abema/i],
+  ["TikTok", /tiktok/i],
+  ["Instagram", /instagram|インスタグラム/i],
+  ["Facebook", /facebook|フェイスブック/i],
+  ["X (Twitter)", /twitter|ツイッター|x\.com|旧\s*twitter/i],
+  ["ニコニコ", /niconico|ニコニコ/i],
+  ["Twitch", /twitch/i],
+  ["5ch", /5ch|５ちゃんねる|2ちゃんねる|2ch\.net/i],
+  ["まとめサイト", /まとめサイト/],
+  ["Amazon", /amazon|アマゾン/i, /\baws\b|amazon\s*web\s*services/i],
+  ["楽天", /楽天(?!銀行|証券|カード)|rakuten(?!\s*bank)/i],
+  ["Yahoo!ショッピング", /yahoo!?\s*ショッピング|ヤフーショッピング|yahoo\s*shopping/i],
+  ["メルカリ", /メルカリ|mercari/i],
+  ["ZOZOTOWN", /zozotown/i],
+]
+
+/** モデルの出力（apps と activity）に、予定作業に関わらず脱線のサイトが含まれていれば、その名前を返す */
+export function detectLeisureSite(analysis: any): string | null {
+  const apps = Array.isArray(analysis?.apps) ? analysis.apps.filter((a: unknown) => typeof a === "string") : []
+  const activity = typeof analysis?.activity === "string" ? analysis.activity : ""
+  const haystack = [...apps, activity].join(" / ")
+  if (!haystack.trim()) return null
+  for (const [name, re, exclude] of LEISURE_SITE_PATTERNS) {
+    if (re.test(haystack) && !exclude?.test(haystack)) return name
+  }
+  return null
+}
+
 /** モデルの生 JSON を、DB に保存できる形へ正規化する（旧サーバールートと同じ規則） */
 export function normalizeAnalysis(analysis: any, ctx: NormalizeContext): AnalysisResult {
   const validCategory = resolveWorkCategory(analysis?.work_category, ctx.categories)
@@ -195,6 +234,13 @@ export function normalizeAnalysis(analysis: any, ctx: NormalizeContext): Analysi
     isDistracted = !!ctx.currentTask && taskAlignment < 0.35
   }
 
+  // 優先順位 2（予定作業に関わらず脱線のサイト）は、モデルの判断に任せず、モデルが挙げた
+  // アプリ名・活動名からコード側でも確定させる。2026-10-06 の実モデル確認で、Amazon の画面を
+  // 「予定作業に関連」と誤答した例があったため。ユーザー定義ルールがあるときはルールを優先して適用しない
+  // （「YouTube の講義動画は仕事」等のルールを潰さないため）
+  const leisureSite = ctx.hasUserRules ? null : detectLeisureSite(analysis)
+  if (leisureSite) isDistracted = true
+
   const rawReason =
     typeof analysis?.distraction_check?.reason === "string" ? analysis.distraction_check.reason.trim() : ""
   // reason が空文字のまま下流に出ないよう、既定文へフォールバックする（distraction_check オブジェクトが
@@ -202,16 +248,19 @@ export function normalizeAnalysis(analysis: any, ctx: NormalizeContext): Analysi
   // 効かず、強制 distracted でも reason が空文字のままになり得た）
   // ただし、モデルが「脱線ではない」と真偽値で明示して理由を書かなかっただけなら空のままにする
   // （判定できているのに「判定できませんでした」と表示されて紛らわしかった）
-  const reason =
-    rawReason || (isDistracted ? ctx.reasonLowAlignment : modelSaidBoolean ? "" : ctx.reasonUnknown)
+  const reason = leisureSite && modelIsDistracted !== true
+    ? ctx.reasonLeisureSite ?? ctx.reasonLowAlignment
+    : rawReason || (isDistracted ? ctx.reasonLowAlignment : modelSaidBoolean ? "" : ctx.reasonUnknown)
 
   const hasDistractionCheckObject =
     analysis?.distraction_check && typeof analysis.distraction_check === "object" && !Array.isArray(analysis.distraction_check)
+  // サイトで脱線を確定した回は、集中度（task_alignment×100）も低く揃える
+  const finalAlignment = leisureSite ? Math.min(taskAlignment, 0.2) : taskAlignment
   const distractionCheck = {
     ...(hasDistractionCheckObject ? analysis.distraction_check : {}),
     is_distracted: isDistracted,
     reason,
-    task_alignment: taskAlignment,
+    task_alignment: finalAlignment,
   }
 
   // category は DB 側に CHECK 制約があるため、許可3値へ正規化する
@@ -254,7 +303,7 @@ export function normalizeAnalysis(analysis: any, ctx: NormalizeContext): Analysi
     details,
     confidence: Math.round(confidence * 100),
     applications: normalizedApps,
-    focus_score: Math.round(taskAlignment * 100),
+    focus_score: Math.round(finalAlignment * 100),
     distraction_check: distractionCheck,
   }
 }
@@ -273,8 +322,6 @@ export interface TaskMatchInput {
   applications: string[]
   /** 有効なユーザー定義ルール（0 件なら省略可）。ルールに当てはまる作業は一致扱いにする */
   userRules?: string[]
-  /** 1 段目でモデルが書いた判定理由（空なら省略可）。2 段目の判断材料として渡す */
-  firstStageReason?: string
 }
 
 /**
@@ -297,14 +344,12 @@ export function buildTaskMatchPrompt(input: TaskMatchInput): string {
 【ユーザー定義の判定ルール】次のルールに当てはまる場合は、ルールを優先して yes と答えてください。
 ${rules.map((r) => `- ${r}`).join("\n")}`
       : ""
-  const reason = (input.firstStageReason ?? "").trim()
-  const reasonNote = reason ? `\n1 段目の判断理由: ${reason}` : ""
   // 2026-10-05 の実画面テストで、要約が一般的（「コード編集」等）なだけで no と答え、
   // 予定作業どおりの作業に誤アラートが出た。迷ったら脱線にしない側に倒す
   return `予定作業と、いま画面で行われている作業を比べてください。
 
 予定作業: "${input.currentTask}"
-画面の作業: ${input.activity}（${input.details}）${apps}${reasonNote}${rulesNote}
+画面の作業: ${input.activity}（${input.details}）${apps}${rulesNote}
 
 画面の作業が、予定作業そのもの、または予定作業を進めるために直接必要な作業なら yes と答えてください。
 no と答えるのは、画面の作業が予定作業と明らかに別の業務・別のテーマだと分かる場合だけです。

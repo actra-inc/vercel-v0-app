@@ -26,7 +26,8 @@ export async function verifyTaskMatchLocal(
         details: result.details,
         applications: result.applications,
         userRules: opts.userRules ?? [],
-        firstStageReason: result.distraction_check.reason,
+        // 1 段目の判定理由は渡さない。1 段目が「予定作業に関連」と誤答した回に、2 段目まで
+        // 引きずられて別業務を見逃した（2026-10-06 実モデル確認：予定「経理の請求書処理」で開発ドキュメント）
       }),
       timeoutMs: TASK_MATCH_TIMEOUT_MS,
     })

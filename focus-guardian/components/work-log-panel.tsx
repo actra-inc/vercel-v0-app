@@ -513,6 +513,7 @@ export function WorkLogPanel({
           fallbackActivity: t('wlp_unknownActivity'),
           reasonLowAlignment: t('wlp_reasonLowAlignment'),
           reasonUnknown: t('wlp_reasonUnknown'),
+          reasonLeisureSite: t('wlp_reasonLeisureSite'),
           hasUserRules: enabledRules.length > 0,
           detailsMaxLength: language === "en" ? 80 : 40,
         })

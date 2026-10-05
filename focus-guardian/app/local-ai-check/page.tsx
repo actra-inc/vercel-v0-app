@@ -140,6 +140,7 @@ export default function LocalAiCheckPage() {
           fallbackActivity: "-",
           reasonLowAlignment: t('wlp_reasonLowAlignment'),
           reasonUnknown: t('wlp_reasonUnknown'),
+          reasonLeisureSite: t('wlp_reasonLeisureSite'),
           detailsMaxLength: language === "en" ? 80 : 40,
         })
         // 本番（work-log-panel）と同じく、2 段目で予定作業との照合を行う

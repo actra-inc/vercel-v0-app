@@ -19,10 +19,10 @@
 | `lib/local-ai.ts` | Prompt API の薄いラッパー。利用可否の判定と購読、モデルのダウンロード、推論の直列化（同時に 1 件）、JSON 抽出。`runLocalPrompt` の `timeoutMs` は**実行開始時点から**数える（順番待ちは含めない）。失敗時（中断以外）はベースセッションを作り直し、JSON Schema 無しで 1 回だけ再試行する |
 | `types/prompt-api.d.ts` | Prompt API（グローバル `LanguageModel`）の最小型定義 |
 | `hooks/use-local-ai.ts` | `lib/local-ai.ts` の状態を React から購読 |
-| `lib/analysis-prompt.ts` | 画面解析のプロンプト・JSON Schema・応答の正規化（純関数）。予定作業が空なら「未設定」と書く。作業種類は一覧の表記のまま（翻訳しない）返させる |
+| `lib/analysis-prompt.ts` | 画面解析のプロンプト・JSON Schema・応答の正規化（純関数）。ユーザー定義ルールが無いときは、動画・SNS・買い物サイト（`detectLeisureSite`）をコード側でも脱線と確定する。予定作業が空なら「未設定」と書く。作業種類は一覧の表記のまま（翻訳しない）返させる |
 | `lib/report-builders.ts` | まとめレポート／日報のプロンプト・スキーマ・AI 不使用時のフォールバック・正規化・日報 Markdown（純関数・日英対応） |
 | `lib/local-reports.ts` | まとめレポート／日報を端末内 AI で生成。失敗時はログからの機械的レポート |
-| `lib/local-analysis.ts` | 画面解析の 2 段目。1 段目で「脱線ではない」と出た回だけ、予定作業と同じ業務かを文字だけで確かめる（予定作業あり・ユーザー定義ルール無しのとき）。失敗時は 1 段目の判定のまま |
+| `lib/local-analysis.ts` | 画面解析の 2 段目。1 段目で「脱線ではない」と出た回だけ、予定作業と同じ業務かを文字だけで確かめる（予定作業ありのとき。ユーザー定義ルールはプロンプトに渡して優先させる）。失敗時は 1 段目の判定のまま |
 | `components/work-log-panel.tsx` | キャプチャ → 差分スキップ（2%）→ 縮小（768px、2 画面合成時 1536px）→ 端末内推論 → 正規化 → `work_logs` へ保存。判定呼び出しには JSON Schema を付けない |
 | `components/local-ai-settings.tsx` | 設定タブ「端末内 AI」：利用可否・動作要件・モデルダウンロード |
 | `app/local-ai-check/page.tsx` | ログイン不要の動作確認ページ。DB に保存しない。機種チェックと 1 枚解析（所要時間・判定・生出力） |
@@ -75,7 +75,7 @@ NEXT_PUBLIC_SUPABASE_URL=https://placeholder.supabase.co NEXT_PUBLIC_SUPABASE_AN
    grep -rl "SERVICE_ROLE\|CRON_SECRET" .next/static/
    ```
 
-4. 翻訳キーの件数一致（ja と en が同数であること。現在 614）
+4. 翻訳キーの件数一致（ja と en が同数であること。現在 615）
 
    ```bash
    grep -cE "^  [A-Za-z0-9_]+:" lib/translations/ja.ts lib/translations/en.ts

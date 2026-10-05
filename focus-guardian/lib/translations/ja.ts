@@ -670,6 +670,7 @@ export const ja = {
   wlp_reasonLowAlignment: '予定作業との一致度が低い',
   wlp_reasonUnknown: '判定できませんでした',
   wlp_reasonOffTask: '予定作業とは別の作業をしています',
+  wlp_reasonLeisureSite: '動画・SNS・買い物などのサイトを見ています',
   sp_tabToggl: 'Toggl連携',
   sp_tabProjects: 'プロジェクト',
   sp_tabOther: 'その他',
