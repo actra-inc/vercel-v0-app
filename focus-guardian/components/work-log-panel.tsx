@@ -422,6 +422,10 @@ export function WorkLogPanel({
       }
       analyzingRef.current = true
       setIsAnalyzing(true)
+      // 作業ログの時刻には、判定が終わった時刻ではなく画面を撮った時刻を使う。
+      // 端末内 AI の判定は 1 回 15〜35 秒かかるため、判定後に時刻を取ると全ログがその分遅れ、
+      // 解析停止の直前に撮った画面がセッション終了後の時刻で記録される（2026-10-05 実画面テスト）
+      const capturedAt = new Date().toISOString()
 
       try {
         // 前回と画面が変わっていなければ推論をスキップ（閾値2%）。
@@ -526,7 +530,7 @@ export function WorkLogPanel({
         registerObjectUrl(imageUrl)
 
         const logEntry = {
-          timestamp: new Date().toISOString(),
+          timestamp: capturedAt,
           activity: result.activity || t('wlp_unknownActivity'),
           category: result.category || "neutral",
           details: result.details || t('wlp_noDetails'),
