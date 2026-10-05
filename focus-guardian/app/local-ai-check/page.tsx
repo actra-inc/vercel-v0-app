@@ -145,7 +145,7 @@ export default function LocalAiCheckPage() {
         // 本番（work-log-panel）と同じく、2 段目で予定作業との照合を行う
         result = await verifyTaskMatchLocal(firstStage, {
           currentTask: task.trim(),
-          hasUserRules: false,
+          userRules: [],
           lang: language,
           reasonOffTask: t('wlp_reasonOffTask'),
         })

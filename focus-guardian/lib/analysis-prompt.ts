@@ -267,19 +267,34 @@ export interface TaskMatchInput {
   activity: string
   details: string
   applications: string[]
+  /** 有効なユーザー定義ルール（0 件なら省略可）。ルールに当てはまる作業は一致扱いにする */
+  userRules?: string[]
 }
 
-/** 2 段目の確認が必要か（予定作業あり・ルール無し・1 段目で脱線ではない） */
-export function needsTaskMatchCheck(result: AnalysisResult, currentTask: string, hasUserRules: boolean): boolean {
-  return !!currentTask.trim() && !hasUserRules && !result.distraction_check.is_distracted
+/**
+ * 2 段目の確認が必要か（予定作業あり・1 段目で脱線ではない）。
+ * ユーザー定義ルールの有無では止めない。以前は「ルールあり」で確認を丸ごと省いていたため、
+ * ルールを 1 件でも登録した利用者には別業務の見逃し対策が効かなかった。
+ * ルールは buildTaskMatchPrompt に渡して、2 段目の判断の中で優先させる
+ */
+export function needsTaskMatchCheck(result: AnalysisResult, currentTask: string): boolean {
+  return !!currentTask.trim() && !result.distraction_check.is_distracted
 }
 
 export function buildTaskMatchPrompt(input: TaskMatchInput): string {
   const apps = input.applications.length > 0 ? `／使用アプリ: ${input.applications.join("、")}` : ""
+  const rules = (input.userRules ?? []).map((r) => r.trim()).filter((r) => r.length > 0)
+  const rulesNote =
+    rules.length > 0
+      ? `
+
+【ユーザー定義の判定ルール】次のルールに当てはまる場合は、ルールを優先して yes と答えてください。
+${rules.map((r) => `- ${r}`).join("\n")}`
+      : ""
   return `予定作業と、いま画面で行われている作業を比べてください。
 
 予定作業: "${input.currentTask}"
-画面の作業: ${input.activity}（${input.details}）${apps}
+画面の作業: ${input.activity}（${input.details}）${apps}${rulesNote}
 
 画面の作業が、予定作業そのもの、または予定作業を進めるために直接必要な作業なら yes、
 予定作業とは別の業務・別のテーマなら no と答えてください。仕事らしい作業でも、予定作業と別なら no です。

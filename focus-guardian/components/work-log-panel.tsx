@@ -515,7 +515,7 @@ export function WorkLogPanel({
         // 2 段目: 「脱線ではない」と出た回だけ、予定作業と同じ業務かを文字だけで確かめる
         const result = await verifyTaskMatchLocal(firstStage, {
           currentTask,
-          hasUserRules: enabledRules.length > 0,
+          userRules: enabledRules,
           lang: language,
           reasonOffTask: t('wlp_reasonOffTask'),
         })

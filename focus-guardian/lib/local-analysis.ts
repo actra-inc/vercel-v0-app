@@ -14,9 +14,9 @@ const TASK_MATCH_TIMEOUT_MS = 30_000
 
 export async function verifyTaskMatchLocal(
   result: AnalysisResult,
-  opts: { currentTask: string; hasUserRules: boolean; lang: "ja" | "en"; reasonOffTask: string },
+  opts: { currentTask: string; userRules?: string[]; lang: "ja" | "en"; reasonOffTask: string },
 ): Promise<AnalysisResult> {
-  if (!needsTaskMatchCheck(result, opts.currentTask, opts.hasUserRules)) return result
+  if (!needsTaskMatchCheck(result, opts.currentTask)) return result
   try {
     const answer = await runLocalPrompt({
       lang: opts.lang,
@@ -25,6 +25,7 @@ export async function verifyTaskMatchLocal(
         activity: result.activity,
         details: result.details,
         applications: result.applications,
+        userRules: opts.userRules ?? [],
       }),
       timeoutMs: TASK_MATCH_TIMEOUT_MS,
     })

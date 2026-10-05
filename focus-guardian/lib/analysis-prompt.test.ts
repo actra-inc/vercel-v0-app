@@ -308,20 +308,34 @@ const notDistracted = () =>
     baseCtx({ currentTask: "経理の請求書処理" }),
   )
 
-test("needsTaskMatchCheck: 予定作業あり・ルール無し・脱線ではない、のときだけ確認する", () => {
+test("needsTaskMatchCheck: 予定作業あり・脱線ではない、のときに確認する（ルールの有無では止めない）", () => {
   const r = notDistracted()
-  assert.equal(needsTaskMatchCheck(r, "経理の請求書処理", false), true)
-  assert.equal(needsTaskMatchCheck(r, "", false), false)
-  assert.equal(needsTaskMatchCheck(r, "   ", false), false)
-  assert.equal(needsTaskMatchCheck(r, "経理の請求書処理", true), false)
-  assert.equal(needsTaskMatchCheck(applyTaskMismatch(r, "X"), "経理の請求書処理", false), false)
+  assert.equal(needsTaskMatchCheck(r, "経理の請求書処理"), true)
+  assert.equal(needsTaskMatchCheck(r, ""), false)
+  assert.equal(needsTaskMatchCheck(r, "   "), false)
+  assert.equal(needsTaskMatchCheck(applyTaskMismatch(r, "X"), "経理の請求書処理"), false)
 })
 
-test("buildTaskMatchPrompt: 予定作業・活動・要約・アプリ名と yes/no の指示が入る", () => {
+test("buildTaskMatchPrompt: 予定作業・活動・要約・アプリ名と yes/no の指示が入る。ルール 0 件ならルール欄は出ない", () => {
   const p = buildTaskMatchPrompt({ currentTask: "経理の請求書処理", activity: "コード編集", details: "コードを閲覧", applications: ["GitHub"] })
   assert.match(p, /予定作業: "経理の請求書処理"/)
   assert.match(p, /画面の作業: コード編集（コードを閲覧）／使用アプリ: GitHub/)
   assert.match(p, /yes か no の1語だけ/)
+  assert.ok(!/ユーザー定義の判定ルール/.test(p))
+  const p2 = buildTaskMatchPrompt({ currentTask: "x", activity: "a", details: "d", applications: [], userRules: ["  ", ""] })
+  assert.ok(!/ユーザー定義の判定ルール/.test(p2))
+})
+
+test("buildTaskMatchPrompt: ユーザー定義ルールがあれば本文が入り、ルール優先で yes と答える指示になる", () => {
+  const p = buildTaskMatchPrompt({
+    currentTask: "経理の請求書処理",
+    activity: "コード編集",
+    details: "コードを閲覧",
+    applications: [],
+    userRules: ["GitHub を見るのは仕事", " Slack の確認も仕事 "],
+  })
+  assert.match(p, /【ユーザー定義の判定ルール】次のルールに当てはまる場合は、ルールを優先して yes/)
+  assert.match(p, /- GitHub を見るのは仕事\n- Slack の確認も仕事/)
 })
 
 test("parseTaskMatchAnswer: yes/no/はい/いいえ を読み、それ以外は null", () => {
