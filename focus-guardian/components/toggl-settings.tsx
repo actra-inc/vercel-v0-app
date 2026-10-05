@@ -73,6 +73,9 @@ export function TogglSettings({
     detail?: string
   } | null>(null)
   const [showDebugInfo, setShowDebugInfo] = useState(false)
+  // Debug 表示は開発時の切り分け用。本番では出さない（app/debug/page.tsx と同じ基準）。
+  // 中身は /api/toggl-current の接続状態（ステータスコード等）だけで秘密情報は含まないが、一般利用者には不要
+  const showDebugToggle = process.env.NODE_ENV !== "production"
 
   // 保存済みの値（DB: user_settings）をフォームへ反映する。
   // 以前は localStorage 保存でDB経路が死んでおり、端末間で設定が同期されず
@@ -310,9 +313,11 @@ export function TogglSettings({
             <Button variant="outline" onClick={handleClearCredentials}>
               {t('tg_clearSettings')}
             </Button>
-            <Button variant="outline" size="sm" onClick={() => setShowDebugInfo(!showDebugInfo)} className="ml-auto">
-              {showDebugInfo ? t('tg_hideDebug') : t('tg_showDebug')}
-            </Button>
+            {showDebugToggle && (
+              <Button variant="outline" size="sm" onClick={() => setShowDebugInfo(!showDebugInfo)} className="ml-auto">
+                {showDebugInfo ? t('tg_hideDebug') : t('tg_showDebug')}
+              </Button>
+            )}
           </div>
 
           {connectionError && (
@@ -371,7 +376,7 @@ export function TogglSettings({
                 </div>
               </div>
 
-              {showDebugInfo && currentEntry.debug && (
+              {showDebugToggle && showDebugInfo && currentEntry.debug && (
                 <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
                   <div className="text-sm">
                     <div className="font-medium mb-2">{t('tg_debugInfo')}</div>
