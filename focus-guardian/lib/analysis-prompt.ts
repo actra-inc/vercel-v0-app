@@ -4,6 +4,10 @@
 
 export const DEFAULT_CATEGORY_NAMES = ["メールチェック", "娯楽", "チャット", "リサーチ", "ミーティング", "業務以外のSNS", "未分類"]
 
+// 脱線を表す既定の作業種類。判定が「脱線ではない」の回にこれが付くのは矛盾なので「未分類」に戻す
+// （英語で答えさせると、コード編集に「業務以外のSNS」を付ける回があった。2026-10-06 実モデル確認）
+const DISTRACTION_CATEGORY_NAMES = ["娯楽", "業務以外のSNS"]
+
 // work_category が一覧に無いときのフォールバック先として扱う表記（大小・前後空白を無視して突き合わせる）
 const UNCATEGORIZED_ALIASES = ["未分類", "その他", "other", "uncategorized"]
 const UNCATEGORIZED_FALLBACK = "未分類"
@@ -52,6 +56,12 @@ export function buildAnalysisPrompt(opts: AnalysisPromptOptions): string {
   const userRulesNote =
     opts.userRules.length > 0 ? `\n${opts.userRules.map((r) => `- ${r}`).join("\n")}` : ""
   const outputLang = opts.lang === "en" ? "英語" : "日本語"
+  // 指示文が日本語のため、途中の「英語で書く」だけでは Nano が日本語で答えた（2026-10-06 実モデル確認）。
+  // 英語のときは末尾に英語で念押しする。work_category は一覧の表記のまま（翻訳しない）
+  const englishNote =
+    opts.lang === "en"
+      ? `\n\nIMPORTANT: Write "activity", "details" and "reason" in English, not Japanese. Keep "work_category" exactly as written in the list.`
+      : ""
 
   // 冒頭でシステム自身を名乗らせない（「作業効率モニタリングシステム」と名乗ると、FlowNudge 自身の画面を
   // モデルがその名で言い換え、2 段目で予定作業「flownudge」と結び付かなくなった。2026-10-05 実画面テスト）
@@ -88,7 +98,7 @@ export function buildAnalysisPrompt(opts: AnalysisPromptOptions): string {
   "details": "画面の内容を自分の言葉で簡潔に説明（40文字以内。人名・メールアドレス・件名などの固有名詞は含めない）"
 }
 
-判定基準：productive=予定作業に関連、distracted=明らかに無関係(ショッピング/SNS/動画等)、neutral=判断が難しい活動`
+判定基準：productive=予定作業に関連、distracted=明らかに無関係(ショッピング/SNS/動画等)、neutral=判断が難しい活動${englishNote}`
 }
 
 export interface AnalysisResult {
@@ -268,6 +278,10 @@ export function normalizeAnalysis(analysis: any, ctx: NormalizeContext): Analysi
     analysis?.distraction_check && typeof analysis.distraction_check === "object" && !Array.isArray(analysis.distraction_check)
   // サイトで脱線を確定した回は、集中度（task_alignment×100）も低く揃える
   const finalAlignment = leisureSite ? Math.min(taskAlignment, 0.2) : taskAlignment
+  const workCategory =
+    !isDistracted && DISTRACTION_CATEGORY_NAMES.includes(validCategory)
+      ? resolveFallbackWorkCategory(ctx.categories)
+      : validCategory
   const distractionCheck = {
     ...(hasDistractionCheckObject ? analysis.distraction_check : {}),
     is_distracted: isDistracted,
@@ -311,7 +325,7 @@ export function normalizeAnalysis(analysis: any, ctx: NormalizeContext): Analysi
   return {
     activity: typeof analysis?.activity === "string" && analysis.activity.trim() ? analysis.activity.trim() : ctx.fallbackActivity,
     category,
-    work_category: validCategory,
+    work_category: workCategory,
     details,
     confidence: Math.round(confidence * 100),
     applications: normalizedApps,

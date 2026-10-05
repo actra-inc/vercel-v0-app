@@ -479,3 +479,27 @@ test("buildAnalysisPrompt: FlowNudge の画面の書き方は出力言語に合�
   assert.match(ja, /「FlowNudge の画面」/)
 })
 
+
+// ---- 英語 UI（2026-10-06 実モデル確認：日本語で答える・作業種類の一覧を読めない） ----
+
+test("buildAnalysisPrompt: 英語のときだけ末尾に英語で書く念押しが入る", () => {
+  const en = buildAnalysisPrompt({ currentTask: "x", categories: DEFAULT_CATEGORY_NAMES, userRules: [], lang: "en" } as any)
+  assert.match(en, /IMPORTANT: Write "activity", "details" and "reason" in English/)
+  const ja = buildAnalysisPrompt({ currentTask: "x", categories: DEFAULT_CATEGORY_NAMES, userRules: [], lang: "ja" } as any)
+  assert.ok(!/IMPORTANT/.test(ja))
+})
+
+test("normalizeAnalysis: 脱線ではない回に「娯楽」「業務以外のSNS」が付いたら未分類に戻す。脱線の回はそのまま", () => {
+  const notDistracted = normalizeAnalysis(
+    { activity: "Code editing", work_category: "業務以外のSNS", distraction_check: { is_distracted: false, task_alignment: 0.9 } },
+    baseCtx(),
+  )
+  assert.equal(notDistracted.work_category, "未分類")
+  const distracted = normalizeAnalysis(
+    { activity: "動画視聴", apps: ["YouTube"], work_category: "娯楽", distraction_check: { is_distracted: true, task_alignment: 0.1 } },
+    baseCtx(),
+  )
+  assert.equal(distracted.work_category, "娯楽")
+  const research = normalizeAnalysis({ work_category: "リサーチ", distraction_check: { is_distracted: false, task_alignment: 0.9 } }, baseCtx())
+  assert.equal(research.work_category, "リサーチ")
+})
