@@ -230,7 +230,14 @@ export default function LocalAiCheckPage() {
               <span className="text-gray-500">{t('lc_chromeVersion')}</span>
               <span className="font-mono">{chromeVersion}</span>
               <span className="text-gray-500">{t('lc_apiPresent')}</span>
-              <span>{ai.availability === "unsupported" ? t('lc_no') : t('lc_yes')}</span>
+              {/* 確認中（unknown）は「あり」と断定しない */}
+              <span>
+                {ai.availability === "unknown"
+                  ? t('la_status_unknown')
+                  : ai.availability === "unsupported"
+                    ? t('lc_no')
+                    : t('lc_yes')}
+              </span>
               <span className="text-gray-500">{t('la_statusLabel')}</span>
               <span className="font-medium">{t(statusKey, { pct })}</span>
             </div>
