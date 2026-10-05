@@ -269,6 +269,8 @@ export interface TaskMatchInput {
   applications: string[]
   /** 有効なユーザー定義ルール（0 件なら省略可）。ルールに当てはまる作業は一致扱いにする */
   userRules?: string[]
+  /** 1 段目でモデルが書いた判定理由（空なら省略可）。2 段目の判断材料として渡す */
+  firstStageReason?: string
 }
 
 /**
@@ -291,13 +293,25 @@ export function buildTaskMatchPrompt(input: TaskMatchInput): string {
 【ユーザー定義の判定ルール】次のルールに当てはまる場合は、ルールを優先して yes と答えてください。
 ${rules.map((r) => `- ${r}`).join("\n")}`
       : ""
+  const reason = (input.firstStageReason ?? "").trim()
+  const reasonNote = reason ? `\n1 段目の判断理由: ${reason}` : ""
+  // 2026-10-05 の実画面テストで、要約が一般的（「コード編集」等）なだけで no と答え、
+  // 予定作業どおりの作業に誤アラートが出た。迷ったら脱線にしない側に倒す
   return `予定作業と、いま画面で行われている作業を比べてください。
 
 予定作業: "${input.currentTask}"
-画面の作業: ${input.activity}（${input.details}）${apps}${rulesNote}
+画面の作業: ${input.activity}（${input.details}）${apps}${reasonNote}${rulesNote}
 
-画面の作業が、予定作業そのもの、または予定作業を進めるために直接必要な作業なら yes、
-予定作業とは別の業務・別のテーマなら no と答えてください。仕事らしい作業でも、予定作業と別なら no です。
+画面の作業が、予定作業そのもの、または予定作業を進めるために直接必要な作業なら yes と答えてください。
+no と答えるのは、画面の作業が予定作業と明らかに別の業務・別のテーマだと分かる場合だけです。
+説明が一般的（例：コード編集、ブラウザ閲覧、ドキュメント閲覧、チャット確認）で、予定作業と矛盾すると断定できない場合は yes と答えてください。
+仕事らしい作業でも、予定作業と明らかに別の業務なら no です。
+
+例1: 予定作業「ac)flownudgeのシステム調整」、画面の作業「コード編集（コードエディタでコードを編集している）」
+  → 予定作業と矛盾しないので yes
+例2: 予定作業「経理の請求書処理」、画面の作業「コード編集（next.js のコードを閲覧）」
+  → 明らかに別の業務なので no
+
 yes か no の1語だけで答えてください。`
 }
 

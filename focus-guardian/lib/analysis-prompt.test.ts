@@ -358,3 +358,22 @@ test("applyTaskMismatch: 脱線に書き換え、一致度は 0.3 以下、理�
   assert.equal(r.distraction_check.reason, "OFF_TASK")
   assert.equal(r.activity, "コード編集")
 })
+
+// ---- 2026-10-05 実画面テストの誤アラート（要約が一般的なだけで no）への対策 ----
+
+test("buildTaskMatchPrompt: 迷ったら脱線にしない指示と、実データに基づく例 2 つが入る", () => {
+  const p = buildTaskMatchPrompt({ currentTask: "x", activity: "a", details: "d", applications: [] })
+  assert.match(p, /no と答えるのは、画面の作業が予定作業と明らかに別の業務・別のテーマだと分かる場合だけ/)
+  assert.match(p, /予定作業と矛盾すると断定できない場合は yes/)
+  assert.match(p, /例1: 予定作業「ac\)flownudgeのシステム調整」[\s\S]*→ 予定作業と矛盾しないので yes/)
+  assert.match(p, /例2: 予定作業「経理の請求書処理」[\s\S]*→ 明らかに別の業務なので no/)
+})
+
+test("buildTaskMatchPrompt: 1 段目の判断理由があれば入り、空・空白なら欄が出ない", () => {
+  const withReason = buildTaskMatchPrompt({ currentTask: "x", activity: "a", details: "d", applications: [], firstStageReason: "flownudge の設定を確認中" })
+  assert.match(withReason, /1 段目の判断理由: flownudge の設定を確認中/)
+  for (const r of [undefined, "", "   "]) {
+    const p = buildTaskMatchPrompt({ currentTask: "x", activity: "a", details: "d", applications: [], firstStageReason: r })
+    assert.ok(!/1 段目の判断理由/.test(p))
+  }
+})

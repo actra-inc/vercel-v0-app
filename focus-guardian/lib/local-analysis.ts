@@ -26,6 +26,7 @@ export async function verifyTaskMatchLocal(
         details: result.details,
         applications: result.applications,
         userRules: opts.userRules ?? [],
+        firstStageReason: result.distraction_check.reason,
       }),
       timeoutMs: TASK_MATCH_TIMEOUT_MS,
     })
