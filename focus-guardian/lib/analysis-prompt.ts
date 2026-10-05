@@ -53,7 +53,9 @@ export function buildAnalysisPrompt(opts: AnalysisPromptOptions): string {
     opts.userRules.length > 0 ? `\n${opts.userRules.map((r) => `- ${r}`).join("\n")}` : ""
   const outputLang = opts.lang === "en" ? "英語" : "日本語"
 
-  return `あなたは作業効率モニタリングシステムです。このスクリーンショットを分析し、ユーザーが何をしているかを判定してください。
+  // 冒頭でシステム自身を名乗らせない（「作業効率モニタリングシステム」と名乗ると、FlowNudge 自身の画面を
+  // モデルがその名で言い換え、2 段目で予定作業「flownudge」と結び付かなくなった。2026-10-05 実画面テスト）
+  return `あなたはユーザーのスクリーンショットから作業内容を判定するアシスタントです。このスクリーンショットを分析し、ユーザーが何をしているかを判定してください。
 
 現在の予定作業: "${opts.currentTask || "未設定"}"${multiScreenNote}
 
@@ -62,8 +64,10 @@ export function buildAnalysisPrompt(opts: AnalysisPromptOptions): string {
 2. 1に当てはまらない場合、以下は予定作業に関わらず distracted 扱いとする:
    ショッピングサイト(Amazon/楽天/Yahoo!ショッピング等)、SNS(Twitter/X/Instagram/TikTok/Facebook等)、
    動画サービス(YouTube/Netflix/Hulu等)、ゲーム、まとめサイト、掲示板(5ch等)
-3. 1にも2にも当てはまらない場合は、画面の作業が予定作業そのもの（または予定作業に直接必要な作業）かを確かめる。
-   仕事であっても、予定作業とは別の業務・別のテーマなら is_distracted は true、task_alignment は 0.3 以下にする。
+3. 画面に FlowNudge（この集中支援アプリ。作業ログ・画面解析の状況・レポート・設定画面など）が表示されているときは、
+   activity と details に「FlowNudge の画面」と書き、それ自体は脱線扱いにしない（is_distracted: false）。
+4. 1〜3のいずれにも当てはまらない場合は、画面の作業が予定作業そのもの（または予定作業に直接必要な作業）かを確かめる。
+   仕事であっても、予定作業とは明らかに別の業務・別のテーマなら is_distracted は true、task_alignment は 0.3 以下にする。
    （例：予定作業が「経理の請求書処理」で、画面がプログラミングなら、別の業務なので is_distracted: true）
    ニュースサイトや技術ブログは内容次第で neutral や productive にもなり得る。
    予定作業が「未設定」のときは予定作業との比較はせず、2のような明らかな娯楽系のみ distracted とし、
@@ -306,6 +310,8 @@ ${rules.map((r) => `- ${r}`).join("\n")}`
 no と答えるのは、画面の作業が予定作業と明らかに別の業務・別のテーマだと分かる場合だけです。
 説明が一般的（例：コード編集、ブラウザ閲覧、ドキュメント閲覧、チャット確認）で、予定作業と矛盾すると断定できない場合は yes と答えてください。
 仕事らしい作業でも、予定作業と明らかに別の業務なら no です。
+
+画面の作業が FlowNudge（この集中支援アプリ）の画面の確認であれば yes と答えてください。
 
 例1: 予定作業「ac)flownudgeのシステム調整」、画面の作業「コード編集（コードエディタでコードを編集している）」
   → 予定作業と矛盾しないので yes

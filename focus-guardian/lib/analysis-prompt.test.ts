@@ -377,3 +377,17 @@ test("buildTaskMatchPrompt: 1 段目の判断理由があれば入り、空・�
     assert.ok(!/1 段目の判断理由/.test(p))
   }
 })
+
+// ---- FlowNudge 自身の画面が「作業効率モニタリングシステム」と言い換えられる問題（2026-10-05） ----
+
+test("buildAnalysisPrompt: 冒頭でシステム自身を名乗らず、FlowNudge の画面は脱線扱いにしないルールが入る", () => {
+  const p = buildAnalysisPrompt({ currentTask: "x", categories: DEFAULT_CATEGORY_NAMES, userRules: [], multiScreen: false, lang: "ja" })
+  assert.ok(!/作業効率モニタリングシステム/.test(p))
+  assert.match(p, /FlowNudge（この集中支援アプリ[^）]*）が表示されているときは[\s\S]*それ自体は脱線扱いにしない/)
+  assert.match(p, /^1\. /m); assert.match(p, /^2\. /m); assert.match(p, /^3\. /m); assert.match(p, /^4\. /m)
+})
+
+test("buildTaskMatchPrompt: FlowNudge の画面の確認は yes のルールが入る", () => {
+  const p = buildTaskMatchPrompt({ currentTask: "x", activity: "a", details: "d", applications: [] })
+  assert.match(p, /FlowNudge（この集中支援アプリ）の画面の確認であれば yes/)
+})
