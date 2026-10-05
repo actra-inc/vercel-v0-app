@@ -513,6 +513,7 @@ export const en: Record<TranslationKey, string> = {
   as_every2m: 'Every 2 minutes',
   as_every5m: 'Every 5 minutes',
   as_intervalHint: 'Shorter intervals for focused work, longer for battery saving',
+  as_intervalActualNote: 'Each on-device AI analysis takes about 15–35 seconds, so the actual logging interval is longer than the setting (roughly every 1–1.5 minutes at the 30-second setting). Captures with no screen change are skipped.',
   as_recommended: '💡 Recommended:',
   as_rec1: 'Focused work: 30s–1min',
   as_rec2: 'Research/learning: 1–2min',

@@ -75,7 +75,7 @@ NEXT_PUBLIC_SUPABASE_URL=https://placeholder.supabase.co NEXT_PUBLIC_SUPABASE_AN
    grep -rl "SERVICE_ROLE\|CRON_SECRET" .next/static/
    ```
 
-4. 翻訳キーの件数一致（ja と en が同数であること。現在 613）
+4. 翻訳キーの件数一致（ja と en が同数であること。現在 614）
 
    ```bash
    grep -cE "^  [A-Za-z0-9_]+:" lib/translations/ja.ts lib/translations/en.ts

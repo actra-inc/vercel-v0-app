@@ -212,6 +212,8 @@ export function AppSettings({
             </SelectContent>
           </Select>
           <p className="text-xs text-gray-500">{t('as_intervalHint')}</p>
+          {/* 端末内 AI の判定時間ぶん、実際の記録間隔は設定より長くなる（2026-10-05 実測: 30 秒設定で平均 77 秒） */}
+          <p className="text-xs text-gray-500">{t('as_intervalActualNote')}</p>
         </div>
 
         {/* 休憩・無操作リマインド */}
