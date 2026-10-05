@@ -101,7 +101,7 @@ export const en: Record<TranslationKey, string> = {
   wlp_currentTask: '🎯 Current planned task:',
   wlp_taskCompareDesc: 'This is compared with screen analysis to auto-detect distractions',
   wlp_noTaskSet: 'ℹ️ No task set',
-  wlp_noTaskSetDesc: 'Enter a task in the Time Tracker to enable distraction detection. Until then no distraction checks run and the focus score is recorded as a fixed 50',
+  wlp_noTaskSetDesc: 'Enter a task in the Time Tracker to check your screen against it. Until then, only obvious leisure (video, social media, shopping) is flagged as a distraction, and the focus score is only a rough guide',
   wlp_workLogsTitle: 'Work Logs',
   wlp_logCount: '{count}',
   wlp_clearAll: 'Clear All',
@@ -372,7 +372,7 @@ export const en: Record<TranslationKey, string> = {
   ai_productivityRate: 'Share of productive logs',
   ai_productiveDesc: 'Share of logs classified as productive',
   ai_logsAnalyzedBasis: 'Total logs recorded by screen analysis (reports excluded)',
-  ai_avgFocusBasis: 'Simple average of the focus score (alignment with your planned task × 100) across {count} analyzed logs. Logs recorded without a planned task are fixed at 50',
+  ai_avgFocusBasis: 'Simple average of the focus score (alignment with your planned task × 100) across {count} analyzed logs. For logs recorded without a planned task, the score is only a rough guide',
   ai_productivityBasis: 'Share of the {count} analyzed logs that the AI classified as productive',
   ai_resultLabel: 'AI Analysis Result:',
   ai_highFocusMsg: 'Maintaining high focus!',
@@ -480,7 +480,7 @@ export const en: Record<TranslationKey, string> = {
   // Metrics explanation
   mx_title: 'How the metrics work',
   mx_focus: 'Focus score',
-  mx_focusDesc: "Each log's focus score is the AI-judged alignment with your planned task (0-1) scaled to 100. When no task is set, it is fixed at 50.",
+  mx_focusDesc: "Each log's focus score is the AI-judged alignment with your planned task (0-1) scaled to 100. When no task is set there is nothing to compare against, so it is only a rough guide.",
   mx_avgFocus: 'Average focus',
   mx_avgFocusDesc: 'A simple average of the focus scores of the logs currently shown.',
   mx_productive: 'Productive log ratio',
@@ -493,8 +493,8 @@ export const en: Record<TranslationKey, string> = {
   mx_confidenceDesc: "The AI's self-reported certainty of its judgement (0-100). It is separate from the focus score; low values mean the judgement may be off.",
   mx_breakdownTime: 'Time in the breakdown',
   mx_breakdownTimeDesc: 'Computed by summing the real time gaps between consecutive logs. Gaps larger than 3× the capture interval (max 5 minutes) count as pauses and the excess is not included.',
-  mx_noTaskNote: '⚠️ While no planned task is entered, the focus score is recorded as a fixed 50 and no distraction checks run. Enter a task in the Time Tracker.',
-  mx_focusTip: 'Alignment with your planned task × 100. Fixed at 50 for logs without a task',
+  mx_noTaskNote: '⚠️ While no planned task is entered, only obvious leisure (video, social media, shopping) is flagged as a distraction, and the focus score is only a rough guide. Enter a task in the Time Tracker.',
+  mx_focusTip: 'Alignment with your planned task × 100. Only a rough guide for logs without a task',
   mx_productiveTip: 'Count-based ratio of logs judged productive (not time-based)',
 
   // DistractionAlert

@@ -99,7 +99,7 @@ export const ja = {
   wlp_currentTask: '🎯 現在の予定作業:',
   wlp_taskCompareDesc: 'この内容と画面解析結果を比較して脱線を自動判定します',
   wlp_noTaskSet: 'ℹ️ 作業内容が未設定です',
-  wlp_noTaskSetDesc: 'タイムトラッカーで作業内容を入力すると脱線判定が有効になります。未入力の間は脱線判定が行われず、集中度は一律50点で記録されます',
+  wlp_noTaskSetDesc: 'タイムトラッカーで作業内容を入力すると、予定作業と照らした脱線判定が有効になります。未入力の間は、動画・SNS・買い物などの明らかな娯楽だけを脱線と判定し、集中度は予定作業と比べられないため参考値になります',
   wlp_workLogsTitle: '作業ログ',
   wlp_logCount: '{count}件',
   wlp_clearAll: '全てクリア',
@@ -370,7 +370,7 @@ export const ja = {
   ai_productivityRate: '生産的ログの割合',
   ai_productiveDesc: '「生産的」と判定されたログの割合',
   ai_logsAnalyzedBasis: '画面解析で記録されたログの累計（レポートは含みません）',
-  ai_avgFocusBasis: '解析済みログ{count}件の集中度（予定作業との一致度×100）の単純平均。予定作業が未設定のログは50点固定です',
+  ai_avgFocusBasis: '解析済みログ{count}件の集中度（予定作業との一致度×100）の単純平均。予定作業が未設定のログの集中度は参考値です',
   ai_productivityBasis: '解析済みログ{count}件のうち、AIが「生産的」と判定した件数の割合',
   ai_resultLabel: 'AI分析結果:',
   ai_highFocusMsg: '高い集中力を維持できています！',
@@ -477,7 +477,7 @@ export const ja = {
   // 指標の見方（Metrics eXplanation）
   mx_title: '指標の見方',
   mx_focus: '集中度',
-  mx_focusDesc: '各ログの集中度は、AIが判定した「予定作業との一致度」（0〜1）を100点満点にした値です。予定作業が未設定のときは一律50点になります。',
+  mx_focusDesc: '各ログの集中度は、AIが判定した「予定作業との一致度」（0〜1）を100点満点にした値です。予定作業が未設定のときは比べる対象が無いため参考値です。',
   mx_avgFocus: '平均集中度',
   mx_avgFocusDesc: '表示中の作業ログの集中度の単純平均です。',
   mx_productive: '生産的ログの割合',
@@ -490,8 +490,8 @@ export const ja = {
   mx_confidenceDesc: 'AI自身が申告する判定の確からしさ（0〜100）です。集中度とは別の数値で、低いときは判定が外れている可能性があります。',
   mx_breakdownTime: '作業内訳の時間',
   mx_breakdownTimeDesc: '隣り合うログの実際の時刻差を合計しています。大きく間隔が空いた区間（キャプチャ間隔の3倍・最大5分を超える）は解析の中断とみなし、超過分は合計に数えません。',
-  mx_noTaskNote: '⚠️ 予定作業を入力していない間は、集中度が一律50点で記録され、脱線判定も行われません。タイムトラッカーで作業内容を入力してください。',
-  mx_focusTip: '予定作業との一致度×100。予定作業が未設定のログは50点固定',
+  mx_noTaskNote: '⚠️ 予定作業を入力していない間は、動画・SNS・買い物などの明らかな娯楽だけを脱線と判定し、集中度も参考値になります。タイムトラッカーで作業内容を入力してください。',
+  mx_focusTip: '予定作業との一致度×100。予定作業が未設定のログは参考値',
   mx_productiveTip: '生産的と判定されたログの件数割合（時間ではありません）',
 
   // DistractionAlert
