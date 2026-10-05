@@ -19,6 +19,7 @@ import {
   type AnalysisResult,
 } from "@/lib/analysis-prompt"
 import type { TranslationKey } from "@/lib/translations/ja"
+import { verifyTaskMatchLocal } from "@/lib/local-analysis"
 
 // 端末内 AI の動作確認ページ（ログイン不要・DB に何も保存しない）。
 // 目的: ①この端末で Prompt API が使えるかの確認 ②モデルのダウンロード
@@ -132,7 +133,7 @@ export default function LocalAiCheckPage() {
       })
       const parsed = extractJsonObject(raw)
       if (parsed) {
-        result = normalizeAnalysis(parsed, {
+        const firstStage = normalizeAnalysis(parsed, {
           currentTask: task.trim(),
           categories: DEFAULT_CATEGORY_NAMES,
           fallbackDetails: "-",
@@ -140,6 +141,13 @@ export default function LocalAiCheckPage() {
           reasonLowAlignment: t('wlp_reasonLowAlignment'),
           reasonUnknown: t('wlp_reasonUnknown'),
           detailsMaxLength: language === "en" ? 80 : 40,
+        })
+        // 本番（work-log-panel）と同じく、2 段目で予定作業との照合を行う
+        result = await verifyTaskMatchLocal(firstStage, {
+          currentTask: task.trim(),
+          hasUserRules: false,
+          lang: language,
+          reasonOffTask: t('wlp_reasonOffTask'),
         })
       } else {
         error = t('lc_parseFailed')

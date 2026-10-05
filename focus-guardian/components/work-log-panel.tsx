@@ -24,6 +24,7 @@ import { useLocalAi } from "@/hooks/use-local-ai"
 import { extractJsonObject, runLocalPrompt } from "@/lib/local-ai"
 import { buildAnalysisPrompt, normalizeAnalysis } from "@/lib/analysis-prompt"
 import { generateSummaryReportLocal } from "@/lib/local-reports"
+import { verifyTaskMatchLocal } from "@/lib/local-analysis"
 import { Textarea } from "@/components/ui/textarea"
 import {
   Dialog,
@@ -501,7 +502,7 @@ export function WorkLogPanel({
           setLastAnalysisError(t('wlp_errParseFailed'))
           return
         }
-        const result = normalizeAnalysis(parsed, {
+        const firstStage = normalizeAnalysis(parsed, {
           currentTask,
           categories: categoryNames,
           fallbackDetails: currentTask ? t('wlp_workingOnTask', { task: currentTask }) : t('wlp_noDetails'),
@@ -510,6 +511,13 @@ export function WorkLogPanel({
           reasonUnknown: t('wlp_reasonUnknown'),
           hasUserRules: enabledRules.length > 0,
           detailsMaxLength: language === "en" ? 80 : 40,
+        })
+        // 2 段目: 「脱線ではない」と出た回だけ、予定作業と同じ業務かを文字だけで確かめる
+        const result = await verifyTaskMatchLocal(firstStage, {
+          currentTask,
+          hasUserRules: enabledRules.length > 0,
+          lang: language,
+          reasonOffTask: t('wlp_reasonOffTask'),
         })
         console.log("[v0] Analysis result:", result)
 

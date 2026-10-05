@@ -671,6 +671,7 @@ export const en: Record<TranslationKey, string> = {
   wlp_workingOnTask: 'Working on "{task}"',
   wlp_reasonLowAlignment: 'Low match with your planned task',
   wlp_reasonUnknown: 'Could not determine',
+  wlp_reasonOffTask: 'Working on something other than your planned task',
   sp_tabToggl: 'Toggl Integration',
   sp_tabProjects: 'Projects',
   sp_tabOther: 'Other',

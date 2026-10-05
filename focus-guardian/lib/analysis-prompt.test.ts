@@ -3,7 +3,16 @@
 // 実行: node --experimental-strip-types --test lib/analysis-prompt.test.ts
 import { test } from "node:test"
 import assert from "node:assert/strict"
-import { buildAnalysisPrompt, normalizeAnalysis, DEFAULT_CATEGORY_NAMES, type NormalizeContext } from "./analysis-prompt.ts"
+import {
+  buildAnalysisPrompt,
+  normalizeAnalysis,
+  DEFAULT_CATEGORY_NAMES,
+  type NormalizeContext,
+  needsTaskMatchCheck,
+  buildTaskMatchPrompt,
+  parseTaskMatchAnswer,
+  applyTaskMismatch,
+} from "./analysis-prompt.ts"
 
 function baseCtx(overrides: Partial<NormalizeContext> = {}): NormalizeContext {
   return {
@@ -289,4 +298,49 @@ test("buildAnalysisPrompt: apps の例示に特定のアプリ名（VS Code な�
   const p = buildAnalysisPrompt({ currentTask: "", categories: DEFAULT_CATEGORY_NAMES, userRules: [], multiScreen: false, lang: "ja" })
   assert.ok(!/VS Code/.test(p))
   assert.match(p, /見えないものを推測で書かない/)
+})
+
+// ---- 2 段目：予定作業との照合 ----
+
+const notDistracted = () =>
+  normalizeAnalysis(
+    { activity: "コード編集", category: "productive", details: "コードを閲覧", apps: ["GitHub"], distraction_check: { is_distracted: false, task_alignment: 1 } },
+    baseCtx({ currentTask: "経理の請求書処理" }),
+  )
+
+test("needsTaskMatchCheck: 予定作業あり・ルール無し・脱線ではない、のときだけ確認する", () => {
+  const r = notDistracted()
+  assert.equal(needsTaskMatchCheck(r, "経理の請求書処理", false), true)
+  assert.equal(needsTaskMatchCheck(r, "", false), false)
+  assert.equal(needsTaskMatchCheck(r, "   ", false), false)
+  assert.equal(needsTaskMatchCheck(r, "経理の請求書処理", true), false)
+  assert.equal(needsTaskMatchCheck(applyTaskMismatch(r, "X"), "経理の請求書処理", false), false)
+})
+
+test("buildTaskMatchPrompt: 予定作業・活動・要約・アプリ名と yes/no の指示が入る", () => {
+  const p = buildTaskMatchPrompt({ currentTask: "経理の請求書処理", activity: "コード編集", details: "コードを閲覧", applications: ["GitHub"] })
+  assert.match(p, /予定作業: "経理の請求書処理"/)
+  assert.match(p, /画面の作業: コード編集（コードを閲覧）／使用アプリ: GitHub/)
+  assert.match(p, /yes か no の1語だけ/)
+})
+
+test("parseTaskMatchAnswer: yes/no/はい/いいえ を読み、それ以外は null", () => {
+  assert.equal(parseTaskMatchAnswer("yes"), true)
+  assert.equal(parseTaskMatchAnswer(" Yes."), true)
+  assert.equal(parseTaskMatchAnswer("はい"), true)
+  assert.equal(parseTaskMatchAnswer("no"), false)
+  assert.equal(parseTaskMatchAnswer("No, it is different"), false)
+  assert.equal(parseTaskMatchAnswer("「いいえ」"), false)
+  assert.equal(parseTaskMatchAnswer("わかりません"), null)
+  assert.equal(parseTaskMatchAnswer(""), null)
+})
+
+test("applyTaskMismatch: 脱線に書き換え、一致度は 0.3 以下、理由は指定文", () => {
+  const r = applyTaskMismatch(notDistracted(), "OFF_TASK")
+  assert.equal(r.category, "distracted")
+  assert.equal(r.distraction_check.is_distracted, true)
+  assert.equal(r.distraction_check.task_alignment, 0.3)
+  assert.equal(r.focus_score, 30)
+  assert.equal(r.distraction_check.reason, "OFF_TASK")
+  assert.equal(r.activity, "コード編集")
 })

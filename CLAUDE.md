@@ -22,6 +22,7 @@
 | `lib/analysis-prompt.ts` | 画面解析のプロンプト・JSON Schema・応答の正規化（純関数）。予定作業が空なら「未設定」と書く。作業種類は一覧の表記のまま（翻訳しない）返させる |
 | `lib/report-builders.ts` | まとめレポート／日報のプロンプト・スキーマ・AI 不使用時のフォールバック・正規化・日報 Markdown（純関数・日英対応） |
 | `lib/local-reports.ts` | まとめレポート／日報を端末内 AI で生成。失敗時はログからの機械的レポート |
+| `lib/local-analysis.ts` | 画面解析の 2 段目。1 段目で「脱線ではない」と出た回だけ、予定作業と同じ業務かを文字だけで確かめる（予定作業あり・ユーザー定義ルール無しのとき）。失敗時は 1 段目の判定のまま |
 | `components/work-log-panel.tsx` | キャプチャ → 差分スキップ（2%）→ 縮小（768px、2 画面合成時 1536px）→ 端末内推論 → 正規化 → `work_logs` へ保存。判定呼び出しには JSON Schema を付けない |
 | `components/local-ai-settings.tsx` | 設定タブ「端末内 AI」：利用可否・動作要件・モデルダウンロード |
 | `app/local-ai-check/page.tsx` | ログイン不要の動作確認ページ。DB に保存しない。機種チェックと 1 枚解析（所要時間・判定・生出力） |
@@ -74,10 +75,16 @@ NEXT_PUBLIC_SUPABASE_URL=https://placeholder.supabase.co NEXT_PUBLIC_SUPABASE_AN
    grep -rl "SERVICE_ROLE\|CRON_SECRET" .next/static/
    ```
 
-4. 翻訳キーの件数一致（ja と en が同数であること。現在 612）
+4. 翻訳キーの件数一致（ja と en が同数であること。現在 613）
 
    ```bash
    grep -cE "^  [A-Za-z0-9_]+:" lib/translations/ja.ts lib/translations/en.ts
+   ```
+
+5. 単体テスト（Node 組み込みの node:test。偽の LanguageModel・偽の Supabase で動き、実モデル・実 DB には触らない）
+
+   ```bash
+   node --test lib/*.test.ts
    ```
 
 ## 禁止事項

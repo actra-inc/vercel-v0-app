@@ -42,6 +42,7 @@
 - `lib/analysis-prompt.ts` — 解析プロンプト・JSON Schema・応答の正規化（旧サーバールートの純関数化）
 - `lib/report-builders.ts` — レポート/日報のプロンプト・スキーマ・フォールバック・正規化
 - `lib/local-reports.ts` — レポート/日報の端末内生成
+- `lib/local-analysis.ts` — 画面解析の 2 段目（予定作業との照合を文字だけで確認。1 段目で脱線ではないと出た回のみ）
 
 ## 既知の制約・今後
 

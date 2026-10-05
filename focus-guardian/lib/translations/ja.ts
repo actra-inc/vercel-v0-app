@@ -668,6 +668,7 @@ export const ja = {
   wlp_workingOnTask: '「{task}」の作業中',
   wlp_reasonLowAlignment: '予定作業との一致度が低い',
   wlp_reasonUnknown: '判定できませんでした',
+  wlp_reasonOffTask: '予定作業とは別の作業をしています',
   sp_tabToggl: 'Toggl連携',
   sp_tabProjects: 'プロジェクト',
   sp_tabOther: 'その他',

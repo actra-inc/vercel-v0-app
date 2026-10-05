@@ -254,3 +254,58 @@ export function normalizeAnalysis(analysis: any, ctx: NormalizeContext): Analysi
     distraction_check: distractionCheck,
   }
 }
+
+// ---- 予定作業との照合（2 段目の文字だけの確認） ---------------------------------
+// 画像を見ながら「予定作業と同じ業務か」まで一度に判断させると、小型モデルは
+// 仕事らしい画面なら一致と見なしやすい（2026-10-05 実測：予定「経理の請求書処理」で
+// 画面がコード／開発ドキュメントでも「生産的・一致度 100」）。そこで、1 段目で
+// 「脱線ではない」と判定された回に限り、抽出済みの活動内容と予定作業を文字だけで
+// 比べさせる。ユーザー定義ルールがあるときはルールを優先し、この確認はしない。
+
+export interface TaskMatchInput {
+  currentTask: string
+  activity: string
+  details: string
+  applications: string[]
+}
+
+/** 2 段目の確認が必要か（予定作業あり・ルール無し・1 段目で脱線ではない） */
+export function needsTaskMatchCheck(result: AnalysisResult, currentTask: string, hasUserRules: boolean): boolean {
+  return !!currentTask.trim() && !hasUserRules && !result.distraction_check.is_distracted
+}
+
+export function buildTaskMatchPrompt(input: TaskMatchInput): string {
+  const apps = input.applications.length > 0 ? `／使用アプリ: ${input.applications.join("、")}` : ""
+  return `予定作業と、いま画面で行われている作業を比べてください。
+
+予定作業: "${input.currentTask}"
+画面の作業: ${input.activity}（${input.details}）${apps}
+
+画面の作業が、予定作業そのもの、または予定作業を進めるために直接必要な作業なら yes、
+予定作業とは別の業務・別のテーマなら no と答えてください。仕事らしい作業でも、予定作業と別なら no です。
+yes か no の1語だけで答えてください。`
+}
+
+/** 2 段目の回答を解釈する。yes→true（一致）、no→false（別作業）、読めなければ null（判定を変えない） */
+export function parseTaskMatchAnswer(text: string): boolean | null {
+  const s = (text || "").trim().toLowerCase().replace(/^[`"'「『\s]+/, "")
+  if (/^(yes|はい)/.test(s)) return true
+  if (/^(no|いいえ)/.test(s)) return false
+  return null
+}
+
+/** 2 段目で「別の作業」と分かったときに、判定を脱線へ書き換える */
+export function applyTaskMismatch(result: AnalysisResult, reasonOffTask: string): AnalysisResult {
+  const alignment = Math.min(result.distraction_check.task_alignment, 0.3)
+  return {
+    ...result,
+    category: "distracted",
+    focus_score: Math.round(alignment * 100),
+    distraction_check: {
+      ...result.distraction_check,
+      is_distracted: true,
+      task_alignment: alignment,
+      reason: reasonOffTask,
+    },
+  }
+}
