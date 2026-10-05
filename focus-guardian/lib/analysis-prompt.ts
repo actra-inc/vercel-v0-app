@@ -65,7 +65,7 @@ export function buildAnalysisPrompt(opts: AnalysisPromptOptions): string {
    ショッピングサイト(Amazon/楽天/Yahoo!ショッピング等)、SNS(Twitter/X/Instagram/TikTok/Facebook等)、
    動画サービス(YouTube/Netflix/Hulu等)、ゲーム、まとめサイト、掲示板(5ch等)
 3. 画面に FlowNudge（この集中支援アプリ。作業ログ・画面解析の状況・レポート・設定画面など）が表示されているときは、
-   activity と details に「FlowNudge の画面」と書き、それ自体は脱線扱いにしない（is_distracted: false）。
+   activity と details に「${opts.lang === "en" ? "FlowNudge screen" : "FlowNudge の画面"}」と書き、それ自体は脱線扱いにしない（is_distracted: false）。
 4. 1〜3のいずれにも当てはまらない場合は、画面の作業が予定作業そのもの（または予定作業に直接必要な作業）かを確かめる。
    仕事であっても、予定作業とは明らかに別の業務・別のテーマなら is_distracted は true、task_alignment は 0.3 以下にする。
    （例：予定作業が「経理の請求書処理」で、画面がプログラミングなら、別の業務なので is_distracted: true）
@@ -173,7 +173,7 @@ function toRatio(raw: unknown, fallback: number): number {
 // 仕事中にも名前が出やすいので見ない）。誤検知を避けるため、業務でも使う名前は除外条件を付ける
 // [表示名, 該当パターン, 除外パターン（当てはまれば業務利用とみなす）]
 const LEISURE_SITE_PATTERNS: Array<[string, RegExp, RegExp?]> = [
-  ["YouTube", /youtube(?!\s*studio)/i],
+  ["YouTube", /youtube/i, /studio|\bapi\b|data\s*api/i],
   ["Netflix", /netflix/i],
   ["Hulu", /hulu/i],
   ["Prime Video", /prime\s*video|プライム\s*ビデオ/i],
@@ -181,26 +181,37 @@ const LEISURE_SITE_PATTERNS: Array<[string, RegExp, RegExp?]> = [
   ["TikTok", /tiktok/i],
   ["Instagram", /instagram|インスタグラム/i],
   ["Facebook", /facebook|フェイスブック/i],
-  ["X (Twitter)", /twitter|ツイッター|x\.com|旧\s*twitter/i],
+  ["X (Twitter)", /twitter|ツイッター|(?<![\w.-])x\.com\b/i],
   ["ニコニコ", /niconico|ニコニコ/i],
   ["Twitch", /twitch/i],
-  ["5ch", /5ch|５ちゃんねる|2ちゃんねる|2ch\.net/i],
+  ["5ch", /(?<![\w.])5ch\b|５ちゃんねる|2ちゃんねる|2ch\.net/i],
   ["まとめサイト", /まとめサイト/],
-  ["Amazon", /amazon|アマゾン/i, /\baws\b|amazon\s*web\s*services/i],
-  ["楽天", /楽天(?!銀行|証券|カード)|rakuten(?!\s*bank)/i],
+  ["Amazon", /amazon|アマゾン/i, /\baws\b|web\s*services|seller\s*central|セラーセントラル|amazon\s*business|amazon\s*ビジネス|請求書|invoice|\bapi\b/i],
+  ["楽天", /楽天|rakuten/i, /銀行|証券|カード|bank|rms|api/i],
   ["Yahoo!ショッピング", /yahoo!?\s*ショッピング|ヤフーショッピング|yahoo\s*shopping/i],
   ["メルカリ", /メルカリ|mercari/i],
   ["ZOZOTOWN", /zozotown/i],
 ]
 
-/** モデルの出力（apps と activity）に、予定作業に関わらず脱線のサイトが含まれていれば、その名前を返す */
+// activity にサイト名が出ても、閲覧・視聴・買い物を表す語と一緒のときだけ判定に使う
+// （「YouTube Data API の実装」「Amazon の請求書ダウンロード」のような業務の文脈を脱線にしないため）
+const LEISURE_ACTIVITY_VERB = /視聴|閲覧|見て|検索|購入|買い物|ショッピング|商品|動画|タイムライン|投稿|watch|brows|view|shop|scroll|feed/i
+
+/**
+ * モデルの出力（apps と activity）に、予定作業に関わらず脱線のサイトが含まれていれば、その名前を返す。
+ * 判定は要素ごと（除外パターンも要素ごと。「AWS Console」と「Amazon.co.jp」が並ぶ画面で買い物を見逃さない）。
+ * FlowNudge 自身の画面（過去の作業ログに「YouTube 視聴」等が並ぶ）では判定しない
+ */
 export function detectLeisureSite(analysis: any): string | null {
-  const apps = Array.isArray(analysis?.apps) ? analysis.apps.filter((a: unknown) => typeof a === "string") : []
+  const apps: string[] = Array.isArray(analysis?.apps) ? analysis.apps.filter((a: unknown): a is string => typeof a === "string") : []
   const activity = typeof analysis?.activity === "string" ? analysis.activity : ""
-  const haystack = [...apps, activity].join(" / ")
-  if (!haystack.trim()) return null
-  for (const [name, re, exclude] of LEISURE_SITE_PATTERNS) {
-    if (re.test(haystack) && !exclude?.test(haystack)) return name
+  if ([...apps, activity].some((t) => /flownudge/i.test(t))) return null
+  const candidates = [...apps]
+  if (LEISURE_ACTIVITY_VERB.test(activity)) candidates.push(activity)
+  for (const text of candidates) {
+    for (const [name, re, exclude] of LEISURE_SITE_PATTERNS) {
+      if (re.test(text) && !exclude?.test(text)) return name
+    }
   }
   return null
 }
@@ -248,7 +259,8 @@ export function normalizeAnalysis(analysis: any, ctx: NormalizeContext): Analysi
   // 効かず、強制 distracted でも reason が空文字のままになり得た）
   // ただし、モデルが「脱線ではない」と真偽値で明示して理由を書かなかっただけなら空のままにする
   // （判定できているのに「判定できませんでした」と表示されて紛らわしかった）
-  const reason = leisureSite && modelIsDistracted !== true
+  // モデルが脱線と答えていない回（モデルの理由は「関連」等で矛盾する）と、理由が空の回はサイト用の理由にする
+  const reason = leisureSite && (modelIsDistracted !== true || !rawReason)
     ? ctx.reasonLeisureSite ?? ctx.reasonLowAlignment
     : rawReason || (isDistracted ? ctx.reasonLowAlignment : modelSaidBoolean ? "" : ctx.reasonUnknown)
 

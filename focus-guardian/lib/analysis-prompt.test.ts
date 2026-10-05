@@ -436,3 +436,46 @@ test("normalizeAnalysis: ユーザー定義ルールがあるときはサイト�
   assert.equal(r.distraction_check.is_distracted, false)
   assert.equal(r.distraction_check.reason, "ルールにより業務")
 })
+
+// ---- サイト判定の誤検知・見逃し（2026-10-06 レビュー指摘） ----
+
+test("detectLeisureSite: x.com・5ch は語の境界で判定し、dropbox.com 等に反応しない", () => {
+  for (const app of ["dropbox.com", "box.com", "fedex.com", "linux.com", "abc5ch"]) {
+    assert.equal(detectLeisureSite({ apps: [app] }), null, app)
+  }
+  assert.equal(detectLeisureSite({ apps: ["x.com"] }), "X (Twitter)")
+  assert.equal(detectLeisureSite({ apps: ["5ch"] }), "5ch")
+})
+
+test("detectLeisureSite: activity は閲覧・視聴・買い物の語と一緒のときだけ見る（業務の文脈は脱線にしない）", () => {
+  assert.equal(detectLeisureSite({ apps: ["VS Code"], activity: "YouTube Data API の実装" }), null)
+  assert.equal(detectLeisureSite({ apps: ["Chrome"], activity: "Amazon の請求書ダウンロード" }), null)
+  assert.equal(detectLeisureSite({ apps: ["Chrome"], activity: "YouTubeで動画視聴" }), "YouTube")
+  assert.equal(detectLeisureSite({ apps: ["Chrome"], activity: "Amazonで商品閲覧" }), "Amazon")
+})
+
+test("detectLeisureSite: FlowNudge の画面（過去ログに YouTube 等が並ぶ）では判定しない", () => {
+  assert.equal(detectLeisureSite({ apps: ["FlowNudge", "YouTube"], activity: "FlowNudge の画面" }), null)
+})
+
+test("detectLeisureSite: 除外は要素ごと。AWS Console と Amazon.co.jp が並べば買い物として検出する", () => {
+  assert.equal(detectLeisureSite({ apps: ["AWS Console", "Amazon.co.jp"] }), "Amazon")
+  assert.equal(detectLeisureSite({ apps: ["Amazon Seller Central"] }), null)
+})
+
+test("normalizeAnalysis: モデルが脱線と答えて理由が空なら、一致度の文言ではなくサイト用の理由にする", () => {
+  const r = normalizeAnalysis(
+    { activity: "動画視聴", apps: ["YouTube"], distraction_check: { is_distracted: true, task_alignment: 0.1, reason: "" } },
+    baseCtx({ currentTask: "", reasonLeisureSite: "REASON_LEISURE" }),
+  )
+  assert.equal(r.distraction_check.reason, "REASON_LEISURE")
+})
+
+test("buildAnalysisPrompt: FlowNudge の画面の書き方は出力言語に合わせる（英語 UI に日本語が混ざらない）", () => {
+  const en = buildAnalysisPrompt({ currentTask: "x", categories: DEFAULT_CATEGORY_NAMES, userRules: [], lang: "en" } as any)
+  assert.match(en, /「FlowNudge screen」/)
+  assert.ok(!/「FlowNudge の画面」/.test(en))
+  const ja = buildAnalysisPrompt({ currentTask: "x", categories: DEFAULT_CATEGORY_NAMES, userRules: [], lang: "ja" } as any)
+  assert.match(ja, /「FlowNudge の画面」/)
+})
+

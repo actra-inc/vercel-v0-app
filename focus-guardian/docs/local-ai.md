@@ -39,7 +39,7 @@
 - `types/prompt-api.d.ts` — Prompt API の最小型定義（グローバル `LanguageModel`）
 - `lib/local-ai.ts` — 利用可否の購読、ダウンロード、推論の直列化（同時に 1 推論）、JSON 抽出
 - `hooks/use-local-ai.ts` — React から状態を購読
-- `lib/analysis-prompt.ts` — 解析プロンプト・JSON Schema・応答の正規化（旧サーバールートの純関数化）
+- `lib/analysis-prompt.ts` — 解析プロンプト・JSON Schema・応答の正規化（旧サーバールートの純関数化）。動画・SNS・買い物サイトのコード側確定（`detectLeisureSite`）
 - `lib/report-builders.ts` — レポート/日報のプロンプト・スキーマ・フォールバック・正規化
 - `lib/local-reports.ts` — レポート/日報の端末内生成
 - `lib/local-analysis.ts` — 画面解析の 2 段目（予定作業との照合を文字だけで確認。1 段目で脱線ではないと出た回のみ）
@@ -47,6 +47,11 @@
 ## 既知の制約・今後
 
 - Gemini Nano は小型モデルのため、Gemini 3.5 Flash-Lite より判定が粗い可能性がある。ドッグフーディングで旧ログと突き合わせる
+- 実測（2026-10-06、Chrome 154・Gemini Nano、`/local-ai-check` に公開ページの画像を入力）:
+  - 動画・SNS・買い物サイト（YouTube／Amazon／楽天）は予定作業の有無にかかわらず毎回脱線。モデルが誤っても `detectLeisureSite` がコード側で確定する（ユーザー定義ルールが無いとき）
+  - 予定作業どおりの作業（コード・開発ドキュメント・FlowNudge 自身の画面）を脱線と誤る率は低い（MDN で 1/8 程度）
+  - **別業務の見逃しは残る**：予定「経理の請求書処理」で開発ドキュメントを見ている画面は約半数、予定「flownudge の開発」で請求書ソフトの紹介ページは半数以上を見逃した。2 段目は「迷ったら脱線にしない」側に倒しているため（実画面テストで誤アラートが出たことへの対策）。1 段目の要約に「画面に見える内容だけを書く」指示を足す案は、24 回ずつの比較で差が出なかったため採用していない
+- 1 回の判定は画像 1 枚で約 10 秒（2 段目を含む）
 - 推論はページのメインスレッド外（ブラウザ側）で走るが、1 回あたり数秒かかる。差分スキップ（2%）と再入ガードは旧版のまま
 - `distraction_check` は旧版同様 DB に保存されない（`lib/supabase.ts` の insert で除外）。PMF 指標に必要なら列追加が要る
 - `tesseract.js` は未使用のまま package.json に残る（pnpm 不在のためロックファイルを更新できない）
