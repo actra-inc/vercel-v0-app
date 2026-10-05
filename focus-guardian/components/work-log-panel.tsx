@@ -508,6 +508,8 @@ export function WorkLogPanel({
           fallbackActivity: t('wlp_unknownActivity'),
           reasonLowAlignment: t('wlp_reasonLowAlignment'),
           reasonUnknown: t('wlp_reasonUnknown'),
+          hasUserRules: enabledRules.length > 0,
+          detailsMaxLength: language === "en" ? 80 : 40,
         })
         console.log("[v0] Analysis result:", result)
 

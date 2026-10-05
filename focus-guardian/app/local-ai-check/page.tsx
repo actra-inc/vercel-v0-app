@@ -139,6 +139,7 @@ export default function LocalAiCheckPage() {
           fallbackActivity: "-",
           reasonLowAlignment: t('wlp_reasonLowAlignment'),
           reasonUnknown: t('wlp_reasonUnknown'),
+          detailsMaxLength: language === "en" ? 80 : 40,
         })
       } else {
         error = t('lc_parseFailed')

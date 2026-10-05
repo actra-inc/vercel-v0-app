@@ -8,6 +8,10 @@ export const DEFAULT_CATEGORY_NAMES = ["メールチェック", "娯楽", "チ�
 const UNCATEGORIZED_ALIASES = ["未分類", "その他", "other", "uncategorized"]
 const UNCATEGORIZED_FALLBACK = "未分類"
 
+// apps の上限（プロンプトの「最大5件」と揃える）と、details の既定の最大文字数
+const MAX_APPS = 5
+const DEFAULT_DETAILS_MAX = 40
+
 export interface AnalysisPromptOptions {
   currentTask: string
   categories: string[]
@@ -58,7 +62,9 @@ export function buildAnalysisPrompt(opts: AnalysisPromptOptions): string {
 2. 1に当てはまらない場合、以下は予定作業に関わらず distracted 扱いとする:
    ショッピングサイト(Amazon/楽天/Yahoo!ショッピング等)、SNS(Twitter/X/Instagram/TikTok/Facebook等)、
    動画サービス(YouTube/Netflix/Hulu等)、ゲーム、まとめサイト、掲示板(5ch等)
-3. 1にも2にも当てはまらない場合は、予定作業とどれくらい関係があるかで判断する。
+3. 1にも2にも当てはまらない場合は、画面の作業が予定作業そのもの（または予定作業に直接必要な作業）かを確かめる。
+   仕事であっても、予定作業とは別の業務・別のテーマなら is_distracted は true、task_alignment は 0.3 以下にする。
+   （例：予定作業が「経理の請求書処理」で、画面がプログラミングなら、別の業務なので is_distracted: true）
    ニュースサイトや技術ブログは内容次第で neutral や productive にもなり得る。
    予定作業が「未設定」のときは予定作業との比較はせず、2のような明らかな娯楽系のみ distracted とし、
    それ以外で判断がつかない場合は neutral とする。
@@ -69,10 +75,10 @@ export function buildAnalysisPrompt(opts: AnalysisPromptOptions): string {
   "category": "productive/distracted/neutral のいずれか",
   "work_category": "作業種類（次のいずれかから最も近いものを1つ選び、一覧の表記をそのまま書く。翻訳しない: ${categoriesList}）",
   "confidence": 0.0〜1.0の数値,
-  "apps": ["画面に表示されているアプリ・サービス名（例：Chrome、VS Code、Slack、YouTube）"],
+  "apps": ["画面に実際に表示されていて名前が読み取れるアプリ・サービス名のみ（最大5件。見えないものを推測で書かない）"],
   "distraction_check": {
     "is_distracted": true/false,
-    "reason": "脱線している場合の具体的な理由",
+    "reason": "判定の理由（30文字以内）",
     "task_alignment": 0.0〜1.0の数値（予定作業とどれくらい関係があるかを表す）
   },
   "details": "画面の内容を自分の言葉で簡潔に説明（40文字以内。人名・メールアドレス・件名などの固有名詞は含めない）"
@@ -106,6 +112,8 @@ export interface NormalizeContext {
   /** 判定理由が返らなかったときの文言（i18n 済み）: 一致度が低くて脱線扱いにした場合 / 判定できなかった場合 */
   reasonLowAlignment: string
   reasonUnknown: string
+  /** details の最大文字数（省略時 40）。英語 UI では長めにしてよい */
+  detailsMaxLength?: number
   /**
    * 有効なユーザー定義ルールが1件以上あるかどうか（省略可。既存呼び出し元との互換のため）。
    * 省略時は「ルール無し」と同じ扱いになるが、下の isDistracted 判定で説明する通り、
@@ -188,7 +196,10 @@ export function normalizeAnalysis(analysis: any, ctx: NormalizeContext): Analysi
   // reason が空文字のまま下流に出ないよう、既定文へフォールバックする（distraction_check オブジェクトが
   // 返ってきた場合も含む。以前は analysis.distraction_check が存在するときだけこのフォールバックが
   // 効かず、強制 distracted でも reason が空文字のままになり得た）
-  const reason = rawReason || (isDistracted ? ctx.reasonLowAlignment : ctx.reasonUnknown)
+  // ただし、モデルが「脱線ではない」と真偽値で明示して理由を書かなかっただけなら空のままにする
+  // （判定できているのに「判定できませんでした」と表示されて紛らわしかった）
+  const reason =
+    rawReason || (isDistracted ? ctx.reasonLowAlignment : modelSaidBoolean ? "" : ctx.reasonUnknown)
 
   const hasDistractionCheckObject =
     analysis?.distraction_check && typeof analysis.distraction_check === "object" && !Array.isArray(analysis.distraction_check)
@@ -208,16 +219,35 @@ export function normalizeAnalysis(analysis: any, ctx: NormalizeContext): Analysi
   // is_distracted と category が食い違わないよう、distracted と判定したら category も distracted にする
   const category = isDistracted ? "distracted" : normalizedCategory
 
-  // applications は TEXT[] 列のため、文字列のみ・上限20件に整形する
-  const normalizedApps = Array.isArray(analysis?.apps)
-    ? analysis.apps.filter((a: unknown): a is string => typeof a === "string" && a.length > 0).slice(0, 20)
+  // applications は TEXT[] 列のため、文字列のみに整形する。プロンプトの指示（最大5件）に合わせ、
+  // 前後空白を除いて重複を落とし、5件までにする
+  const normalizedApps: string[] = Array.isArray(analysis?.apps)
+    ? [
+        ...new Set<string>(
+          analysis.apps
+            .filter((a: unknown): a is string => typeof a === "string")
+            .map((a: string) => a.trim())
+            .filter((a: string) => a.length > 0),
+        ),
+      ].slice(0, MAX_APPS)
     : []
+
+  // details はプロンプトで文字数を指定しているが、モデルが守らないことがあるので切り詰める
+  // （サロゲートペア・絵文字を壊さないよう、文字単位で数える）
+  const rawDetails = typeof analysis?.details === "string" ? analysis.details.trim() : ""
+  const maxDetails = ctx.detailsMaxLength ?? DEFAULT_DETAILS_MAX
+  const detailChars = Array.from(rawDetails)
+  const details = rawDetails
+    ? detailChars.length > maxDetails
+      ? detailChars.slice(0, maxDetails - 1).join("") + "…"
+      : rawDetails
+    : ctx.fallbackDetails
 
   return {
     activity: typeof analysis?.activity === "string" && analysis.activity.trim() ? analysis.activity.trim() : ctx.fallbackActivity,
     category,
     work_category: validCategory,
-    details: typeof analysis?.details === "string" && analysis.details.trim() ? analysis.details.trim() : ctx.fallbackDetails,
+    details,
     confidence: Math.round(confidence * 100),
     applications: normalizedApps,
     focus_score: Math.round(taskAlignment * 100),

@@ -202,7 +202,54 @@ export async function runLocalPrompt(input: LocalPromptInput): Promise<string> {
   })
 }
 
-/** モデル出力から JSON オブジェクトを取り出す（コードフェンス・前置き文に耐える） */
+/**
+ * 途中で切れた JSON を補って読む。
+ * Gemini Nano は出力がまれに末尾で途切れる（2026-10-05 の実測で 33 回中 1 回。閉じ括弧の手前で終わる）。
+ * 判定に必要な項目は揃っていることが多いので、その回を丸ごと捨てずに救う。
+ * 文字列の途中で切れていれば閉じ、開いたままの {} [] を閉じる。それでも読めなければ、
+ * 最後の項目を区切りのカンマまで削って閉じ直す（後ろから順に試す）。
+ */
+export function repairTruncatedJson(text: string): any | null {
+  const start = text.indexOf("{")
+  if (start < 0) return null
+  const body = text.slice(start)
+  const stack: string[] = []
+  // 文字列の外にあるカンマの位置と、その時点で開いている括弧
+  const cuts: Array<{ pos: number; stack: string[] }> = []
+  let inString = false
+  let escaped = false
+  for (let i = 0; i < body.length; i++) {
+    const ch = body[i]
+    if (inString) {
+      if (escaped) escaped = false
+      else if (ch === "\\") escaped = true
+      else if (ch === '"') inString = false
+      continue
+    }
+    if (ch === '"') inString = true
+    else if (ch === "{") stack.push("}")
+    else if (ch === "[") stack.push("]")
+    else if (ch === "}" || ch === "]") stack.pop()
+    else if (ch === ",") cuts.push({ pos: i, stack: [...stack] })
+  }
+  const close = (s: string[]) => s.slice().reverse().join("")
+  const candidates = [
+    // 末尾の空白・カンマ・コロンだけの残骸を落としてから閉じる
+    body.replace(/[\s,:]+$/, "") + (inString && !escaped ? '"' : "") + close(stack),
+    ...cuts.slice().reverse().map((c) => body.slice(0, c.pos) + close(c.stack)),
+  ]
+  for (const c of candidates) {
+    try {
+      const v = JSON.parse(c)
+      if (v && typeof v === "object" && !Array.isArray(v)) return v
+    } catch {
+      /* 次の候補へ */
+    }
+  }
+  return null
+}
+
+/** モデル出力から JSON オブジェクトを取り出す（コードフェンス・前置き文・末尾の途切れに耐える） */
 export function extractJsonObject(text: string): any | null {
   if (!text) return null
   let s = text.trim()
@@ -210,12 +257,14 @@ export function extractJsonObject(text: string): any | null {
     s = s.replace(/```(?:json)?\n?/g, "").replace(/```\n?/g, "")
   }
   const match = s.match(/\{[\s\S]*\}/)
-  if (!match) return null
-  try {
-    return JSON.parse(match[0])
-  } catch {
-    return null
+  if (match) {
+    try {
+      return JSON.parse(match[0])
+    } catch {
+      /* 途切れや余分な閉じ括弧の可能性があるので、補って読む */
+    }
   }
+  return repairTruncatedJson(s)
 }
 
 /** 推論をやめてセッションを解放する（言語切替・ログアウト時） */

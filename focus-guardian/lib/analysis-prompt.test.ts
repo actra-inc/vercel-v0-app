@@ -243,3 +243,50 @@ test("buildAnalysisPrompt: userRules が0件でもルールの行が追加され
   assert.ok(!withoutRules.includes("Amazonは出品作業なので作業中扱い"))
   assert.ok(withoutRules.length < withRules.length)
 })
+
+// ---- 2026-10-05 実画面テストで見つかった不具合の回帰防止 ----
+
+test("reason: モデルが is_distracted:false を明示して理由が空なら、「判定できませんでした」を入れない", () => {
+  const r = normalizeAnalysis({ distraction_check: { is_distracted: false, reason: "", task_alignment: 0.9 } }, baseCtx())
+  assert.equal(r.distraction_check.is_distracted, false)
+  assert.equal(r.distraction_check.reason, "")
+})
+
+test("reason: モデルが is_distracted:true で理由が空なら、既定文（一致度が低い）を入れる", () => {
+  const r = normalizeAnalysis({ distraction_check: { is_distracted: true, reason: "" } }, baseCtx())
+  assert.equal(r.distraction_check.reason, "REASON_LOW_ALIGNMENT")
+})
+
+test("details: 既定の上限（40文字）を超えたら切り詰めて末尾に … を付ける", () => {
+  const long = "あ".repeat(60)
+  const r = normalizeAnalysis({ details: long }, baseCtx())
+  assert.equal(Array.from(r.details).length, 40)
+  assert.ok(r.details.endsWith("…"))
+})
+
+test("details: detailsMaxLength を指定するとその文字数まで許す（英語 UI 用）", () => {
+  const s = "a".repeat(70)
+  assert.equal(normalizeAnalysis({ details: s }, baseCtx({ detailsMaxLength: 80 })).details, s)
+})
+
+test("details: 絵文字（サロゲートペア）を途中で壊さない", () => {
+  const r = normalizeAnalysis({ details: "😀".repeat(50) }, baseCtx())
+  assert.equal(Array.from(r.details).length, 40)
+  assert.ok(!r.details.includes("�"))
+})
+
+test("apps: 前後空白を除き、重複を落とし、最大5件にする", () => {
+  const r = normalizeAnalysis({ apps: [" Chrome ", "Chrome", "YouTube", "", 3, "A", "B", "C", "D"] }, baseCtx())
+  assert.deepEqual(r.applications, ["Chrome", "YouTube", "A", "B", "C"])
+})
+
+test("buildAnalysisPrompt: 予定作業と別の業務なら仕事でも脱線、という照合ルールが入っている", () => {
+  const p = buildAnalysisPrompt({ currentTask: "経理の請求書処理", categories: DEFAULT_CATEGORY_NAMES, userRules: [], multiScreen: false, lang: "ja" })
+  assert.match(p, /別の業務・別のテーマなら is_distracted は true/)
+})
+
+test("buildAnalysisPrompt: apps の例示に特定のアプリ名（VS Code など）を入れない（モデルが引きずられて捏造するため）", () => {
+  const p = buildAnalysisPrompt({ currentTask: "", categories: DEFAULT_CATEGORY_NAMES, userRules: [], multiScreen: false, lang: "ja" })
+  assert.ok(!/VS Code/.test(p))
+  assert.match(p, /見えないものを推測で書かない/)
+})

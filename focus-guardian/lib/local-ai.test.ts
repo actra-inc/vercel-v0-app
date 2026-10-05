@@ -94,3 +94,33 @@ test(
     assert.equal(createCalls, 2, "打ち切り後は新しい lm.create() で再試行しているはず")
   },
 )
+
+// ---- extractJsonObject: 途中で切れた出力を補って読む（2026-10-05 の実画面テストで 33 回中 1 回発生） ----
+import { extractJsonObject } from "./local-ai.ts"
+
+test("extractJsonObject: 実際に起きた途切れ（details の文字列の途中で終わる）を補って読める", () => {
+  const raw =
+    '```json\n{\n  "activity": "YouTube動画の視聴",\n  "category": "distracted",\n  "work_category": "娯楽",\n  "confidence": 0.95,\n  "apps": ["YouTube"],\n  "distraction_check": {\n    "is_distracted": true,\n    "reason": "娯楽系の動画を視聴しているため。",\n    "task_alignment": 0.1\n  },\n  "details": "猫の動画を視聴している。'
+  const v = extractJsonObject(raw)
+  assert.equal(v.category, "distracted")
+  assert.equal(v.distraction_check.is_distracted, true)
+  assert.equal(v.work_category, "娯楽")
+  assert.equal(v.details, "猫の動画を視聴している。")
+})
+
+test("extractJsonObject: キーの途中・コロンの直後で切れても、直前の項目までで読める", () => {
+  assert.deepEqual(extractJsonObject('{"a": 1, "b": {"c": true}, "de'), { a: 1, b: { c: true } })
+  assert.deepEqual(extractJsonObject('{"a": 1, "b":'), { a: 1 })
+  assert.deepEqual(extractJsonObject('{"a": [1, 2'), { a: [1, 2] })
+})
+
+test("extractJsonObject: エスケープされた引用符を含む文字列の途中で切れても読める", () => {
+  assert.deepEqual(extractJsonObject('{"a": "x\\"y'), { a: 'x"y' })
+})
+
+test("extractJsonObject: 完全な JSON・前置き文つき・JSON 無しの既存挙動は変わらない", () => {
+  assert.deepEqual(extractJsonObject('はい。{"a":{"b":2}} 以上'), { a: { b: 2 } })
+  assert.deepEqual(extractJsonObject('```json\n{"a":1}\n```'), { a: 1 })
+  assert.equal(extractJsonObject("no json here"), null)
+  assert.equal(extractJsonObject(""), null)
+})
