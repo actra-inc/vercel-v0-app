@@ -21,10 +21,10 @@ import { DEFAULT_NUDGE_PREFERENCES, MAX_ANALYSIS_RULES, MAX_ANALYSIS_RULE_LENGTH
 import type { AnalysisRule, WorkLog } from "@/lib/supabase"
 import { evaluateNudgeTick, initialNudgeState, snoozeBreak, type NudgeState } from "@/lib/nudge-logic"
 import { useLocalAi } from "@/hooks/use-local-ai"
-import { extractJsonObject, prewarmLocalAi, runLocalPrompt } from "@/lib/local-ai"
+import { prewarmLocalAi } from "@/lib/local-ai"
 import { buildAnalysisPrompt, normalizeAnalysis } from "@/lib/analysis-prompt"
 import { generateSummaryReportLocal } from "@/lib/local-reports"
-import { verifyTaskMatchLocal } from "@/lib/local-analysis"
+import { runAnalysisLocal, verifyTaskMatchLocal } from "@/lib/local-analysis"
 import { Textarea } from "@/components/ui/textarea"
 import {
   Dialog,
@@ -481,17 +481,18 @@ export function WorkLogPanel({
         })
 
         console.log("[v0] Running on-device analysis (nothing leaves this browser)")
-        let rawText: string
+        let parsed: any
         try {
-          rawText = await runLocalPrompt({
+          // 使えない応答（雛形の書き写し等）は runAnalysisLocal の中で 1 回だけやり直す
+          ;({ parsed } = await runAnalysisLocal({
             lang: language,
             image: resized,
-            text: prompt,
+            prompt,
             // JSON Schema は付けない（Gemini Nano では複雑なスキーマ指定がまれに失敗し、
-            // 付けない方が速い。出力は extractJsonObject → normalizeAnalysis で検証する）
+            // 付けない方が速い。出力は runAnalysisLocal（使えない応答はやり直し）→ normalizeAnalysis で検証する）
             // ハング時に isAnalyzing が固着しないようタイムアウトを設ける（実行開始から数える）
             timeoutMs: 90 * 1000,
-          })
+          }))
         } catch (e) {
           const msg = e instanceof Error ? e.message : String(e)
           console.warn("⚠️ On-device analysis failed:", msg)
@@ -499,9 +500,8 @@ export function WorkLogPanel({
           return
         }
 
-        const parsed = extractJsonObject(rawText)
         if (!parsed) {
-          // 応答のJSONが解釈できなかった（この回は保存しない）→ 次回に任せる
+          // 応答が判定として使えなかった（この回は保存しない。既定値の偽の記録を残さない）→ 次回に任せる
           console.warn("⚠️ AI response could not be parsed; skipping this capture")
           setLastAnalysisError(t('wlp_errParseFailed'))
           return

@@ -84,20 +84,19 @@ export function buildAnalysisPrompt(opts: AnalysisPromptOptions): string {
    予定作業が「未設定」のときは予定作業との比較はせず、2のような明らかな娯楽系のみ distracted とし、
    それ以外で判断がつかない場合は neutral とする。
 
-必須回答項目（JSON形式のみ、余計な説明不要。文章は${outputLang}で書く）：
-{
-  "activity": "画面で行われている主な活動（20文字以内。例：「コード編集」「資料作成」「ブラウザ閲覧」）",
-  "category": "productive/distracted/neutral のいずれか",
-  "work_category": "作業種類（次のいずれかから最も近いものを1つ選び、一覧の表記をそのまま書く。翻訳しない: ${categoriesList}）",
-  "confidence": 0.0〜1.0の数値,
-  "apps": ["画面に実際に表示されていて名前が読み取れるアプリ・サービス名のみ（最大5件。見えないものを推測で書かない）"],
-  "distraction_check": {
-    "is_distracted": true/false,
-    "reason": "判定の理由（30文字以内）",
-    "task_alignment": 0.0〜1.0の数値（予定作業とどれくらい関係があるかを表す）
-  },
-  "details": "画面の内容を自分の言葉で簡潔に説明（40文字以内。人名・メールアドレス・件名などの固有名詞は含めない）"
-}
+回答は次の形の JSON を1つだけ返す（余計な説明は不要。文章は${outputLang}で書く）。null の所に、画像を見て判断した値を入れる。下の「各項目の書き方」の説明文は書き写さない。
+{"activity": null, "category": null, "work_category": null, "confidence": null, "apps": [], "distraction_check": {"is_distracted": null, "reason": null, "task_alignment": null}, "details": null}
+
+各項目の書き方：
+- activity: 画面で行われている主な活動を20文字以内で（例：コード編集、資料作成、ブラウザ閲覧、SNS閲覧）
+- category: productive、distracted、neutral のどれか1語
+- work_category: 次の一覧から最も近いものを1つ選び、一覧の表記をそのまま書く。翻訳しない: ${categoriesList}
+- confidence: 0.0〜1.0の数値
+- apps: 画面に実際に表示されていて名前が読み取れるアプリ・サービス名のみ（最大5件。見えないものを推測で書かない）
+- distraction_check.is_distracted: true か false
+- distraction_check.reason: 判定の理由を30文字以内で
+- distraction_check.task_alignment: 予定作業とどれくらい関係があるかを表す0.0〜1.0の数値
+- details: 画面の内容を自分の言葉で簡潔に説明（40文字以内。人名・メールアドレス・件名などの固有名詞は含めない）
 
 判定基準：productive=予定作業に関連、distracted=明らかに無関係(ショッピング/SNS/動画等)、neutral=判断が難しい活動${englishNote}`
 }
@@ -193,7 +192,8 @@ const LEISURE_SITE_PATTERNS: Array<[string, LeisureKind, RegExp, RegExp?]> = [
   ["TikTok", "sns", /tiktok/i],
   ["Instagram", "sns", /instagram|インスタグラム/i],
   ["Facebook", "sns", /facebook|フェイスブック/i],
-  ["X (Twitter)", "sns", /twitter|ツイッター|(?<![\w.-])x\.com\b/i],
+  // apps に「X」だけ、activity が「Xのタイムライン閲覧」のように出る（2026-10-22 実モデル確認）。Xcode・XD などは除く
+  ["X (Twitter)", "sns", /twitter|ツイッター|(?<![\w.-])x\.com\b|^\s*x(?![a-z0-9])/i],
   ["ニコニコ", "video", /niconico|ニコニコ/i],
   ["Twitch", "video", /twitch/i],
   ["5ch", "forum", /(?<![\w.])5ch\b|５ちゃんねる|2ちゃんねる|2ch\.net/i],
@@ -257,6 +257,26 @@ function findLeisureSite(analysis: any): { name: string; kind: LeisureKind } | n
   return null
 }
 
+// モデルが画面を判定せず、プロンプトの説明文や雛形をそのまま返したときに出る語
+// （2026-10-22 実画面：activity が「画面で行われている主な活動（20文字以内。例：…）」の記録が 25 件中 23 件。
+//   脱線かどうかが読めず「集中度 50・脱線なし」で保存され、X なども素通りになった）
+const TEMPLATE_ECHO_MARKERS = /文字以内|例：|のどれか|のいずれか|0\.0〜1\.0|true か false|true\/false|書き写さない|一覧から|各項目の書き方/
+
+/**
+ * 判定として使えない応答か（雛形の書き写し・脱線かどうかが真偽値で無い・活動名が無い）。
+ * 使えない応答を正規化すると既定値（集中度 50・脱線なし）の偽の記録になるため、呼び出し側でやり直す
+ */
+export function isUnusableAnalysis(analysis: any): boolean {
+  if (!analysis || typeof analysis !== "object") return true
+  const dc = analysis.distraction_check
+  const isD = dc?.is_distracted
+  const boolish = typeof isD === "boolean" || (typeof isD === "string" && /^(true|false)$/i.test(isD.trim()))
+  if (!boolish) return true
+  if (typeof analysis.activity !== "string" || !analysis.activity.trim()) return true
+  const texts = [analysis.activity, analysis.details, dc?.reason, ...(Array.isArray(analysis.apps) ? analysis.apps : [])]
+  return texts.some((v) => typeof v === "string" && TEMPLATE_ECHO_MARKERS.test(v))
+}
+
 /** モデルの生 JSON を、DB に保存できる形へ正規化する（旧サーバールートと同じ規則） */
 export function normalizeAnalysis(analysis: any, ctx: NormalizeContext): AnalysisResult {
   const validCategory = resolveWorkCategory(analysis?.work_category, ctx.categories)
@@ -268,7 +288,12 @@ export function normalizeAnalysis(analysis: any, ctx: NormalizeContext): Analysi
   // 3) task_alignment 0.35 の閾値。1・2 はプロンプト側の指示としてモデルに渡しており、結果は
   // モデル自身が返す is_distracted に反映される設計にした（H-6）。そのためコード側は
   // 「モデルが真偽値で明示したかどうか」だけを見ればよい。
-  const modelIsDistracted = analysis?.distraction_check?.is_distracted
+  // "true" / "false" の文字列で返す回もあるので真偽値として読む
+  const rawIsDistracted = analysis?.distraction_check?.is_distracted
+  const modelIsDistracted =
+    typeof rawIsDistracted === "string" && /^(true|false)$/i.test(rawIsDistracted.trim())
+      ? rawIsDistracted.trim().toLowerCase() === "true"
+      : rawIsDistracted
   const modelSaidBoolean = typeof modelIsDistracted === "boolean"
   let isDistracted: boolean
   if (ctx.hasUserRules && modelSaidBoolean) {

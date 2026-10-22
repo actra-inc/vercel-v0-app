@@ -11,7 +11,6 @@ import { Progress } from "@/components/ui/progress"
 import { Cpu, Monitor, Upload, Download, RefreshCw, Loader2, ShieldCheck } from "lucide-react"
 import { useTranslation } from "@/lib/i18n"
 import { useLocalAi } from "@/hooks/use-local-ai"
-import { extractJsonObject, runLocalPrompt } from "@/lib/local-ai"
 import {
   DEFAULT_CATEGORY_NAMES,
   buildAnalysisPrompt,
@@ -19,7 +18,7 @@ import {
   type AnalysisResult,
 } from "@/lib/analysis-prompt"
 import type { TranslationKey } from "@/lib/translations/ja"
-import { verifyTaskMatchLocal } from "@/lib/local-analysis"
+import { runAnalysisLocal, verifyTaskMatchLocal } from "@/lib/local-analysis"
 
 // 端末内 AI の動作確認ページ（ログイン不要・DB に何も保存しない）。
 // 目的: ①この端末で Prompt API が使えるかの確認 ②モデルのダウンロード
@@ -118,10 +117,11 @@ export default function LocalAiCheckPage() {
     let result: AnalysisResult | null = null
     let error: string | null = null
     try {
-      raw = await runLocalPrompt({
+      // 本番（work-log-panel）と同じく、使えない応答は 1 回だけやり直す
+      const analysis = await runAnalysisLocal({
         lang: language,
         image,
-        text: buildAnalysisPrompt({
+        prompt: buildAnalysisPrompt({
           currentTask: task.trim(),
           categories: DEFAULT_CATEGORY_NAMES,
           userRules: [],
@@ -131,7 +131,8 @@ export default function LocalAiCheckPage() {
         // 本番（work-log-panel）と同じくスキーマ無しで投げる
         timeoutMs: 120_000,
       })
-      const parsed = extractJsonObject(raw)
+      raw = analysis.raw
+      const parsed = analysis.parsed
       if (parsed) {
         const firstStage = normalizeAnalysis(parsed, {
           currentTask: task.trim(),

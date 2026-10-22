@@ -13,6 +13,7 @@ import {
   parseTaskMatchAnswer,
   applyTaskMismatch,
   detectLeisureSite,
+  isUnusableAnalysis,
 } from "./analysis-prompt.ts"
 
 function baseCtx(overrides: Partial<NormalizeContext> = {}): NormalizeContext {
@@ -181,13 +182,15 @@ test("(d) currentTask が空文字なら、is_distracted 欠落 + task_alignment
   assert.equal(r.distraction_check.is_distracted, false)
 })
 
-test("is_distracted が型違い（文字列）のときも閾値補完の扱いになる", () => {
-  const r = normalizeAnalysis(
-    { distraction_check: { is_distracted: "true", task_alignment: 0.9 } },
-    baseCtx({ currentTask: "資料作成" }),
-  )
+test("is_distracted が \"true\" / \"false\" の文字列なら真偽値として読み、それ以外の文字列は閾値補完の扱いになる", () => {
+  // 2026-10-22: Nano が "true" を文字列で返す回があり、以前は無視して閾値補完していた（SNS 等が脱線にならない一因）
+  const asTrue = normalizeAnalysis({ distraction_check: { is_distracted: "true", task_alignment: 0.9 } }, baseCtx({ currentTask: "資料作成" }))
+  assert.equal(asTrue.distraction_check.is_distracted, true)
+  const asFalse = normalizeAnalysis({ distraction_check: { is_distracted: " FALSE ", task_alignment: 0.1 } }, baseCtx({ currentTask: "資料作成" }))
+  assert.equal(asFalse.distraction_check.is_distracted, false)
+  const other = normalizeAnalysis({ distraction_check: { is_distracted: "不明", task_alignment: 0.9 } }, baseCtx({ currentTask: "資料作成" }))
   // task_alignment が高いので閾値補完では distracted にならない
-  assert.equal(r.distraction_check.is_distracted, false)
+  assert.equal(other.distraction_check.is_distracted, false)
 })
 
 // ---- category と is_distracted の整合、reason の空文字フォールバック ----
@@ -566,4 +569,39 @@ test("normalizeAnalysis: 脱線ではないのに category が distracted なら
     baseCtx(),
   )
   assert.equal(other.category, "neutral")
+})
+
+// ---- 雛形の書き写し（2026-10-22 実画面：25 件中 23 件が「画面で行われている主な活動（20文字以内。例：…）」） ----
+
+const GOOD = { activity: "SNS閲覧", apps: ["X"], details: "投稿を見ている", distraction_check: { is_distracted: true, reason: "SNS", task_alignment: 0.1 } }
+
+test("isUnusableAnalysis: まともな応答は使える（is_distracted が文字列の true/false でもよい）", () => {
+  assert.equal(isUnusableAnalysis(GOOD), false)
+  assert.equal(isUnusableAnalysis({ ...GOOD, distraction_check: { ...GOOD.distraction_check, is_distracted: "false" } }), false)
+})
+
+test("isUnusableAnalysis: 説明文の書き写し・雛形の null・真偽値でない・活動名なしは使えない", () => {
+  assert.equal(isUnusableAnalysis({ ...GOOD, activity: "画面で行われている主な活動（20文字以内。例：「コード編集」）" }), true)
+  assert.equal(isUnusableAnalysis({ ...GOOD, details: "画面の内容を自分の言葉で簡潔に説明（40文字以内。…）" }), true)
+  assert.equal(isUnusableAnalysis({ ...GOOD, distraction_check: { ...GOOD.distraction_check, is_distracted: "true/false" } }), true)
+  assert.equal(isUnusableAnalysis({ ...GOOD, distraction_check: { ...GOOD.distraction_check, is_distracted: null } }), true)
+  assert.equal(isUnusableAnalysis({ ...GOOD, activity: null }), true)
+  assert.equal(isUnusableAnalysis({ ...GOOD, activity: "  " }), true)
+  assert.equal(isUnusableAnalysis(null), true)
+})
+
+test("buildAnalysisPrompt: 回答の雛形は値が null で、各項目の説明は雛形の外に書く", () => {
+  const p = buildAnalysisPrompt({ currentTask: "x", categories: DEFAULT_CATEGORY_NAMES, userRules: [], lang: "ja" } as any)
+  assert.match(p, /\{"activity": null, "category": null/)
+  assert.match(p, /"is_distracted": null/)
+  assert.match(p, /各項目の書き方：/)
+  assert.ok(!/"activity": "画面で行われている/.test(p))
+})
+
+test("detectLeisureSite: apps が「X」だけ、activity が「Xのタイムライン閲覧」でも X と判定する。Xcode・XD は除く", () => {
+  assert.equal(detectLeisureSite({ apps: ["X"] }), "X (Twitter)")
+  assert.equal(detectLeisureSite({ apps: ["Chrome"], activity: "Xのタイムライン閲覧" }), "X (Twitter)")
+  assert.equal(detectLeisureSite({ apps: ["Xcode"] }), null)
+  assert.equal(detectLeisureSite({ apps: ["Adobe XD"] }), null)
+  assert.equal(detectLeisureSite({ apps: ["XD"] }), null)
 })
