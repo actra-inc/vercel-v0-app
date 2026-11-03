@@ -709,6 +709,13 @@ export function WorkLogPanel({
     showCaptureInterruptedNotification(t('wlp_interruptedNotifTitle'), t('wlp_interruptedNotifBody'))
   }, [t])
 
+  // 共有は切れていないが、しばらくフレームを取れていない（スリープ明けに映像が戻らない等）。
+  // 画面ロック中にも起こり得るので、警告音は鳴らさず通知と表示だけにする
+  const handleStalled = useCallback(() => {
+    showCaptureInterruptedNotification(t('wlp_stalledNotifTitle'), t('wlp_stalledNotifBody'))
+    setLastAnalysisError(t('wlp_errStalled'))
+  }, [t])
+
   const {
     isTracking,
     isCapturing,
@@ -730,6 +737,7 @@ export function WorkLogPanel({
     onCapture: handleCapture,
     onError: handleError,
     onInterrupted: handleInterrupted,
+    onStalled: handleStalled,
   })
   useEffect(() => {
     isSourcePausedRef.current = isSourcePaused
@@ -790,6 +798,18 @@ export function WorkLogPanel({
     nudgeStateRef.current = snoozeBreak(nudgeStateRef.current, Date.now())
     setBreakBanner(null)
   }, [])
+
+  // 解析中にタブを閉じる・再読み込みする前に、ブラウザ標準の確認を出す
+  // （ページが消えると共有も止まり、通知も出せないため。alert/confirm と違い解析ループは止めない）
+  useEffect(() => {
+    if (!isTracking) return
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault()
+      e.returnValue = ""
+    }
+    window.addEventListener("beforeunload", onBeforeUnload)
+    return () => window.removeEventListener("beforeunload", onBeforeUnload)
+  }, [isTracking])
 
   // 中断していない＝現在解析対象の画面
   const activeScreens = screens.filter((sc) => !sc.interrupted)

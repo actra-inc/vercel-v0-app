@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useCallback, useRef, useEffect } from "react"
+import { WATCHDOG_TICK_MS, evaluateWatchdog, initialWatchdogState, recordFrame, type WatchdogState } from "@/lib/capture-watchdog"
 
 // 複数ディスプレイ対応:
 // getDisplayMedia は1回の呼び出しで1つの共有面しか取れない（ブラウザ仕様）。
@@ -78,6 +79,8 @@ interface UseScreenCaptureOptions {
   onError?: (error: Error) => void
   /** ユーザーの停止操作以外でストリームが終了したとき（ディスプレイの接続が外れた等） */
   onInterrupted?: () => void
+  /** 解析中なのに一定時間フレームを取れていないとき（スリープ明けに映像が戻らない等）。停滞 1 回につき 1 回 */
+  onStalled?: () => void
 }
 
 // 合成画像の長辺の上限（大きすぎる画像は解析APIのペイロードを無駄に膨らませる）
@@ -95,7 +98,7 @@ let screenIdCounter = 0
 const nextScreenId = () => `screen-${++screenIdCounter}-${Date.now()}`
 
 export function useScreenCapture(options: UseScreenCaptureOptions = {}) {
-  const { interval = 30000, quality = 0.8, onCapture, onError, onInterrupted } = options
+  const { interval = 30000, quality = 0.8, onCapture, onError, onInterrupted, onStalled } = options
 
   const [mediaStream, setMediaStream] = useState<MediaStream | null>(null)
   const [isTracking, setIsTracking] = useState(false)
@@ -112,6 +115,13 @@ export function useScreenCapture(options: UseScreenCaptureOptions = {}) {
   const [startError, setStartError] = useState<CaptureStartError | null>(null)
 
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
+  // 見張り（lib/capture-watchdog.ts）。キャプチャのタイマーと同時に動かし、同時に止める
+  const watchdogTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const watchdogStateRef = useRef<WatchdogState>(initialWatchdogState(0))
+  const intervalMsRef = useRef(interval)
+  useEffect(() => {
+    intervalMsRef.current = interval
+  }, [interval])
   const isCapturingRef = useRef(false)
   const streamsRef = useRef<StreamEntry[]>([])
   // 停止がユーザー起点かどうか。track の 'ended' はどちらでも発火するため、
@@ -123,11 +133,13 @@ export function useScreenCapture(options: UseScreenCaptureOptions = {}) {
   const onCaptureRef = useRef(onCapture)
   const onErrorRef = useRef(onError)
   const onInterruptedRef = useRef(onInterrupted)
+  const onStalledRef = useRef(onStalled)
   useEffect(() => {
     onCaptureRef.current = onCapture
     onErrorRef.current = onError
     onInterruptedRef.current = onInterrupted
-  }, [onCapture, onError, onInterrupted])
+    onStalledRef.current = onStalled
+  }, [onCapture, onError, onInterrupted, onStalled])
 
   // ---- 内部ユーティリティ --------------------------------------------------
 
@@ -158,6 +170,10 @@ export function useScreenCapture(options: UseScreenCaptureOptions = {}) {
     if (intervalRef.current) {
       clearInterval(intervalRef.current)
       intervalRef.current = null
+    }
+    if (watchdogTimerRef.current) {
+      clearInterval(watchdogTimerRef.current)
+      watchdogTimerRef.current = null
     }
   }
 
@@ -244,6 +260,15 @@ export function useScreenCapture(options: UseScreenCaptureOptions = {}) {
   // アンマウント時（タブ切り替え等）にストリームとインターバルを確実に解放する
   useEffect(() => {
     return () => {
+      // 共有中に画面ごと消えた（ログインが切れてログイン画面に戻った等）。黙って止めずに知らせる
+      if (streamsRef.current.length > 0 && !intentionalStopRef.current) {
+        console.warn("[capture] unmounted while sharing; notifying")
+        onInterruptedRef.current?.()
+      }
+      if (watchdogTimerRef.current) {
+        clearInterval(watchdogTimerRef.current)
+        watchdogTimerRef.current = null
+      }
       streamsRef.current.forEach((e) => {
         e.stream.getTracks().forEach((t) => t.stop())
         e.video.pause()
@@ -395,6 +420,7 @@ export function useScreenCapture(options: UseScreenCaptureOptions = {}) {
       const blob =
         frames.length === 1 ? await canvasToBlob(frames[0].canvas) : await composeFrames(frames)
       if (blob) {
+        watchdogStateRef.current = recordFrame(watchdogStateRef.current, Date.now())
         setLastCaptureTime(new Date())
         onCaptureRef.current?.(blob, { screenCount: frames.length })
       }
@@ -414,11 +440,34 @@ export function useScreenCapture(options: UseScreenCaptureOptions = {}) {
     tickRef.current = captureTick
   }, [captureTick])
 
+  // 見張りの 1 回分。スリープ明けなら共有の状態をすぐ確かめ、記録が止まっていれば知らせる
+  const watchdogTickRef = useRef<() => void>(() => {})
+  watchdogTickRef.current = () => {
+    if (streamsRef.current.length === 0) return
+    const { wokeFromSleep, stalled, next } = evaluateWatchdog(watchdogStateRef.current, Date.now(), intervalMsRef.current)
+    watchdogStateRef.current = next
+    if (wokeFromSleep) {
+      console.warn("[capture] watchdog: resumed after a long gap (sleep?); checking streams now")
+      // 'ended' が届かないまま終わっている共有を、ここで中断として扱う（警告音・通知・再開ボタン）
+      for (const e of [...streamsRef.current]) {
+        if (e.stream.getVideoTracks()[0]?.readyState === "ended" || !e.stream.active) handleScreenEnded(e.id, "proactive")
+      }
+      if (streamsRef.current.length > 0) tickRef.current()
+    }
+    if (stalled && streamsRef.current.length > 0) {
+      console.warn("[capture] watchdog: no frames for a while; notifying")
+      onStalledRef.current?.()
+    }
+  }
+
   const startIntervalTimer = useCallback((ms: number) => {
     clearIntervalTimer()
     intervalRef.current = setInterval(() => {
       tickRef.current()
     }, ms)
+    // 開始（または間隔の変更）時点を基準に見張りを始める
+    watchdogStateRef.current = initialWatchdogState(Date.now())
+    watchdogTimerRef.current = setInterval(() => watchdogTickRef.current(), WATCHDOG_TICK_MS)
   }, [])
 
   // トラッキング中にキャプチャ間隔の設定が変わったら、実際の周期にも反映する。

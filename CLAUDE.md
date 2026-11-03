@@ -24,6 +24,7 @@
 | `lib/local-reports.ts` | まとめレポート／日報を端末内 AI で生成。失敗時はログからの機械的レポート |
 | `lib/local-analysis.ts` | 画面解析の 1 段目の実行（`runAnalysisLocal`：雛形の書き写しなど使えない応答は 1 回だけやり直し、駄目なら記録しない）と 2 段目。1 段目で「脱線ではない」と出た回だけ、予定作業と同じ業務かを文字だけで確かめる（予定作業ありのとき。ユーザー定義ルールはプロンプトに渡して優先させる）。失敗時は 1 段目の判定のまま |
 | `components/work-log-panel.tsx` | キャプチャ → 差分スキップ（2%）→ 縮小（768px、2 画面合成時 1536px）→ 端末内推論 → 正規化 → `work_logs` へ保存。判定呼び出しには JSON Schema を付けない |
+| `hooks/use-screen-capture.ts`・`lib/capture-watchdog.ts` | 画面共有。共有が切れたら警告音・通知・「共有を再開」。見張り（15 秒ごと）がスリープ明けに共有の状態を確かめ、解析中なのにキャプチャ間隔 3 回分（最低 90 秒）フレームを取れなければ通知する。共有中に画面ごと消えた（ログイン切れ等）ときも通知する |
 | `components/local-ai-settings.tsx` | 設定タブ「端末内 AI」：利用可否・動作要件・モデルダウンロード |
 | `app/local-ai-check/page.tsx` | ログイン不要の動作確認ページ。DB に保存しない。機種チェックと 1 枚解析（所要時間・判定・生出力） |
 | `app/privacy/page.tsx`・`app/privacy/en/page.tsx` | プライバシーポリシー（日・英） |
@@ -75,7 +76,7 @@ NEXT_PUBLIC_SUPABASE_URL=https://placeholder.supabase.co NEXT_PUBLIC_SUPABASE_AN
    grep -rl "SERVICE_ROLE\|CRON_SECRET" .next/static/
    ```
 
-4. 翻訳キーの件数一致（ja と en が同数であること。現在 615）
+4. 翻訳キーの件数一致（ja と en が同数であること。現在 618）
 
    ```bash
    grep -cE "^  [A-Za-z0-9_]+:" lib/translations/ja.ts lib/translations/en.ts
