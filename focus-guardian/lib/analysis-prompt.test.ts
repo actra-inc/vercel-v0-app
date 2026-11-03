@@ -14,6 +14,7 @@ import {
   applyTaskMismatch,
   detectLeisureSite,
   isUnusableAnalysis,
+  isFlowNudgeScreen,
 } from "./analysis-prompt.ts"
 
 function baseCtx(overrides: Partial<NormalizeContext> = {}): NormalizeContext {
@@ -604,4 +605,49 @@ test("detectLeisureSite: apps が「X」だけ、activity が「Xのタイムラ
   assert.equal(detectLeisureSite({ apps: ["Xcode"] }), null)
   assert.equal(detectLeisureSite({ apps: ["Adobe XD"] }), null)
   assert.equal(detectLeisureSite({ apps: ["XD"] }), null)
+})
+
+// ---- X の画面をサイト名なしで書く回（2026-11-04 実モデル確認：NHKニュースの X アカウント） ----
+
+test("detectLeisureSite: activity「SNS閲覧」や、details の「公式Twitterページを閲覧」を拾う", () => {
+  assert.equal(detectLeisureSite({ apps: ["NHKニュース"], activity: "SNS閲覧" }), "SNS")
+  assert.equal(detectLeisureSite({ apps: ["NHKニュース"], activity: "ニュース閲覧", details: "NHKニュースの公式Twitterページを閲覧している。" }), "X (Twitter)")
+  assert.equal(detectLeisureSite({ apps: ["NHK"], activity: "情報収集", details: "NHKニュースのSNSアカウントの投稿を見ている。" }), "SNS")
+})
+
+test("detectLeisureSite: details の業務の文脈（API・実装・運用・広告など）や、閲覧の語が無い文は拾わない", () => {
+  assert.equal(detectLeisureSite({ apps: ["VS Code"], activity: "コード編集", details: "YouTube Data API を見ながら実装している。" }), null)
+  assert.equal(detectLeisureSite({ apps: ["Chrome"], activity: "資料作成", details: "SNS運用の報告資料を見て修正している。" }), null)
+  assert.equal(detectLeisureSite({ apps: ["Chrome"], activity: "資料作成", details: "Instagram のキャンペーン案を作っている。" }), null)
+  assert.equal(detectLeisureSite({ apps: ["Slack"], activity: "チャット", details: "チームと SNS の話をしている。" }), null)
+})
+
+// 「X のロゴ」等の見分け方をプロンプトに足すと、FlowNudge の画面を「X の投稿を閲覧」と読み違えた（2026-11-04、2 回中 1 回）。
+// 足さない版では X の画面 4/4・読み違い 0 だったため、見分け方は入れない
+test("buildAnalysisPrompt: SNS の見分け方（X のロゴ等）は入れない（読み違いを招くため）", () => {
+  const p = buildAnalysisPrompt({ currentTask: "x", categories: DEFAULT_CATEGORY_NAMES, userRules: [], lang: "ja" } as any)
+  assert.ok(!/X のロゴ/.test(p))
+})
+
+// ---- FlowNudge 自身の画面と、タブの見出しへの写り込み（2026-11-04 実モデル確認） ----
+
+test("isFlowNudgeScreen: 活動名に FlowNudge、またはアプリが FlowNudge だけのとき。X と並ぶだけなら違う", () => {
+  assert.equal(isFlowNudgeScreen({ apps: ["FlowNudge"], activity: "画面閲覧" }), true)
+  assert.equal(isFlowNudgeScreen({ apps: ["Chrome"], activity: "FlowNudge の画面" }), true)
+  assert.equal(isFlowNudgeScreen({ apps: ["FlowNudge", "X"], activity: "SNS閲覧" }), false)
+  assert.equal(isFlowNudgeScreen({ apps: [], activity: "画面閲覧" }), false)
+})
+
+test("detectLeisureSite: タブの見出しに FlowNudge が写り込んでいても、X が並んでいれば X と判定する", () => {
+  assert.equal(detectLeisureSite({ apps: ["FlowNudge", "X"], activity: "SNS閲覧" }), "X (Twitter)")
+})
+
+test("normalizeAnalysis: FlowNudge だけの画面はモデルが脱線と答えても脱線にせず、2 段目も行わない", () => {
+  const r = normalizeAnalysis(
+    { activity: "画面閲覧", apps: ["FlowNudge"], distraction_check: { is_distracted: true, task_alignment: 0.2, reason: "別の作業" } },
+    baseCtx({ currentTask: "unb)work" }),
+  )
+  assert.equal(r.distraction_check.is_distracted, false)
+  assert.equal(r.distraction_check.reason, "")
+  assert.equal(needsTaskMatchCheck(r, "unb)work"), false)
 })

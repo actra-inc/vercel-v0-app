@@ -198,6 +198,8 @@ const LEISURE_SITE_PATTERNS: Array<[string, LeisureKind, RegExp, RegExp?]> = [
   ["Twitch", "video", /twitch/i],
   ["5ch", "forum", /(?<![\w.])5ch\b|５ちゃんねる|2ちゃんねる|2ch\.net/i],
   ["まとめサイト", "forum", /まとめサイト/],
+  // サイト名を挙げず「SNS閲覧」「SNSアカウントの投稿を見ている」とだけ書く回がある（2026-11-04 実モデル確認、X の画面）
+  ["SNS", "sns", /(?<![a-z])sns(?![a-z])|ソーシャルメディア|social\s*media/i],
   ["Amazon", "shopping", /amazon|アマゾン/i, /\baws\b|web\s*services|seller\s*central|セラーセントラル|amazon\s*business|amazon\s*ビジネス|請求書|invoice|\bapi\b/i],
   ["楽天", "shopping", /楽天|rakuten/i, /銀行|証券|カード|bank|rms|api/i],
   ["Yahoo!ショッピング", "shopping", /yahoo!?\s*ショッピング|ヤフーショッピング|yahoo\s*shopping/i],
@@ -208,6 +210,8 @@ const LEISURE_SITE_PATTERNS: Array<[string, LeisureKind, RegExp, RegExp?]> = [
 // activity にサイト名が出ても、閲覧・視聴・買い物を表す語と一緒のときだけ判定に使う
 // （「YouTube Data API の実装」「Amazon の請求書ダウンロード」のような業務の文脈を脱線にしないため）
 const LEISURE_ACTIVITY_VERB = /視聴|閲覧|見て|検索|購入|買い物|ショッピング|商品|動画|タイムライン|投稿|watch|brows|view|shop|scroll|feed/i
+
+const DETAILS_WORK_CONTEXT = /api|開発|実装|コード|プログラム|設定|管理画面|studio|広告|分析|運用|請求|invoice|develop|code|admin|analytics/i
 
 // 予定作業そのものがその種類の活動を指すときは、サイトを見ていても脱線と確定しない
 // （2026-10-06 実画面テスト：予定作業「go back home, shopping」で Amazon を 7 回とも脱線と判定し警告音が鳴った）
@@ -243,12 +247,29 @@ export function isPlannedLeisure(analysis: any, currentTask: string): boolean {
   return !!site && taskCoversLeisure(currentTask, site.name, site.kind)
 }
 
+/**
+ * FlowNudge 自身の画面か（プロンプトの優先順位 3）。活動名に FlowNudge とある、または読み取れたアプリが FlowNudge だけのとき。
+ * ウィンドウ共有ではタブの見出しに「FlowNudge」が写り込むので、他のアプリ（X 等）と並んでいるだけでは FlowNudge の画面とみなさない
+ */
+export function isFlowNudgeScreen(analysis: any): boolean {
+  const apps: string[] = Array.isArray(analysis?.apps) ? analysis.apps.filter((a: unknown): a is string => typeof a === "string" && a.trim() !== "") : []
+  const activity = typeof analysis?.activity === "string" ? analysis.activity : ""
+  return /flownudge/i.test(activity) || (apps.length > 0 && apps.every((a) => /flownudge/i.test(a)))
+}
+
 function findLeisureSite(analysis: any): { name: string; kind: LeisureKind } | null {
   const apps: string[] = Array.isArray(analysis?.apps) ? analysis.apps.filter((a: unknown): a is string => typeof a === "string") : []
   const activity = typeof analysis?.activity === "string" ? analysis.activity : ""
-  if ([...apps, activity].some((t) => /flownudge/i.test(t))) return null
-  const candidates = [...apps]
+  if (isFlowNudgeScreen(analysis)) return null
+  // タブの見出しなどに写り込んだ「FlowNudge」は判定から外す（X と並んでいても X として判定する）
+  const candidates = apps.filter((a) => !/flownudge/i.test(a))
   if (LEISURE_ACTIVITY_VERB.test(activity)) candidates.push(activity)
+  // details は、閲覧・視聴の語を伴い、開発・業務の語を含まない文だけを見る
+  // （「NHKニュースの公式Twitterページを閲覧している」は拾い、「YouTube API の実装」は拾わない）
+  const details = typeof analysis?.details === "string" ? analysis.details : ""
+  for (const clause of details.split(/[。．.、,\n]/)) {
+    if (LEISURE_ACTIVITY_VERB.test(clause) && !DETAILS_WORK_CONTEXT.test(clause)) candidates.push(clause)
+  }
   for (const text of candidates) {
     for (const [name, kind, re, exclude] of LEISURE_SITE_PATTERNS) {
       if (re.test(text) && !exclude?.test(text)) return { name, kind }
@@ -321,6 +342,9 @@ export function normalizeAnalysis(analysis: any, ctx: NormalizeContext): Analysi
   // （プロンプトの但し書きだけでは Nano が守らず、予定「go back home, shopping」で楽天を脱線と答えた。2026-10-06）
   const plannedLeisure = !ctx.hasUserRules && isPlannedLeisure(analysis, ctx.currentTask)
   if (plannedLeisure) isDistracted = false
+  // FlowNudge 自身の画面は脱線にしない（優先順位 3）。モデルが守らない回があった（2026-11-04 実モデル確認：4 回中 1 回）
+  const flowNudgeScreen = !ctx.hasUserRules && !leisureSite && isFlowNudgeScreen(analysis)
+  if (flowNudgeScreen) isDistracted = false
 
   const rawReason =
     typeof analysis?.distraction_check?.reason === "string" ? analysis.distraction_check.reason.trim() : ""
@@ -330,7 +354,7 @@ export function normalizeAnalysis(analysis: any, ctx: NormalizeContext): Analysi
   // ただし、モデルが「脱線ではない」と真偽値で明示して理由を書かなかっただけなら空のままにする
   // （判定できているのに「判定できませんでした」と表示されて紛らわしかった）
   // モデルが脱線と答えていない回（モデルの理由は「関連」等で矛盾する）と、理由が空の回はサイト用の理由にする
-  const reason = plannedLeisure && modelIsDistracted === true
+  const reason = (plannedLeisure || flowNudgeScreen) && modelIsDistracted === true
     ? "" // モデルの理由（「買い物サイトのため脱線」等）は結論と矛盾するので残さない
     : leisureSite && (modelIsDistracted !== true || !rawReason)
     ? ctx.reasonLeisureSite ?? ctx.reasonLowAlignment
@@ -341,7 +365,7 @@ export function normalizeAnalysis(analysis: any, ctx: NormalizeContext): Analysi
   // サイトで脱線を確定した回は、集中度（task_alignment×100）も低く揃える
   const finalAlignment = leisureSite
     ? Math.min(taskAlignment, 0.2)
-    : plannedLeisure
+    : plannedLeisure || flowNudgeScreen
       ? Math.max(taskAlignment, 0.8)
       : taskAlignment
   const workCategory =
@@ -432,8 +456,9 @@ export interface TaskMatchInput {
  */
 export function needsTaskMatchCheck(result: AnalysisResult, currentTask: string): boolean {
   if (!currentTask.trim() || result.distraction_check.is_distracted) return false
-  // 予定作業どおりの買い物・動画など（1 段目でコード側が確定した回）は、2 段目で覆さない
-  return !isPlannedLeisure({ apps: result.applications, activity: result.activity }, currentTask)
+  // 予定作業どおりの買い物・動画など、FlowNudge 自身の画面（1 段目でコード側が確定した回）は、2 段目で覆さない
+  const shown = { apps: result.applications, activity: result.activity }
+  return !isPlannedLeisure(shown, currentTask) && !isFlowNudgeScreen(shown)
 }
 
 export function buildTaskMatchPrompt(input: TaskMatchInput): string {
