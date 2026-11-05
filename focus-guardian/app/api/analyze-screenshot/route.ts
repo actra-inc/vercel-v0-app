@@ -9,7 +9,7 @@ import { MAX_ANALYSIS_RULES, MAX_ANALYSIS_RULE_LENGTH } from "@/lib/config"
 export const maxDuration = 30
 
 // クライアントが model を指定しなかった場合のフォールバック既定モデル
-const DEFAULT_ANALYSIS_MODEL = "gemini-2.0-flash-lite"
+const DEFAULT_ANALYSIS_MODEL = "gemini-3.5-flash-lite"
 
 // URLのパス断片に埋め込むため、モデルIDとして妥当な文字列だけを通す
 const isValidModelId = (m: unknown): m is string =>
