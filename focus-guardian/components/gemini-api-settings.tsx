@@ -28,10 +28,10 @@ const MODEL_OPTIONS: Array<{
   recommended?: boolean
   estFreeRpd: number
 }> = [
-  { id: "gemini-3.5-flash-lite", descKey: "ga_modelDesc35FlashLite", recommended: true, estFreeRpd: 1000 },
-  { id: "gemini-3.1-flash-lite", descKey: "ga_modelDesc31FlashLite", estFreeRpd: 1000 },
-  { id: "gemini-3.5-flash", descKey: "ga_modelDesc35Flash", estFreeRpd: 250 },
-  { id: "gemini-3.7-flash", descKey: "ga_modelDesc37Flash", estFreeRpd: 250 },
+  { id: "gemini-2.0-flash-lite", descKey: "ga_modelDesc35FlashLite", recommended: true, estFreeRpd: 1000 },
+  { id: "gemini-2.0-flash", descKey: "ga_modelDesc35Flash", estFreeRpd: 250 },
+  { id: "gemini-1.5-flash", descKey: "ga_modelDesc37Flash", estFreeRpd: 250 },
+  { id: "gemini-1.5-flash-8b", descKey: "ga_modelDesc31FlashLite", estFreeRpd: 1000 },
 ]
 
 interface GeminiApiSettingsProps {

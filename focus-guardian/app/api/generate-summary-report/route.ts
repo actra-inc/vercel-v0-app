@@ -9,7 +9,7 @@ export const maxDuration = 30
 
 // クライアントが model を指定しなかった場合のフォールバック既定モデル。
 // 既定を Gemini 系へ切り替えるかはプロダクト判断のため、ここでは変更しない
-const DEFAULT_REPORT_MODEL = "gemma-4-26b-a4b-it"
+const DEFAULT_REPORT_MODEL = "gemini-2.0-flash-lite"
 
 // URLのパス断片に埋め込むため、モデルIDとして妥当な文字列だけを通す
 const isValidModelId = (m: unknown): m is string =>
